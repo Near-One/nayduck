@@ -1,2 +1,2 @@
-# nayduck
+# NayDuck
 Test Infra
