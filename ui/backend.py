@@ -2,7 +2,6 @@ from flask import Flask, session, flash, render_template, redirect, json, url_fo
 import os
 from flask_cors import CORS
 
-
 from db import DB
 
 app = Flask(__name__)
