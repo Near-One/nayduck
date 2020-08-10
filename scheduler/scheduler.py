@@ -8,7 +8,6 @@ app = Flask(__name__)
 
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-
 @app.route('/request_a_run', methods=['POST', 'GET'])
 def request_a_run():
     request_json = request.get_json(force=True) 
@@ -17,19 +16,19 @@ def request_a_run():
         return jsonify(resp)
     
     fetch = bash(f'''
-            rm -rf nearcore
-            git clone https://github.com/nearprotocol/nearcore
-            cd nearcore
+            rm -rf {os.getenv('FOLDER')}
+            git clone {os.getenv('GIT_REPO')}
+            cd {os.getenv('FOLDER')}
             git fetch 
             git checkout {request_json['sha']}
     ''')
     if fetch.returncode == 0:
         user = bash(f'''
-            cd nearcore
+            cd {os.getenv('FOLDER')}
             git log --format='%ae' {request_json['sha']}^!
         ''').stdout
         title = bash(f'''
-            cd nearcore
+            cd {os.getenv('FOLDER')}
             git log --format='%s' {request_json['sha']}^!
         ''').stdout
         tests = []
