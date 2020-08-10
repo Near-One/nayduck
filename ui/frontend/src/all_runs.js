@@ -5,7 +5,7 @@ import {
     HashRouter,
   } from "react-router-dom";
 
-import { ServerIp }  from "./common"
+import { ServerIp, GIT_REPO }  from "./common"
 
 
 function AllRuns () {
@@ -76,7 +76,7 @@ function AllRuns () {
           {filteredRuns.map((a_run,i) =>
             <tr key={a_run.id}>
               <td>{a_run.branch}<br/>
-                <a href={"https://github.com/nearprotocol/nearcore/commit/"+a_run.sha.slice(0,7)}>
+                <a href={GIT_REPO()+"/commit/"+a_run.sha.slice(0,7)}>
                     {a_run.sha.slice(0,7)}
                 </a>
               </td>
