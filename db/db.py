@@ -41,7 +41,10 @@ class DB ():
         return self.mycursor
 
     def get_pending_test(self, hostname):
-        sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
+        if "mocknet" in hostname:
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
+        else:
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
         res = self.execute_sql(sql, (hostname,))
         if res.rowcount == 0:
             return None
