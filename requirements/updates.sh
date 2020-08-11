@@ -12,6 +12,7 @@ sudo apt-get install python3-dev
 sudo apt install libpython3.7-dev
 curl https://sh.rustup.rs -sSf | sh
 source $HOME/.cargo/env
+rustup target add wasm32-unknown-unknown
 sudo apt-get install clang
 sudo apt-get install cmake
 sudo update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
