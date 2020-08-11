@@ -89,7 +89,7 @@ class DB ():
         for test in tests:
             if test["finished"] != None and test["started"] != None:
                 test["run_time"] = str(test["finished"] - test["started"])
-            sql = "SELECT type, full_size, storage from logs WHERE test_id = %s ORDER BY type"
+            sql = "SELECT type, full_size, storage, stack_trace from logs WHERE test_id = %s ORDER BY type"
             res = self.execute_sql(sql, (test["test_id"],))
             logs = res.fetchall()
             test["logs"] = []
