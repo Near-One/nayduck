@@ -20,13 +20,16 @@ AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
 def enough_space(filename="/datadrive"):
-    df = subprocess.Popen(["df", filename], stdout=subprocess.PIPE, universal_newlines=True)
-    output = df.communicate()[0]
-    pr = output.split()[11]
-    n_pr = int(str(pr)[:-1])
-    if n_pr >= 90:
+    try:
+        df = subprocess.Popen(["df", filename], stdout=subprocess.PIPE, universal_newlines=True)
+        output = df.communicate()[0]
+        pr = output.split()[11]
+        n_pr = int(str(pr)[:-1])
+        if n_pr >= 90:
+            return False
+        return True
+    except:
         return False
-    return True
 
 
 def prettify_size(size):
