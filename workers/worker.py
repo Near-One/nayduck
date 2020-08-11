@@ -19,6 +19,16 @@ FAIL_PATTERNS = ['stack backtrace:']
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
+def enough_space(filename="/datadrive"):
+    df = subprocess.Popen(["df", filename], stdout=subprocess.PIPE, universal_newlines=True)
+    output = df.communicate()[0]
+    pr = output.split()[11]
+    n_pr = int(str(pr)[:-1])
+    if n_pr >= 90:
+        return False
+    return True
+
+
 def prettify_size(size):
     if size < 1024: return size
     size //= 1024
@@ -188,6 +198,8 @@ def build(sha, thread_n, outdir):
         print('Woohoo! Skipping the build.')
         sys.stdout.flush()
         return 0
+    if not enough_space():
+        bld = bash(f'''rm -rf {thread_n}''')
     with open(str(outdir) + '/build_out', 'w') as fl_o:
         with open(str(outdir) + '/build_err', 'w') as fl_e:
             kwargs = {"stdout": fl_o, "stderr": fl_e}
