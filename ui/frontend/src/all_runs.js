@@ -50,7 +50,7 @@ function AllRuns () {
       );
     };
 
-    var cancelRun = id = event => {
+    var cancelRun = id => event => {
       fetch(ServerIp() + '/cancel_the_run', {
         headers : { 
           'Content-Type': 'application/json',
