@@ -14,7 +14,7 @@
     "react-scripts": "3.4.1"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "REACT_APP_GIT_REPO=$GIT_REPO REACT_APP_SERVER_IP=$SERVER_IP react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

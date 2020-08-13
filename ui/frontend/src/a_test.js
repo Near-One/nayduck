@@ -3,7 +3,7 @@ import {
     NavLink,
   } from "react-router-dom";
 
-import {RenderHistory, StatusColor, ServerIp, GIT_REPO} from "./common"
+import {RenderHistory, StatusColor, ServerIp, GitRepo} from "./common"
 
 function ATest (props) {
     const [aTest, setATest] = useState([]);
@@ -54,7 +54,7 @@ function ATest (props) {
         <br/><br/>
         <table className="big"><tbody>
             <tr><td style={{"width":"20%"}}>Commit</td><td>
-            {a_test.branch} (<a href={GIT_REPO()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
+            {a_test.branch} (<a href={GitRepo()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
             {a_test.title}<br/>
              by {a_test.user}
             </td></tr>

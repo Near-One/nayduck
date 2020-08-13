@@ -39,5 +39,10 @@ export function RenderHistory(a_run, title) {
 }
 
 export function ServerIp() {
-    return process.env.SERVER_IP
+    return process.env.REACT_APP_SERVER_IP
 }
+
+export function GitRepo() {
+    return process.env.REACT_APP_GIT_REPO
+}
+

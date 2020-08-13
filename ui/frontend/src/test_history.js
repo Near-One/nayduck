@@ -2,7 +2,7 @@ import React , { useState, useEffect  } from "react";
 import {
     NavLink,
   } from "react-router-dom";
-import {RenderHistory, ServerIp, GIT_REPO} from "./common"
+import {RenderHistory, ServerIp, GitRepo} from "./common"
 
 
 function status_color(status) {
@@ -89,7 +89,7 @@ function TestHistory (props) {
         </tr>
         {history.map((a_test,i) =>
             <tr key={a_test.test_id}>
-            <td>{a_test.branch} (<a href={GIT_REPO()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
+            <td>{a_test.branch} (<a href={GitRepo()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
             </td>
             <td> <NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
             <td>{a_test.user}</td>
