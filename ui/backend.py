@@ -53,6 +53,14 @@ def branch_history():
     history = [server.get_histoty_for_base_branch(test_id, branch)]
     return jsonify(history)
 
+@app.route('/cancel_the_run', methods=['POST', 'GET'])
+def cancel_the_run():
+    request_json = request.get_json(force=True) 
+    run_id = request_json['run_id']
+    server = DB()
+    server.cancel_the_run(run_id)
+    return jsonify({})
+
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=5005)

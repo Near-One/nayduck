@@ -12,7 +12,7 @@ function AllRuns () {
     const [allRuns, setAllRuns] = useState([]);
     
     const [filteredRuns, setFilteredRuns] = useState([])
-
+    
     useEffect(() => {
             fetch(ServerIp(), {
               headers : { 
@@ -50,6 +50,20 @@ function AllRuns () {
       );
     };
 
+    var cancelRun = id = event => {
+      fetch(ServerIp() + '/cancel_the_run', {
+        headers : { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+         },
+         method: 'POST',
+         body: JSON.stringify({'run_id': id}),
+        }).then((response) => response.json())
+        .then(data => {
+          console.log(data);
+      })
+    }
+
     return (
         <div className="App">
         <HashRouter>
@@ -72,6 +86,8 @@ function AllRuns () {
               <th>Pending</th>
               <th>Running</th>
               <th>Timeout</th>
+              <th>x</th>
+              
           </tr>
           {filteredRuns.map((a_run,i) =>
             <tr key={a_run.id}>
@@ -92,6 +108,8 @@ function AllRuns () {
               <td>{a_run.pending}</td>
               <td style={{"color": "blue"}}>{a_run.running}</td>
               <td style={{"color": "#f0a3aa"}}>{a_run.timeout}</td>
+              <td><button onClick={cancelRun(a_run.id)}>x</button></td>
+
             </tr>)
           }
           </tbody></table>

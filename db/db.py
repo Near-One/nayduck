@@ -57,6 +57,10 @@ class DB ():
         sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
         self.execute_sql(sql, (status, id))
 
+    def cancel_the_run(self, run_id, status="CANCELED"):
+        sql = "UPDATE tests SET finished = now(), status = %s WHERE run_id= %s and status='PENDING'"
+        self.execute_sql(sql, (status, run_id))
+
     def scheduling_a_run(self, branch, sha, user, title, tests):
         sql = "INSERT INTO runs (branch, sha, user, title) values (%s, %s, %s, %s)"
         result = self.execute_sql(sql, (branch, sha, user, title))
