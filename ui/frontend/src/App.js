@@ -24,5 +24,4 @@ function App() {
   </HashRouter>);
 }
 
-App.use(cors())
 export default App;
