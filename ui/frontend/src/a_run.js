@@ -63,7 +63,7 @@ function ARun (props) {
             </th>
             <th>Logs
             </th>
-            <th>Run Time</th>
+            <th>Test Time / Run Time</th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
@@ -82,7 +82,7 @@ function ARun (props) {
                  <a style={{"color": value.stack_trace ? "red" : "blue"}} href={value.storage}> {type + "(" + value.full_size + ")" } </a> 
               )}
             </td>
-            <td>{a_run.run_time}</td>
+            <td>{a_run.test_time} / {a_run.run_time}</td>
                 
             <td>{a_run.started}</td>
             <td>{a_run.finished}</td>

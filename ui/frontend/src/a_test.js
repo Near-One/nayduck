@@ -60,6 +60,7 @@ function ATest (props) {
             </td></tr>
             <tr><td>Test</td><td>{a_test.name}</td></tr>
             <tr><td>Run Time</td><td>{a_test.run_time}</td></tr>
+            <tr><td>Test Time</td><td>{a_test.test_time}</td></tr>
             <tr><td>Finished</td><td>{a_test.finished}</td></tr>
             <tr><td>Started</td><td>{a_test.started}</td></tr>
             <tr><td>Status</td><td style={{"color": StatusColor(a_test.status)}}>{a_test.status}</td></tr>

@@ -270,6 +270,7 @@ def keep_pulling(thread_n):
                 server.update_test_status('BUILD FAILED', test['test_id'])
                 save_logs(server, test['test_id'], outdir)
                 continue
+            server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(thread_n, outdir, test['name'].strip().split(' '))
             server = DB()
             server.update_test_status(code, test['test_id'])
