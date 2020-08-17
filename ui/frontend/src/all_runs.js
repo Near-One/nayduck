@@ -80,12 +80,12 @@ function AllRuns () {
             </th>
             <th>Passed</th>
             <th>Failed</th>
+              <th>Timeout</th>
               <th>Build fail</th>
               <th>Canceled</th>
               <th>Ignored</th>
               <th>Pending</th>
               <th>Running</th>
-              <th>Timeout</th>
               <th>x</th>
               
           </tr>
@@ -102,12 +102,12 @@ function AllRuns () {
               <td>{a_run.user}</td>
               <td style={{"color": "green"}}>{a_run.passed}</td>
               <td style={{"color": "red"}}>{a_run.failed}</td>
+              <td style={{"color": "#f0a3aa"}}>{a_run.timeout}</td>
               <td style={{"color": "#700610"}}>{a_run.build_failed}</td>
               <td>{a_run.canceled}</td>
               <td style={{"color": "grey"}}>{a_run.ignored}</td>
               <td>{a_run.pending}</td>
               <td style={{"color": "blue"}}>{a_run.running}</td>
-              <td style={{"color": "#f0a3aa"}}>{a_run.timeout}</td>
               <td><button onClick={cancelRun(a_run.id)}>x</button></td>
 
             </tr>)
