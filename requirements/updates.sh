@@ -11,8 +11,7 @@ echo -ne '\n' | sudo npm install -g npx
 echo -ne '\n' | npm install --save react-router-dom
 echo -ne '\n' | sudo apt-get install python3-dev
 echo -ne '\n' | sudo apt install libpython3.7-dev
-curl https://sh.rustup.rs -sSf > c
-sh c -y
+curl https://sh.rustup.rs -sSf | sh -- -y
 echo -ne '\n' | source $HOME/.cargo/env
 echo -ne '\n' | rustup target add wasm32-unknown-unknown
 echo -ne '\n' | sudo apt-get install clang

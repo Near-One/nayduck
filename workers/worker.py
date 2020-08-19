@@ -154,10 +154,10 @@ def save_logs(server, test_id, dir_name):
     for filename in os.listdir(dir_name):
         stack_trace = False
         data = ""
-        if os.path.isdir(os.path.join(dir_name, filename)) and "_finished" in filename:
+        if os.path.isdir(os.path.join(dir_name, filename)) and os.path.exists(os.path.join(dir_name, filename, "stderr")):
             fl = os.path.join(dir_name, filename, "stderr")
             fl_name = filename.split('_')[0]
-        else:
+        elif filename in ["stderr", "stdout", "build_err", "build_out"]:
             fl = os.path.join(dir_name, filename)
             fl_name = filename
         file_size = prettify_size(os.path.getsize(fl))
