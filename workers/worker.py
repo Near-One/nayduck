@@ -25,7 +25,7 @@ def enough_space(filename="/datadrive"):
         output = df.communicate()[0]
         pr = output.split()[11]
         n_pr = int(str(pr)[:-1])
-        if n_pr >= 90:
+        if n_pr >= 80:
             return False
         return True
     except:
@@ -199,6 +199,7 @@ def build(sha, thread_n, outdir):
     ''')
     print(already_exists)
     if not enough_space():
+        print("Not enough space.")
         bld = bash(f'''rm -rf {thread_n}''')
     with open(str(outdir) + '/build_out', 'w') as fl_o:
         with open(str(outdir) + '/build_err', 'w') as fl_e:
@@ -248,9 +249,9 @@ def keep_pulling(thread_n):
             server = DB()
             time.sleep(5)
             test = server.get_pending_test(hostname)
-            print(test)
             if not test:
                 continue
+            print(test)
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
