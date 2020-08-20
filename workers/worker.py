@@ -130,6 +130,8 @@ def run_test(thread_n, dir_name, test):
             print("Sending SIGINT to %s" % handle.pid)
             for child in psutil.Process(handle.pid).children(recursive=True):
                 child.terminate()
+            stdout.flush()
+            stderr.flush()
             handle.terminate()
             handle.communicate()
 
@@ -196,36 +198,23 @@ def build(sha, thread_n, outdir):
                     git rev-parse HEAD
     ''')
     print(already_exists)
-    sys.stdout.flush()
-    if already_exists.returncode == 0 and already_exists.stdout.strip() == sha:
-        print('Woohoo! Skipping the build.')
-        sys.stdout.flush()
-        return 0
     if not enough_space():
         bld = bash(f'''rm -rf {thread_n}''')
     with open(str(outdir) + '/build_out', 'w') as fl_o:
         with open(str(outdir) + '/build_err', 'w') as fl_e:
             kwargs = {"stdout": fl_o, "stderr": fl_e}
             bash('''docker build . -f pytest-runtime.Dockerfile -t pytest-runtime''')
-            if already_exists.returncode == 0:
+            print("Fetch")
+            bld = bash(f'''
+                cd {thread_n}
+                git fetch
+                git checkout {sha}
+            ''' , **kwargs, login=True)
+            print(bld)
+            if bld.returncode != 0:
+                print("Clone")
                 bld = bash(f'''
-                    cd {thread_n}
-                    git fetch
-                    git checkout {sha}
-                ''' , **kwargs, login=True)
-                print(bld)
-                if bld.returncode != 0:
-                    bld = bash(f'''
-                        rm -rf {thread_n}
-                        git clone https://github.com/nearprotocol/nearcore {thread_n}
-                        cd {thread_n}
-                        git checkout {sha}
-                    ''' , **kwargs, login=True)
-                    print(bld)
-                    if bld.returncode != 0:
-                        return build_fail_cleanup(bld, thread_n)
-            else:
-                bld = bash(f'''
+                    rm -rf {thread_n}
                     git clone https://github.com/nearprotocol/nearcore {thread_n}
                     cd {thread_n}
                     git checkout {sha}
@@ -233,6 +222,7 @@ def build(sha, thread_n, outdir):
                 print(bld)
                 if bld.returncode != 0:
                     return build_fail_cleanup(bld, thread_n)
+            print("Build")
             bld = bash(f'''
                 cd {thread_n}
                 cargo build -j2 -p neard --features adversarial
