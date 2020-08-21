@@ -192,12 +192,17 @@ def build_fail_cleanup(bld, thread_n):
     ''')
     return bld.returncode
 
-def build(sha, thread_n, outdir):
+def build(sha, thread_n, outdir, build_before):
     already_exists = bash(f'''
                     cd {thread_n}
                     git rev-parse HEAD
     ''')
     print(already_exists)
+    sys.stdout.flush()
+    if already_exists.returncode == 0 and already_exists.stdout.strip() == sha and build_before:
+        print('Woohoo! Skipping the build.')
+        sys.stdout.flush()
+        return 0
     if not enough_space():
         print("Not enough space.")
         bld = bash(f'''rm -rf {thread_n}''')
@@ -205,7 +210,7 @@ def build(sha, thread_n, outdir):
         with open(str(outdir) + '/build_err', 'w') as fl_e:
             kwargs = {"stdout": fl_o, "stderr": fl_e}
             bash('''docker build . -f pytest-runtime.Dockerfile -t pytest-runtime''')
-            print("Fetch")
+            print("Checkout")
             bld = bash(f'''
                 cd {thread_n}
                 git fetch
@@ -244,6 +249,7 @@ def build(sha, thread_n, outdir):
 
 def keep_pulling(thread_n):
     hostname = socket.gethostname()
+    build_before = False
     while True:
         try:
             server = DB()
@@ -255,12 +261,13 @@ def keep_pulling(thread_n):
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(test['sha'], thread_n, outdir)
+            code = build(test['sha'], thread_n, outdir, build_before)
             server = DB()
             if code != 0:
                 server.update_test_status('BUILD FAILED', test['test_id'])
                 save_logs(server, test['test_id'], outdir)
                 continue
+            build_before = True
             server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(thread_n, outdir, test['name'].strip().split(' '))
             server = DB()
