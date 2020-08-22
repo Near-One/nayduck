@@ -192,7 +192,7 @@ def build_fail_cleanup(bld, thread_n):
     ''')
     return bld.returncode
 
-def build(sha, thread_n, outdir, build_before):
+def build(sha, thread_n, outdir, build_before, hostname):
     already_exists = bash(f'''
                     cd {thread_n}
                     git rev-parse HEAD
@@ -228,6 +228,9 @@ def build(sha, thread_n, outdir, build_before):
                 print(bld)
                 if bld.returncode != 0:
                     return build_fail_cleanup(bld, thread_n)
+            if "mocknet" in hostname:
+                print("Skipping the build for mocknet tests")
+                return 0
             print("Build")
             bld = bash(f'''
                 cd {thread_n}
@@ -261,7 +264,7 @@ def keep_pulling(thread_n):
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(test['sha'], thread_n, outdir, build_before)
+            code = build(test['sha'], thread_n, outdir, build_before, hostname)
             server = DB()
             if code != 0:
                 server.update_test_status('BUILD FAILED', test['test_id'])
