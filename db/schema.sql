@@ -19,6 +19,8 @@ CREATE TABLE `runs` (
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `user` varchar(50) DEFAULT NULL,
   `title` varchar(200) DEFAULT NULL,
+  `type` varchar(50) DEFAULT NULL,
+  `requester` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=latin1;
 

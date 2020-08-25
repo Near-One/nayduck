@@ -45,7 +45,7 @@ def request_a_run():
                                   user=user.split('@')[0],
                                   title=title,
                                   tests=tests)
-        resp = {'code': 0, 'response': 'Success. ' + os.getenv('NAYDUCK_UI') + '/run/' + str(run_id)}
+        resp = {'code': 0, 'response': 'Success. ' + os.getenv('NAYDUCK_UI') + '/#/run/' + str(run_id)}
     else:
         resp = {'code': 1, 'response': 'Failure. ' + str(fetch.stderr)}
     return jsonify(resp)
