@@ -14,7 +14,7 @@ echo -ne '\n' | sudo apt install libpython3.7-dev
 curl https://sh.rustup.rs -sSf > c
 sh c -y
 echo -ne '\n' | source $HOME/.cargo/env
-echo -ne '\n' | rustup target add wasm32-unknown-unknown
+echo -ne '\n' | $HOME/.cargo/bin/rustup target add wasm32-unknown-unknown
 echo -ne '\n' | sudo apt-get install clang
 echo -ne '\n' | sudo apt-get install cmake
 echo -ne '\n' | sudo update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
