@@ -14,6 +14,15 @@ def request_a_run():
     if not request_json['branch'] or not request_json['sha']:
         resp = {'code': 1, 'response': 'Failure. Branch and/or git sha were not provided.'}
         return jsonify(resp)
+
+    if 'requester' in request_json:
+        requester = request_json['requester']
+    else:
+        requester = 'unknown'
+    if 'run_type' in request_json:
+        run_type = request_json['run_type']
+    else:
+        run_type = 'unknown'
     
     fetch = bash(f'''
             rm -rf {os.getenv('FOLDER')}
@@ -44,7 +53,9 @@ def request_a_run():
                                   sha=request_json['sha'],
                                   user=user.split('@')[0],
                                   title=title,
-                                  tests=tests)
+                                  tests=tests,
+                                  requester=requester,
+                                  run_type=run_type)
         resp = {'code': 0, 'response': 'Success. ' + os.getenv('NAYDUCK_UI') + '/#/run/' + str(run_id)}
     else:
         resp = {'code': 1, 'response': 'Failure. ' + str(fetch.stderr)}

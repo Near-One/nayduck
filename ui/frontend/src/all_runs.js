@@ -45,7 +45,7 @@ function AllRuns () {
       setFilteredRuns(
         allRuns.filter(
           item =>
-            (item[id].toLowerCase().includes(fltr)) 
+            (String(item[id]).toLowerCase().includes(fltr)) 
         )
       );
     };
@@ -76,8 +76,12 @@ function AllRuns () {
             <input style={{"width":"100%"}} type="text" name="filters" id="title" onChange={filterHandler} onClick={filterClick}/>
             </th>
             <th>User
-            <input style={{"width":"100%"}} type="text" name="filters" id="user" onChange={filterHandler} onClick={filterClick}/>
+            <input style={{"width":"100%"}} type="text" name="filters" id="requester" onChange={filterHandler} onClick={filterClick}/>
             </th>
+            <th>Run Type
+            <input style={{"width":"100%"}} type="text" name="filters" id="type" onChange={filterHandler} onClick={filterClick}/>
+            </th>
+            
             <th>Passed</th>
             <th>Failed</th>
               <th>Timeout</th>
@@ -99,7 +103,8 @@ function AllRuns () {
               <td>
                 <NavLink to={"/run/" + a_run.id} name="title">{a_run.title}</NavLink>
               </td>
-              <td>{a_run.user}</td>
+              <td>{a_run.requester}</td>
+              <td>{a_run.type}</td>
               <td style={{"color": "green"}}>{a_run.passed}</td>
               <td style={{"color": "red"}}>{a_run.failed}</td>
               <td style={{"color": "#f0a3aa"}}>{a_run.timeout}</td>

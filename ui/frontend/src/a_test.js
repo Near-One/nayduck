@@ -56,7 +56,7 @@ function ATest (props) {
             <tr><td style={{"width":"20%"}}>Commit</td><td>
             {a_test.branch} (<a href={GitRepo()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
             {a_test.title}<br/>
-             by {a_test.user}
+             requested by {a_test.requester}
             </td></tr>
             <tr><td>Test</td><td>{a_test.name}</td></tr>
             <tr><td>Run Time</td><td>{a_test.run_time}</td></tr>

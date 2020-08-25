@@ -65,9 +65,9 @@ class DB ():
         sql = "UPDATE tests SET finished = now(), status = %s WHERE run_id= %s and status='PENDING'"
         self.execute_sql(sql, (status, run_id))
 
-    def scheduling_a_run(self, branch, sha, user, title, tests):
-        sql = "INSERT INTO runs (branch, sha, user, title) values (%s, %s, %s, %s)"
-        result = self.execute_sql(sql, (branch, sha, user, title))
+    def scheduling_a_run(self, branch, sha, user, title, tests, requester, run_type):
+        sql = "INSERT INTO runs (branch, sha, user, title, requester, type) values (%s, %s, %s, %s, %s, %s)"
+        result = self.execute_sql(sql, (branch, sha, user, title, requester, run_type))
         run_id = result.lastrowid
         for test in tests:
             sql = "INSERT INTO tests (run_id, status, name) values (%s, %s, %s)"
