@@ -162,6 +162,8 @@ def save_logs(server, test_id, dir_name):
         elif filename in ["stderr", "stdout", "build_err", "build_out"]:
             fl = os.path.join(dir_name, filename)
             fl_name = filename
+        else:
+            continue
         file_size = prettify_size(os.path.getsize(fl))
         res = bash(f'''grep "stack backtrace:" {fl}''')
         if res.returncode == 0:
