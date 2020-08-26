@@ -96,8 +96,8 @@ function AllRuns () {
               <td>
                 <NavLink to={"/run/" + a_run.id} name="title">{a_run.title}</NavLink>
               </td>
-              <td>{a_run.requester}</td>
-              <td>{a_run.type}</td>
+              <td style={{"font-size": "x-small"}}>{a_run.requester}</td>
+              <td style={{"font-size": "x-small"}}>{a_run.type}</td>
               <td >
           
               { a_run.passed > 0 ? <div class="status" style={{"background": "green", }}>{a_run.passed} passed</div> : ''}
