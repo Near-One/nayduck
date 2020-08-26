@@ -128,6 +128,8 @@ def run_test(thread_n, dir_name, test):
         except subprocess.TimeoutExpired as e:
             stdout.flush()
             stderr.flush()
+            sys.stdout.flush()
+            sys.stderr.flush()
             outcome = 'TIMEOUT'
             print("Sending SIGINT to %s" % handle.pid)
             for child in psutil.Process(handle.pid).children(recursive=True):
