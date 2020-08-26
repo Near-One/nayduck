@@ -82,14 +82,7 @@ function AllRuns () {
             <input style={{"width":"100%"}} type="text" name="filters" id="type" onChange={filterHandler} onClick={filterClick}/>
             </th>
             
-            <th>Passed</th>
-            <th>Failed</th>
-              <th>Timeout</th>
-              <th>Build fail</th>
-              <th>Canceled</th>
-              <th>Ignored</th>
-              <th>Pending</th>
-              <th>Running</th>
+            <th width="40%">Status</th>
               <th>x</th>
               
           </tr>
@@ -105,16 +98,18 @@ function AllRuns () {
               </td>
               <td>{a_run.requester}</td>
               <td>{a_run.type}</td>
-              <td style={{"color": "green"}}>{a_run.passed}</td>
-              <td style={{"color": "red"}}>{a_run.failed}</td>
-              <td style={{"color": "#f0a3aa"}}>{a_run.timeout}</td>
-              <td style={{"color": "#700610"}}>{a_run.build_failed}</td>
-              <td>{a_run.canceled}</td>
-              <td style={{"color": "grey"}}>{a_run.ignored}</td>
-              <td>{a_run.pending}</td>
-              <td style={{"color": "blue"}}>{a_run.running}</td>
-              <td><button onClick={cancelRun(a_run.id)}>x</button></td>
-
+              <td >
+          
+              { a_run.passed > 0 ? <div class="status" style={{"background": "green", }}>{a_run.passed} passed</div> : ''}
+              { a_run.failed > 0 ? <div class="status" style={{"background": "red" , }}>{a_run.failed} failed </div> : ''}
+              { a_run.timeout > 0 ? <div class="status" style={{"background": "#f0a3aa", }}>{a_run.timeout} timeout </div> : ''}
+              { a_run.build_failed > 0 ? <div class="status" style={{"background": "#864E4E", }}>{a_run.build_failed} build failed </div> : ''}
+              { a_run.canceled > 0 ? <div class="status" style={{"background": "#FCF88C",}}> {a_run.canceled} canceled </div> : ''}
+              { a_run.ignored > 0 ? <div class="status" style={{"background": "grey", }}>{a_run.ignored} ignored</div> : ''}
+              { a_run.pending > 0 ? <div class="status" style={{"background": "#ED8CFC"}}> {a_run.pending} pending </div> : ''}
+              { a_run.running > 0 ? <div class="status" style={{"background": "#697DCB", }}>{a_run.running} running</div> : ''}
+              </td> 
+              <td><button onClick={cancelRun(a_run.id)}>x</button></td> 
             </tr>)
           }
           </tbody></table>

@@ -44,3 +44,12 @@ table th {
   background-color: #4CAF50;
   color: white;
 }
+
+.status {
+  display: inline-block;
+  margin: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  border-radius: 10px;
+  padding-right: 5px;
+}
