@@ -126,12 +126,12 @@ def run_test(thread_n, dir_name, test):
                         if '1 passed; 0 failed;' in lines[-1]:
                             outcome = 'PASSED'
         except subprocess.TimeoutExpired as e:
+            stdout.flush()
+            stderr.flush()
             outcome = 'TIMEOUT'
             print("Sending SIGINT to %s" % handle.pid)
             for child in psutil.Process(handle.pid).children(recursive=True):
                 child.terminate()
-            stdout.flush()
-            stderr.flush()
             handle.terminate()
             handle.communicate()
 
