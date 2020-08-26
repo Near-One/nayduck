@@ -88,7 +88,7 @@ function AllRuns () {
           </tr>
           {filteredRuns.map((a_run,i) =>
             <tr key={a_run.id}>
-              <td>{a_run.branch}<br/>
+              <td><p style={{"font-size": "x-small", "margin":"0"}}>{a_run.branch}</p>
                 <a href={GitRepo()+"/commit/"+a_run.sha.slice(0,7)}>
                     {a_run.sha.slice(0,7)}
                 </a>
