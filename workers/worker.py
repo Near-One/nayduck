@@ -85,8 +85,8 @@ def run_test(thread_n, dir_name, test):
 
         print("[RUNNING] %s %s" % (' '.join(test), ' '.join(cmd)))
 
-        stdout = open(os.path.join(dir_name, 'stdout'), 'w', 0)
-        stderr = open(os.path.join(dir_name, 'stderr'), 'w', 0)
+        stdout = open(os.path.join(dir_name, 'stdout'), 'w')
+        stderr = open(os.path.join(dir_name, 'stderr'), 'w')
 
         env = os.environ.copy()
         env["RUST_BACKTRACE"] = "1"
