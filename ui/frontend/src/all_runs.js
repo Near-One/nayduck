@@ -109,7 +109,7 @@ function AllRuns () {
               { a_run.pending > 0 ? <div class="status" style={{"background": "#ED8CFC"}}> {a_run.pending} pending </div> : ''}
               { a_run.running > 0 ? <div class="status" style={{"background": "#697DCB", }}>{a_run.running} running</div> : ''}
               </td> 
-              <td><button onClick={cancelRun(a_run.id)}>x</button></td> 
+              <td><button style={{"border-radius": "4px", "cursor": "pointer"}}onClick={cancelRun(a_run.id)}>x</button></td> 
             </tr>)
           }
           </tbody></table>
