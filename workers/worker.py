@@ -12,7 +12,6 @@ from multiprocessing import Process
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
 
-
 DEFAULT_TIMEOUT = 180
 NUMS = 1
 FAIL_PATTERNS = ['stack backtrace:']
@@ -58,6 +57,22 @@ def get_sequential_test_cmd(test):
         print(test)
         raise
 
+
+def install_new_packages(thread_n):
+    try:
+        print("Install new packages")
+        f = open(f'''{thread_n}/pytest/requirements.txt''', 'r')
+        required = {l.strip().lower() for l in f.readlines()}
+        p = bash(f'''pip3 freeze''')
+        rr = p.stdout.split('\n')
+        installed = {k.split('==')[0].lower() for k in rr if k}
+        missing = required - installed
+        print(missing)
+        if missing:
+            python = sys.executable
+            subprocess.check_call([python, '-m', 'pip', 'install', *missing], stdout=subprocess.DEVNULL)
+    except Exception as e:
+        print(e)
 
 def run_test(thread_n, dir_name, test):
     owd = os.getcwd()
@@ -275,6 +290,7 @@ def keep_pulling(thread_n):
                 save_logs(server, test['test_id'], outdir)
                 continue
             build_before = True
+            install_new_packages(thread_n)
             server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(thread_n, outdir, test['name'].strip().split(' '))
             server = DB()
