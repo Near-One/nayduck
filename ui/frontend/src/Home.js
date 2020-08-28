@@ -17,24 +17,11 @@ export default function Home() {
     return <Redirect to="/login" />;
   }
 
-  const { organizations_url } = state.user
-
   const handleLogout = () => {
     dispatch({
       type: "LOGOUT"
     });
   } 
-  fetch(//"https://api.github.com/users/abacabadabacaba/orgs", {
-      organizations_url, {
-  })
-    .then(response => response.json())
-    .then(data => {
-     for (var d of data) {
-        if (d["login"] == "nearprotocol") {
-            console.log("Welcome to Nay!");
-        }
-     }
-    });
   return (
       <div className="container">
         <button class="logout" onClick={()=> handleLogout()}>Logout</button>
