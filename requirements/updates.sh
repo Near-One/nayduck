@@ -8,7 +8,9 @@ echo -ne '\n' | sudo apt-get install --reinstall python3-apt
 echo -ne '\n' | sudo apt-get install nodejs
 echo -ne '\n' | sudo apt-get install npm
 echo -ne '\n' | sudo npm install -g npx
-echo -ne '\n' | npm install --save react-router-dom
+echo -ne '\n' | npm install --save react-router-dom mdi-react styled-components node-fetch url-search-params-polyfill
+
+echo -ne '\n' | npm audit fix
 echo -ne '\n' | sudo apt-get install python3-dev
 echo -ne '\n' | sudo apt install libpython3.7-dev
 curl https://sh.rustup.rs -sSf > c

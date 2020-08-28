@@ -53,3 +53,17 @@ table th {
   border-radius: 10px;
   padding-right: 5px;
 }
+
+.logout{
+  all: unset;
+  width: 100px;
+  height: 35px;
+  margin: 10px 10px 10px 10px;
+  align-self: flex-end;
+  background-color: #0041C2;
+  color: #fff;
+  text-align: center;
+  border-radius: 3px;
+  border: 1px solid #0041C2;
+  cursor: pointer;
+}
