@@ -106,19 +106,7 @@ const Wrapper = Styled.section`
       transition: 0.3s;
       width: 25%;
       height: 45%;
-      > h1 {
-        font-size: 2rem;
-        margin-bottom: 20px;
-      }
-      > span:nth-child(2) {
-        font-size: 1.1rem;
-        color: #808080;
-        margin-bottom: 70px;
-      }
-      > span:nth-child(3) {
-        margin: 10px 0 20px;
-        color: red;
-      }
+     
       .login-container {
         background-color: #000;
         width: 70%;
