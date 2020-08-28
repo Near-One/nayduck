@@ -21,6 +21,13 @@ CREATE TABLE `runs` (
   `title` varchar(200) DEFAULT NULL,
   `type` varchar(50) DEFAULT NULL,
   `requester` varchar(50) DEFAULT NULL,
+  `build_status` varchar(50) DEFAULT NULL,
+  `build_requested` timestamp NULL DEFAULT NULL,
+  `build_started` timestamp NULL DEFAULT NULL,
+  `build_finished` timestamp NULL DEFAULT NULL,
+  `build_stderr` blob,
+  `build_stdout` blob,
+  `ip` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=latin1;
 

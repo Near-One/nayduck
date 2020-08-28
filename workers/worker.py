@@ -6,14 +6,13 @@ import psutil
 import shutil
 from pathlib import Path, PurePath
 import time
-from db import DB
+from db_worker import DB
 from rc import bash, run
 from multiprocessing import Process
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
 
 DEFAULT_TIMEOUT = 180
-NUMS = 1
 FAIL_PATTERNS = ['stack backtrace:']
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
@@ -58,10 +57,10 @@ def get_sequential_test_cmd(test):
         raise
 
 
-def install_new_packages(thread_n):
+def install_new_packages():
     try:
         print("Install new packages")
-        f = open(f'''{thread_n}/pytest/requirements.txt''', 'r')
+        f = open(f'''nearcore/pytest/requirements.txt''', 'r')
         required = {l.strip().lower() for l in f.readlines()}
         p = bash(f'''pip3 freeze''')
         rr = p.stdout.split('\n')
@@ -74,14 +73,14 @@ def install_new_packages(thread_n):
     except Exception as e:
         print(e)
 
-def run_test(thread_n, dir_name, test):
+def run_test(dir_name, test):
     owd = os.getcwd()
     outcome = "FAILED"
     try:
         if test[0] == 'pytest' or test[0] == 'mocknet':
-            os.chdir(os.path.join(str(thread_n), 'pytest'))
+            os.chdir(os.path.join('nearcore', 'pytest'))
         else:
-            os.chdir(str(thread_n))
+            os.chdir('nearcore')
 
         timeout = DEFAULT_TIMEOUT
 
@@ -203,75 +202,14 @@ def save_logs(server, test_id, dir_name):
             s3 = blob_client.url
         print(s3) 
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace)
-            
 
-def build_fail_cleanup(bld, thread_n):
+def scp_build(run_id, ip):
     bash(f'''
-            rm -rf {thread_n}
-    ''')
-    return bld.returncode
+    rm -rf nearcore
+    scp -r -i ~/.ssh/nayduck_key.pem azureuser@{ip}:/datadriver/nayduck/workers/{run_id} nearcore''')
 
-def build(sha, thread_n, outdir, build_before, hostname):
-    already_exists = bash(f'''
-                    cd {thread_n}
-                    git rev-parse HEAD
-    ''')
-    print(already_exists)
-    sys.stdout.flush()
-    if already_exists.returncode == 0 and already_exists.stdout.strip() == sha and build_before:
-        print('Woohoo! Skipping the build.')
-        sys.stdout.flush()
-        return 0
-    if not enough_space():
-        print("Not enough space.")
-        bld = bash(f'''rm -rf {thread_n}''')
-    with open(str(outdir) + '/build_out', 'w') as fl_o:
-        with open(str(outdir) + '/build_err', 'w') as fl_e:
-            kwargs = {"stdout": fl_o, "stderr": fl_e}
-            bash('''docker build . -f pytest-runtime.Dockerfile -t pytest-runtime''')
-            print("Checkout")
-            bld = bash(f'''
-                cd {thread_n}
-                git fetch
-                git checkout {sha}
-            ''' , **kwargs, login=True)
-            print(bld)
-            if bld.returncode != 0:
-                print("Clone")
-                bld = bash(f'''
-                    rm -rf {thread_n}
-                    git clone https://github.com/nearprotocol/nearcore {thread_n}
-                    cd {thread_n}
-                    git checkout {sha}
-                ''' , **kwargs, login=True)
-                print(bld)
-                if bld.returncode != 0:
-                    return build_fail_cleanup(bld, thread_n)
-            if "mocknet" in hostname:
-                print("Skipping the build for mocknet tests")
-                return 0
-            print("Build")
-            bld = bash(f'''
-                cd {thread_n}
-                cargo build -j2 -p neard --features adversarial
-                cargo build -j2 -p genesis-populate
-                cargo build -j2 -p restaked
-            ''' , **kwargs, login=True)
-            print(bld)
-            if bld.returncode != 0:
-                return build_fail_cleanup(bld, thread_n)
-            bld = run(f'''cd {thread_n} && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive''', **kwargs)
-            if bld.returncode != 0:
-                return build_fail_cleanup(bld, thread_n)
-            bld = run(f'''cd {thread_n} && cargo build -j2 -p neard --target-dir normal_target''', **kwargs)
-            if bld.returncode != 0:
-                return build_fail_cleanup(bld, thread_n)
-            return 0    
-
-
-def keep_pulling(thread_n):
+def keep_pulling():
     hostname = socket.gethostname()
-    build_before = False
     while True:
         try:
             server = DB()
@@ -280,19 +218,13 @@ def keep_pulling(thread_n):
             if not test:
                 continue
             print(test)
+            scp_build(test['run_id'], test['ip'])
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(test['sha'], thread_n, outdir, build_before, hostname)
-            server = DB()
-            if code != 0:
-                server.update_test_status('BUILD FAILED', test['test_id'])
-                save_logs(server, test['test_id'], outdir)
-                continue
-            build_before = True
-            install_new_packages(thread_n)
+            install_new_packages()
             server.create_timestamp_for_test_started(test['test_id'])
-            code = run_test(thread_n, outdir, test['name'].strip().split(' '))
+            code = run_test(outdir, test['name'].strip().split(' '))
             server = DB()
             server.update_test_status(code, test['test_id'])
             save_logs(server, test['test_id'], outdir)
@@ -302,12 +234,4 @@ def keep_pulling(thread_n):
 if __name__ == "__main__":
     server = DB()
     server.handle_restart(socket.gethostname())
-    ps = []
-    for i in range(NUMS):
-        p = Process(target=keep_pulling, args=(i,))
-        p.start()
-        ps.append(p)
-
-    for p in ps:
-        p.join()
-        
+    keep_pulling()        
