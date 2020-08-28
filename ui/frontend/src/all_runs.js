@@ -1,4 +1,4 @@
-import React, { useState, useEffect  } from "react";
+import React, { useState, useEffect, useContext } from "react";
 
 import {
     NavLink,
@@ -6,12 +6,32 @@ import {
   } from "react-router-dom";
 
 import { ServerIp, GitRepo }  from "./common"
+import { AuthContext } from "./App";
+
 
 
 function AllRuns () {
+    const { state, dispatch } = useContext(AuthContext);
+
     const [allRuns, setAllRuns] = useState([]);
     
+    const [member, setMember] = useState([]);
+    
     const [filteredRuns, setFilteredRuns] = useState([])
+    
+    const { organizations_url } = state.user
+
+    fetch(organizations_url, {})
+    .then(response => response.json())
+    .then(data => {
+     for (var d of data) {
+        if (d["login"] == "nearprotocol") {
+            console.log("Welcome to Nay!");
+            setMember(true);
+        }
+     }
+    });
+  
     
     useEffect(() => {
             fetch(ServerIp(), {
@@ -83,7 +103,7 @@ function AllRuns () {
             </th>
             
             <th width="40%">Status</th>
-              <th>x</th>
+            { member > 0 ? <th>x</th>:''}
               
           </tr>
           {filteredRuns.map((a_run,i) =>
@@ -109,7 +129,7 @@ function AllRuns () {
               { a_run.pending > 0 ? <div class="status" style={{"background": "#ED8CFC"}}> {a_run.pending} pending </div> : ''}
               { a_run.running > 0 ? <div class="status" style={{"background": "#697DCB", }}>{a_run.running} running</div> : ''}
               </td> 
-              <td><button style={{"border-radius": "4px", "cursor": "pointer"}}onClick={cancelRun(a_run.id)}>x</button></td> 
+              { member > 0 ? <td><button style={{"border-radius": "4px", "cursor": "pointer"}}onClick={cancelRun(a_run.id)}>x</button></td> : ''}
             </tr>)
           }
           </tbody></table>
