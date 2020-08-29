@@ -61,7 +61,7 @@ export default function Login() {
     <Wrapper>
       <section className="container">
         <div>
-          <img src="duck.jpg"/>
+          <img style={{"width": "100%"}} src="duck.jpg"/>
           <span>{data.errorMessage}</span>
           <div className="login-container">
             {data.isLoading ? (
@@ -100,10 +100,7 @@ const Wrapper = Styled.section`
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.2);
-      transition: 0.3s;
-      width: 25%;
-      height: 45%;
+      width:100%;
      
       .login-container {
         background-color: #000;
@@ -112,6 +109,7 @@ const Wrapper = Styled.section`
         display: flex;
         align-items: center;
         justify-content: center;
+        width: 70%;
         > .login-link {
           text-decoration: none;
           color: #fff;
@@ -122,6 +120,7 @@ const Wrapper = Styled.section`
           height: 40px;
           > span:nth-child(2) {
             margin-left: 5px;
+            margin-right: 5px;
           }
         }
         .loader-container {
