@@ -100,7 +100,7 @@ const Wrapper = Styled.section`
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      width:100%;
+      width:45%;
      
       .login-container {
         background-color: #000;
@@ -109,15 +109,14 @@ const Wrapper = Styled.section`
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 70%;
+        
         > .login-link {
           text-decoration: none;
           color: #fff;
           text-transform: uppercase;
-          cursor: default;
+          cursor: pointer;
           display: flex;
           align-items: center;          
-          height: 40px;
           > span:nth-child(2) {
             margin-left: 5px;
             margin-right: 5px;
