@@ -69,7 +69,6 @@ export default function Login() {
                 <div className="loader"></div>
               </div>
             ) : (
-              <>
                 <a
                   className="login-link"
                   href={`https://github.com/login/oauth/authorize?scope=read:user&client_id=${client_id}&redirect_uri=${redirect_uri}`}
@@ -80,7 +79,6 @@ export default function Login() {
                   <GithubIcon />
                   <span>Login with GitHub</span>
                 </a>
-              </>
             )}
           </div>
         </div>
@@ -109,7 +107,6 @@ const Wrapper = Styled.section`
      
       .login-container {
         background-color: #000;
-        width: 70%;
         border-radius: 3px;
         color: #fff;
         display: flex;
