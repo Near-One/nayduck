@@ -4,6 +4,8 @@ const FormData = require("form-data");
 const fetch = require("node-fetch");
 const {URLSearchParams} = require('url')
 
+let access_token;
+
 const app = express();
 
 app.use(bodyParser.json());
@@ -33,7 +35,7 @@ app.post("/authenticate", (req, res) => {
     .then(response => response.text())
     .then(paramsString => {
       let params = new URLSearchParams(paramsString);
-      const access_token = params.get("access_token");
+      access_token = params.get("access_token");
       const scope = params.get("scope");
       const token_type = params.get("token_type");
       
@@ -45,6 +47,7 @@ app.post("/authenticate", (req, res) => {
     })
     .then(response => response.json())
     .then(response => {
+      response['token'] = access_token;
       return res.status(200).json(response);
     })
     .catch(error => {

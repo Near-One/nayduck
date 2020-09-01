@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Redirect } from "react-router-dom";
-import Styled from "styled-components";
 import GithubIcon from "mdi-react/GithubIcon";
 import { AuthContext } from "./App";
+import { LoginPage }  from "./common"
+
 
 
 export default function Login() {
@@ -57,94 +58,5 @@ export default function Login() {
     return <Redirect to="/" />;
   }
 
-  return (
-    <Wrapper>
-      <section className="container">
-        <div>
-          <img style={{"width": "100%"}} src="duck.jpg"/>
-          <span>{data.errorMessage}</span>
-          <div className="login-container">
-            {data.isLoading ? (
-              <div className="loader-container">
-                <div className="loader"></div>
-              </div>
-            ) : (
-                <a
-                  className="login-link"
-                  href={`https://github.com/login/oauth/authorize?scope=read:user&client_id=${client_id}&redirect_uri=${redirect_uri}`}
-                  onClick={() => {
-                    setData({ ...data, errorMessage: "" });
-                  }}
-                >
-                  <GithubIcon />
-                  <span>Login with GitHub</span>
-                </a>
-            )}
-          </div>
-        </div>
-      </section>
-    </Wrapper>
-  );
+  return LoginPage(client_id, redirect_uri, data, setData)
 }
-
-const Wrapper = Styled.section`
-  .container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    font-family: Arial;
-    
-    > div:nth-child(1) {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      width:45%;
-     
-      .login-container {
-        background-color: #000;
-        border-radius: 3px;
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        
-        > .login-link {
-          text-decoration: none;
-          color: #fff;
-          text-transform: uppercase;
-          cursor: pointer;
-          display: flex;
-          align-items: center;          
-          > span:nth-child(2) {
-            margin-left: 5px;
-            margin-right: 5px;
-          }
-        }
-        .loader-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;          
-          height: 40px;
-        }
-        .loader {
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #3498db;
-          border-radius: 50%;
-          width: 12px;
-          height: 12px;
-          animation: spin 2s linear infinite;
-        }
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-      }
-    }
-  }
-`;

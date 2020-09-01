@@ -1,5 +1,6 @@
 import mysql.connector
 import random
+import string
 
 import datetime
 import os
@@ -73,6 +74,27 @@ class DB ():
             sql = "INSERT INTO tests (run_id, status, name) values (%s, %s, %s)"
             self.execute_sql(sql, (run_id, "PENDING", test.strip()))
         return run_id
+
+    def get_auth_code(self, login):
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
+        sql = "SELECT id FROM users WHERE name=%s"
+        result = self.execute_sql(sql, (login,))
+        id = result.fetchone()
+        if id:
+            sql = "UPDATE users SET code=%s WHERE id=%s"
+            self.execute_sql(sql, (code, id['id']))
+        else:
+            sql = "INSERT INTO users (name, code) values (%s, %s)"
+            self.execute_sql(sql, (login, code))
+        return code
+ 
+    def get_github_login(self, token):
+        sql = "SELECT name FROM users WHERE code=%s"
+        result = self.execute_sql(sql, (token,))
+        login = result.fetchone()
+        if id:
+            return login['name']  
+        return None
 
     def get_all_runs(self):
         sql = "SELECT * FROM runs ORDER BY id desc LIMIT 100"

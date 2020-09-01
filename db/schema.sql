@@ -41,3 +41,10 @@ CREATE TABLE `tests` (
   CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7476 DEFAULT CHARSET=latin1;
 
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) DEFAULT NULL,
+  `name` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;

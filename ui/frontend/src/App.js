@@ -5,6 +5,8 @@ import {
   Switch
 } from "react-router-dom";
 import Login from "./Login";
+import LocalAuth from "./LocalAuth";
+import LocalAuthConfirmed from "./LocalAuthConfirmed";
 import Home from "./Home";
 import { initialState, reducer } from "./reducer";
 
@@ -29,7 +31,10 @@ function App() {
     <Router>
       <Switch>
         <Route path="/login" component={Login}/>
+        <Route path="/local_auth" component={LocalAuth}/>
+        <Route path="/local_auth_confirmed" component={LocalAuthConfirmed}/>
         <Route path="/" component={Home}/>
+        
       </Switch>
     </Router>
     </AuthContext.Provider>

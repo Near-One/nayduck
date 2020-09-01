@@ -4,6 +4,9 @@ export const initialState = {
     client_id: process.env.REACT_APP_CLIENT_ID,
     redirect_uri: process.env.REACT_APP_REDIRECT_URI,
     client_secret: process.env.REACT_APP_CLIENT_SECRET,
+    client_id_local: process.env.REACT_APP_CLIENT_ID_LOCAL,
+    redirect_uri_local: process.env.REACT_APP_REDIRECT_URI_LOCAL,
+    client_secret_local: process.env.REACT_APP_CLIENT_SECRET_LOCAL,
     proxy_url: process.env.REACT_APP_PROXY_URL
   };
   
@@ -20,6 +23,7 @@ export const initialState = {
         };
       }
       case "LOGOUT": {
+        
         localStorage.clear()
         return {
           ...state,

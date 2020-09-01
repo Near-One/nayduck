@@ -2,7 +2,7 @@ import React from "react";
 import {
     NavLink,
   } from "react-router-dom";
-
+import GithubIcon from "mdi-react/GithubIcon";
 
 export function StatusColor(status) {
     switch (status) {
@@ -46,3 +46,32 @@ export function GitRepo() {
     return process.env.REACT_APP_GIT_REPO
 }
 
+export function LoginPage(client_id, redirect_uri, data, setData) {
+    console.log(redirect_uri);
+    return (
+    <section className="section-login">
+        <div className="div-login">
+          <img style={{"width": "100%"}} src="duck.jpg"/>
+          <span>{data.errorMessage}</span>
+          <div className="github-login">
+             {data.isLoading ? (
+              <div className="loader-container">
+                <div className="loader"></div>
+              </div>
+            ) : (
+                <a
+                  className="login-link"
+                  href={`https://github.com/login/oauth/authorize?scope=read:user&client_id=${client_id}&redirect_uri=${redirect_uri}`}
+                  onClick={() => {
+                    setData({ ...data, errorMessage: "" });
+                  }}
+                >
+                  <GithubIcon />
+                  <span>Login with GitHub</span>
+                </a>
+            )}
+          </div>
+        </div>
+      </section>
+  );
+}

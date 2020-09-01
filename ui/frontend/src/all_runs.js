@@ -19,9 +19,12 @@ function AllRuns () {
     
     const [filteredRuns, setFilteredRuns] = useState([])
     
-    const { organizations_url } = state.user
-
-    fetch(organizations_url, {})
+    const { organizations_url , token } = state.user
+    fetch(organizations_url, {  
+      headers: new Headers({
+        'Authorization': 'token '+ token, 
+      }),
+    })
     .then(response => response.json())
     .then(data => {
      for (var d of data) {
@@ -43,7 +46,6 @@ function AllRuns () {
               .then(data => {
               setAllRuns(data);
               setFilteredRuns(data)
-              console.log(data);
             })
             
             .catch(function(err) {

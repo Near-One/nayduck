@@ -8,8 +8,6 @@ import AllRuns from "./all_runs";
 import ATest from "./a_test";
 import TestHistory from "./test_history";
   
-
-
 export default function Home() {
   const { state, dispatch } = useContext(AuthContext);
 
