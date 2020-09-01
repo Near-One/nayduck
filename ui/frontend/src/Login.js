@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Redirect } from "react-router-dom";
-import GithubIcon from "mdi-react/GithubIcon";
 import { AuthContext } from "./App";
 import { LoginPage }  from "./common"
-
 
 
 export default function Login() {

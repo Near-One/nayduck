@@ -67,11 +67,11 @@ function TestHistory (props) {
 
     return (
       <div>
-        <table style = {{"border" : "0px", "width": "40%"}}> <tbody><tr>
+        <table style={{"border" : "0px", "width": "40%"}}> <tbody><tr>
           {currentBranchHistory.map((current_test,j) => 
           <td style={{"border": "0px", "font-size":"10px"}}>{
             RenderHistory(current_test, ("This test history for branch " + currentBranch))}</td>)}
-          {baseBranch == currentBranch ? (null) : 
+          {baseBranch === currentBranch ? (null) : 
             baseBranchHistory.map((base_test,j) =>
             <td style={{"border": "0px", "font-size":"10px"}}>{RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
           }

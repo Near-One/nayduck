@@ -11,7 +11,7 @@ import { AuthContext } from "./App";
 
 
 function AllRuns () {
-    const { state, dispatch } = useContext(AuthContext);
+    const { state } = useContext(AuthContext);
 
     const [allRuns, setAllRuns] = useState([]);
     
@@ -28,7 +28,7 @@ function AllRuns () {
     .then(response => response.json())
     .then(data => {
      for (var d of data) {
-        if (d["login"] == "nearprotocol") {
+        if (d["login"] === "nearprotocol") {
             console.log("Welcome to Nay!");
             setMember(true);
         }
