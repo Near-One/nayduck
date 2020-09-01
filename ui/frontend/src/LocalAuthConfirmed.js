@@ -14,8 +14,7 @@ import { ServerIp }  from "./common"
   const { user } = state
   useEffect(() => {
     fetch(
-      "https://api.github.com/users/skidanovalex/orgs", {
-      //user.organizations_url, {  
+      user.organizations_url, {  
       headers: new Headers({
         'Authorization': 'token '+ user.token, 
       }),
