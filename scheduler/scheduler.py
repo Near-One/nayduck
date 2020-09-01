@@ -16,7 +16,7 @@ def request_a_run():
     #     resp = {'code': 1, 'response': 'Failure. Your client is too old. NayDuck requires Github auth. Sync your client to head.'}
     #     return jsonify(resp)
     server = DB()
-    if request_json['token']:
+    if 'token' in request_json:
         github_login = server.get_github_login(request_json['token'])
         if not github_login:
             resp = {'code': 1, 'response': 'Failure. NayDuck token is not found. Do not try to fake it.'}
