@@ -50,7 +50,7 @@ function ARun (props) {
 
     return (
       <div>
-        <table style = {{"border" : "0px", "width": "40%"}}> <tbody>
+        <table style={{"border" : "0px", "width": "40%"}}> <tbody>
           <tr><td style={{"border": "0px"}}><NavLink to={"/"}> Back To All Runs</NavLink></td></tr>
         </tbody></table>
     

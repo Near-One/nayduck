@@ -15,7 +15,6 @@ export const initialState = {
       case "LOGIN": {
         localStorage.setItem("isLoggedIn", JSON.stringify(action.payload.isLoggedIn))
         localStorage.setItem("user", JSON.stringify(action.payload.user))
-        console.log(action.payload.isLoggedIn)
         return {
           ...state,
           isLoggedIn: action.payload.isLoggedIn,
@@ -23,7 +22,6 @@ export const initialState = {
         };
       }
       case "LOGOUT": {
-        
         localStorage.clear()
         return {
           ...state,
