@@ -24,7 +24,7 @@ def enough_space(filename="/datadrive"):
         output = df.communicate()[0]
         pr = output.split()[11]
         n_pr = int(str(pr)[:-1])
-        if n_pr >= 80:
+        if n_pr >= 65:
             return False
         return True
     except:
