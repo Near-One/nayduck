@@ -76,14 +76,13 @@ class DB ():
         return run_id
 
     def get_auth_code(self, login):
-        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
-        sql = "SELECT id FROM users WHERE name=%s"
+        sql = "SELECT id, code FROM users WHERE name=%s"
         result = self.execute_sql(sql, (login,))
-        id = result.fetchone()
-        if id:
-            sql = "UPDATE users SET code=%s WHERE id=%s"
-            self.execute_sql(sql, (code, id['id']))
+        user = result.fetchone()
+        if user:
+            code = user['code']
         else:
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
             sql = "INSERT INTO users (name, code) values (%s, %s)"
             self.execute_sql(sql, (login, code))
         return code
