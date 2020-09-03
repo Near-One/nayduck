@@ -21,9 +21,6 @@ function AllRuns () {
     
     const { organizations_url , token } = state.user
     fetch(organizations_url, {  
-      headers: new Headers({
-        'Authorization': 'token '+ token, 
-      }),
     })
     .then(response => response.json())
     .then(data => {

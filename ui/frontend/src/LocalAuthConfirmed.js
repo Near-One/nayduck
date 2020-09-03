@@ -15,9 +15,6 @@ import { ServerIp }  from "./common"
   useEffect(() => {
     fetch(
       user.organizations_url, {  
-      headers: new Headers({
-        'Authorization': 'token '+ user.token, 
-      }),
     })
       .then(response => response.json())
       .then(data => {
