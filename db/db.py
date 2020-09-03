@@ -91,7 +91,7 @@ class DB ():
         sql = "SELECT name FROM users WHERE code=%s"
         result = self.execute_sql(sql, (token,))
         login = result.fetchone()
-        if id:
+        if login:
             return login['name']  
         return None
 
