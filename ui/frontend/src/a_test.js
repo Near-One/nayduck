@@ -69,7 +69,8 @@ function ATest (props) {
         {Object.entries(a_test.logs).map( ([key, value]) =>
         
         <tr><td style={{"width":"20%"}}>
-            <a style={{"color": value.stack_trace ? "red" : "blue"}} href={value.storage}>{key}</a></td>
+            <a style={{"color": value.stack_trace ? "red" : 
+                  "LONG DELAY" in String(value.patterns) ? "purple" : "blue"}} href={value.storage}>{key}</a></td>
             <td><textarea style={{"width":"100%", "height": "300px"}}>{value.log}</textarea></td></tr> 
         
         )}

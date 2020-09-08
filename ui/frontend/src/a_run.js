@@ -81,10 +81,9 @@ function ARun (props) {
             {RenderHistory(a_run)}
             </td>
             <td>
-              
                    {Object.entries(a_run.logs).map( ([type, value]) => 
                  <a style={{"color": value.stack_trace ? "red" : 
-                                     "LONG DELAY" in value.patterns ? "purple" : "blue"}} 
+                                     "LONG DELAY" in String(value.patterns) ? "purple" : "blue"}} 
                   href={value.storage}> {type + "(" + value.full_size + ")" } 
                  
                  </a> 
