@@ -70,7 +70,7 @@ function ATest (props) {
         
         <tr><td style={{"width":"20%"}}>
             <a style={{"color": value.stack_trace ? "red" : 
-                  String(value.patterns).includes("LONG DELAY") ? "purple" : "blue"}} href={value.storage}>{key}</a></td>
+                  String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}} href={value.storage}>{key}</a></td>
             <td><textarea style={{"width":"100%", "height": "300px"}}>{value.log}</textarea></td></tr> 
         
         )}
