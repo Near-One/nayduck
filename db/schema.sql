@@ -6,6 +6,7 @@ CREATE TABLE `logs` (
   `full_size` varchar(50) DEFAULT NULL,
   `storage` varchar(200) DEFAULT NULL,
   `stack_trace` tinyint(1) DEFAULT '0',
+  `patterns` varchar(200) DEFAULT NULL,
   KEY `test_id` (`test_id`),
   KEY `test_id_2` (`test_id`,`type`),
   KEY `test_id_3` (`test_id`,`type`) USING BTREE

@@ -15,6 +15,7 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 DEFAULT_TIMEOUT = 180
 NUMS = 1
 FAIL_PATTERNS = ['stack backtrace:']
+INTERESTING_PATTERNS = ["LONG DELAY"]
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
@@ -185,6 +186,11 @@ def save_logs(server, test_id, dir_name):
         res = bash(f'''grep "stack backtrace:" {fl}''')
         if res.returncode == 0:
             stack_trace = True
+        found_patterns = []
+        for pattern in INTERESTING_PATTERNS:
+            res = bash(f'''grep "{pattern}" {fl}''')
+            if res.returncode == 0:
+                found_patterns.append(pattern)
         blob_name = str(test_id) + "_" + fl_name
         s3 = ""
         with open(fl, 'rb') as f:
@@ -202,7 +208,7 @@ def save_logs(server, test_id, dir_name):
             blob_client.upload_blob(f, content_settings=cnt_settings)
             s3 = blob_client.url
         print(s3) 
-        server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace)
+        server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
 
 def build_fail_cleanup(bld, thread_n):

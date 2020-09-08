@@ -83,7 +83,11 @@ function ARun (props) {
             <td>
               
                    {Object.entries(a_run.logs).map( ([type, value]) => 
-                 <a style={{"color": value.stack_trace ? "red" : "blue"}} href={value.storage}> {type + "(" + value.full_size + ")" } </a> 
+                 <a style={{"color": value.stack_trace ? "red" : 
+                                     "LONG DELAY" in value.patterns ? "purple" : "blue"}} 
+                  href={value.storage}> {type + "(" + value.full_size + ")" } 
+                 
+                 </a> 
               )}
             </td>
             <td>{a_run.test_time} / {a_run.run_time}</td>

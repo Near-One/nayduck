@@ -19,7 +19,7 @@ function AllRuns () {
     
     const [filteredRuns, setFilteredRuns] = useState([])
     
-    const { organizations_url , token } = state.user
+    const { organizations_url } = state.user
     fetch(organizations_url, {  
     })
     .then(response => response.json())

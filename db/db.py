@@ -123,7 +123,7 @@ class DB ():
                 test["run_time"] = str(test["finished"] - test["started"])
             if test["test_started"] != None and test["finished"] != None:
                 test["test_time"] = str(test["finished"] - test["test_started"])
-            sql = "SELECT type, full_size, storage, stack_trace from logs WHERE test_id = %s ORDER BY type"
+            sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
             res = self.execute_sql(sql, (test["test_id"],))
             logs = res.fetchall()
             test["logs"] = []
@@ -145,7 +145,7 @@ class DB ():
         if blob:
             sql = "SELECT * from logs WHERE test_id = %s ORDER BY type"
         else:
-            sql = "SELECT type, full_size, storage, stack_trace from logs WHERE test_id = %s ORDER BY type"
+            sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
         res = self.execute_sql(sql, (test["test_id"],))
         logs = res.fetchall()
         test["logs"] = {}
@@ -207,9 +207,9 @@ class DB ():
             test.update(run_data)       
         return tests
             
-    def save_short_logs(self, test_id, filename, file_size, data, storage, stack_trace):
-        sql = "INSERT INTO logs (test_id, type, full_size, log, storage, stack_trace) VALUES (%s, %s, %s, %s, %s, %s)"
-        self.execute_sql(sql, (test_id, filename, file_size, data, storage, stack_trace))
+    def save_short_logs(self, test_id, filename, file_size, data, storage, stack_trace, found_patterns):
+        sql = "INSERT INTO logs (test_id, type, full_size, log, storage, stack_trace, patterns) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        self.execute_sql(sql, (test_id, filename, file_size, data, storage, stack_trace, found_patterns))
 
     def handle_restart(self, hostname):
         sql = "UPDATE tests SET started = null, status = 'PENDING', hostname=null  WHERE status = 'RUNNING' and hostname=%s"

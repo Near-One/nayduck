@@ -21,12 +21,14 @@ def request_a_run():
         if not github_login:
             resp = {'code': 1, 'response': 'Failure. NayDuck token is not found. Do not try to fake it.'}
             return jsonify(resp)
+        elif github_login == "NayDuck":
+                allowed = True
         else:
             allowed = False
             github_req = f'''https://api.github.com/users/{github_login}/orgs'''
             response = requests.get(github_req)
             for org in response.json():
-                if org['login'] == 'nearprotocol':
+                if "login" in org and org['login'] == 'nearprotocol':
                     allowed = True
                     break
             if not allowed:
