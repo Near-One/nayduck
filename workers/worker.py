@@ -75,7 +75,7 @@ def install_new_packages(thread_n):
     except Exception as e:
         print(e)
 
-def run_test(thread_n, dir_name, test):
+def run_test(thread_n, dir_name, test, remote=False):
     owd = os.getcwd()
     outcome = "FAILED"
     try:
@@ -89,6 +89,9 @@ def run_test(thread_n, dir_name, test):
         if len(test) > 1 and test[1].startswith('--timeout='):
             timeout = int(test[1][10:])
             test = [test[0]] + test[2:]
+
+        if remote:
+            timeout += 60 * 15
 
         cmd = get_sequential_test_cmd(test)
 
@@ -174,8 +177,13 @@ def save_logs(server, test_id, dir_name):
     for filename in os.listdir(dir_name):
         stack_trace = False
         data = ""
-        if os.path.isdir(os.path.join(dir_name, filename)) and os.path.exists(os.path.join(dir_name, filename, "stderr")):
-            fl = os.path.join(dir_name, filename, "stderr")
+        if os.path.isdir(os.path.join(dir_name, filename)) and ( 
+             os.path.exists(os.path.join(dir_name, filename, "stderr")) or 
+             os.path.exists(os.path.join(dir_name, filename, "remote.log"))):
+            if os.path.exists(os.path.join(dir_name, filename, "remote.log")):
+                fl = os.path.join(dir_name, filename, "remote.log")
+            else:
+                fl = os.path.join(dir_name, filename, "stderr")
             fl_name = filename.split('_')[0]
         elif filename in ["stderr", "stdout", "build_err", "build_out"]:
             fl = os.path.join(dir_name, filename)
@@ -217,7 +225,7 @@ def build_fail_cleanup(bld, thread_n):
     ''')
     return bld.returncode
 
-def build(sha, thread_n, outdir, build_before, hostname):
+def build(sha, thread_n, outdir, build_before, hostname, remote):
     already_exists = bash(f'''
                     cd {thread_n}
                     git rev-parse HEAD
@@ -256,6 +264,9 @@ def build(sha, thread_n, outdir, build_before, hostname):
             if "mocknet" in hostname:
                 print("Skipping the build for mocknet tests")
                 return 0
+            if remote:
+                print("Skipping the build for remote tests")
+                return 0
             print("Build")
             bld = bash(f'''
                 cd {thread_n}
@@ -289,7 +300,14 @@ def keep_pulling(thread_n):
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(test['sha'], thread_n, outdir, build_before, hostname)
+            remote = False
+            if "NEAR_PYTEST_CONFIG" in os.environ:
+                del os.environ["NEAR_PYTEST_CONFIG"]
+            if '--remote' in test['name']: 
+                remote = True
+                os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
+                test['name'] = test['name'].replace(' --remote', '')
+            code = build(test['sha'], thread_n, outdir, build_before, hostname, remote)
             server = DB()
             if code != 0:
                 server.update_test_status('BUILD FAILED', test['test_id'])
@@ -298,7 +316,7 @@ def keep_pulling(thread_n):
             build_before = True
             install_new_packages(thread_n)
             server.create_timestamp_for_test_started(test['test_id'])
-            code = run_test(thread_n, outdir, test['name'].strip().split(' '))
+            code = run_test(thread_n, outdir, test['name'].strip().split(' '), remote)
             server = DB()
             server.update_test_status(code, test['test_id'])
             save_logs(server, test['test_id'], outdir)

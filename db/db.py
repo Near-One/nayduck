@@ -155,11 +155,15 @@ class DB ():
             test["logs"][l["type"]] = l
         spl = test["name"].split(' ')
         test["type"] = spl[0]
-        if spl[1].startswith("--"):
-            test["args"] = spl[1]
-            test["test"] = ' '.join(spl[2:])
-        else:
-            test["test"] = ' '.join(spl[1:])
+        args = []
+        test_l = []
+        for s in spl:
+            if s.startswith("--"):
+                args.append(s)
+            else:
+                test_l.append(s)
+        test["args"] = ' '.join(args)
+        test["test"] = ' '.join(test_l)
         if test["finished"] != None and test["started"] != None:
             test["run_time"] = str(test["finished"] - test["started"])
         if test["test_started"] != None and test["finished"] != None:
