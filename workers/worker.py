@@ -266,7 +266,13 @@ def build(sha, thread_n, outdir, build_before, hostname, remote, release):
                 print("Skipping the build for mocknet tests")
                 return 0
             if remote:
-                print("Skipping the build for remote tests")
+                print("Build for remote.")
+                bld = bash(f'''
+                    cd nearcore
+                    cargo build -j2 -p neard --features adversarial
+                ''' , **kwargs, login=True)
+                if bld.returncode != 0:
+                    return build_fail_cleanup(bld, thread_n)
                 return 0
             print("Build")
             bld = bash(f'''
