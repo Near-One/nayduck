@@ -9,6 +9,7 @@ import time
 from db import DB
 from rc import bash, run
 from multiprocessing import Process
+import json
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
 
@@ -225,7 +226,7 @@ def build_fail_cleanup(bld, thread_n):
     ''')
     return bld.returncode
 
-def build(sha, thread_n, outdir, build_before, hostname, remote):
+def build(sha, thread_n, outdir, build_before, hostname, remote, release):
     already_exists = bash(f'''
                     cd {thread_n}
                     git rev-parse HEAD
@@ -270,17 +271,17 @@ def build(sha, thread_n, outdir, build_before, hostname, remote):
             print("Build")
             bld = bash(f'''
                 cd {thread_n}
-                cargo build -j2 -p neard --features adversarial
-                cargo build -j2 -p genesis-populate
-                cargo build -j2 -p restaked
+                cargo build -j2 -p neard --features adversarial {release}
+                cargo build -j2 -p genesis-populate {release}
+                cargo build -j2 -p restaked {release}
             ''' , **kwargs, login=True)
             print(bld)
             if bld.returncode != 0:
                 return build_fail_cleanup(bld, thread_n)
-            bld = run(f'''cd {thread_n} && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive''', **kwargs)
+            bld = run(f'''cd {thread_n} && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive {release}''', **kwargs)
             if bld.returncode != 0:
                 return build_fail_cleanup(bld, thread_n)
-            bld = run(f'''cd {thread_n} && cargo build -j2 -p neard --target-dir normal_target''', **kwargs)
+            bld = run(f'''cd {thread_n} && cargo build -j2 -p neard --target-dir normal_target {release}''', **kwargs)
             if bld.returncode != 0:
                 return build_fail_cleanup(bld, thread_n)
             return 0    
@@ -301,13 +302,26 @@ def keep_pulling(thread_n):
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
             remote = False
+            config_override = {}
             if "NEAR_PYTEST_CONFIG" in os.environ:
                 del os.environ["NEAR_PYTEST_CONFIG"]
             if '--remote' in test['name']: 
                 remote = True
+                config_override['local'] = False
+                config_override['preexist'] = True
                 os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
                 test['name'] = test['name'].replace(' --remote', '')
-            code = build(test['sha'], thread_n, outdir, build_before, hostname, remote)
+            release = ""
+            if '--release' in test['name']:
+                release = "--release"
+                config_override['release'] = True
+                os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
+                test['name'] = test['name'].replace(' --release', '')
+            if "NEAR_PYTEST_CONFIG" in os.environ:
+                with open("/datadrive/nayduck/.remote", "w") as f:
+                    json.dump(config_override, f)
+
+            code = build(test['sha'], thread_n, outdir, build_before, hostname, remote, release)
             server = DB()
             if code != 0:
                 server.update_test_status('BUILD FAILED', test['test_id'])
