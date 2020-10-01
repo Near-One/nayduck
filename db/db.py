@@ -23,11 +23,11 @@ class DB ():
 
     def execute_sql(self, sql, val):
         try:
-            print(sql, val)
             self.mycursor.execute(sql, val)
             self.mydb.commit()
         except mysql.connector.errors.DatabaseError as e:
             try:
+                print(sql, val)
                 print(e)
                 self.mycursor.close()
                 self.mydb.close()

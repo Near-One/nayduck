@@ -268,7 +268,7 @@ def build(sha, thread_n, outdir, build_before, hostname, remote, release):
             if remote:
                 print("Build for remote.")
                 bld = bash(f'''
-                    cd nearcore
+                    cd {thread_n}
                     cargo build -j2 -p neard --features adversarial
                 ''' , **kwargs, login=True)
                 if bld.returncode != 0:
