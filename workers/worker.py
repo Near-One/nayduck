@@ -134,6 +134,8 @@ def run_test(thread_n, dir_name, test, remote=False):
                             if line.strip() in FAIL_PATTERNS:
                                 outcome = 'FAILED'
                                 break
+            elif ret == 13:
+                return 'POSTPONE'
             else:
                 outcome = 'FAILED'
                 with open(os.path.join(dir_name, 'stdout')) as f:
@@ -338,6 +340,9 @@ def keep_pulling(thread_n):
             server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(thread_n, outdir, test['name'].strip().split(' '), remote)
             server = DB()
+            if code == 'POSTPONE':
+                server.remark_test_pending(test['test_id'])
+                continue
             server.update_test_status(code, test['test_id'])
             save_logs(server, test['test_id'], outdir)
         except Exception as e:

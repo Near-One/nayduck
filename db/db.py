@@ -1,6 +1,7 @@
 import mysql.connector
 import random
 import string
+import time
 
 import datetime
 import os
@@ -42,11 +43,12 @@ class DB ():
         return self.mycursor
 
     def get_pending_test(self, hostname):
+        after = int(time.time())
         if "mocknet" in hostname:
-            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and @tmp_id := test_id and select_after < %s ORDER BY test_id LIMIT 1 "
         else:
-            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
-        res = self.execute_sql(sql, (hostname,))
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and @tmp_id := test_id and select_after < %s ORDER BY test_id LIMIT 1 "
+        res = self.execute_sql(sql, (hostname, after))
         if res.rowcount == 0:
             return None
         sql = "SELECT t.test_id, t.run_id, r.sha, t.name FROM tests t, runs r WHERE t.test_id = @tmp_id and t.run_id = r.id"
@@ -62,6 +64,11 @@ class DB ():
         sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
         self.execute_sql(sql, (status, id))
 
+    def remark_test_pending(self, id):
+        after = int(time.time()) + 3*60
+        sql = "UPDATE tests SET started = null, hostname=null, status='PENDING', select_after=%s WHERE test_id= %s"
+        self.execute_sql(sql, (after, id))
+
     def cancel_the_run(self, run_id, status="CANCELED"):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE run_id= %s and status='PENDING'"
         self.execute_sql(sql, (status, run_id))
@@ -70,9 +77,10 @@ class DB ():
         sql = "INSERT INTO runs (branch, sha, user, title, requester, type) values (%s, %s, %s, %s, %s, %s)"
         result = self.execute_sql(sql, (branch, sha, user, title, requester, run_type))
         run_id = result.lastrowid
+        after = int(time.time())
         for test in tests:
-            sql = "INSERT INTO tests (run_id, status, name) values (%s, %s, %s)"
-            self.execute_sql(sql, (run_id, "PENDING", test.strip()))
+            sql = "INSERT INTO tests (run_id, status, name, select_after) values (%s, %s, %s, %s)"
+            self.execute_sql(sql, (run_id, "PENDING", test.strip(), after))
         return run_id
 
     def get_auth_code(self, login):

@@ -35,6 +35,7 @@ CREATE TABLE `tests` (
   `finished` timestamp NULL DEFAULT NULL,
   `hostname` varchar(50) DEFAULT NULL,
   `test_started` timestamp NULL DEFAULT NULL,
+  `select_after` int(11) DEFAULT NULL,
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),
   KEY `name` (`name`),
