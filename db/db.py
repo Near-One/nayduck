@@ -45,9 +45,9 @@ class DB ():
     def get_pending_test(self, hostname):
         after = int(time.time())
         if "mocknet" in hostname:
-            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and @tmp_id := test_id and select_after < %s ORDER BY test_id LIMIT 1 "
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
         else:
-            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and @tmp_id := test_id and select_after < %s ORDER BY test_id LIMIT 1 "
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
         res = self.execute_sql(sql, (hostname, after))
         if res.rowcount == 0:
             return None
