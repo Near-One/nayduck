@@ -47,7 +47,7 @@ class DB ():
         if "mocknet" in hostname:
             sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
         else:
-            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
+            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY priority, test_id LIMIT 1 "
         res = self.execute_sql(sql, (hostname, after))
         if res.rowcount == 0:
             return None
@@ -79,8 +79,12 @@ class DB ():
         run_id = result.lastrowid
         after = int(time.time())
         for test in tests:
-            sql = "INSERT INTO tests (run_id, status, name, select_after) values (%s, %s, %s, %s)"
-            self.execute_sql(sql, (run_id, "PENDING", test.strip(), after))
+            if requester == 'NayDuck':
+                priority = 1
+            else:
+                priority = 0
+            sql = "INSERT INTO tests (run_id, status, name, select_after, priority) values (%s, %s, %s, %s, %s)"
+            self.execute_sql(sql, (run_id, "PENDING", test.strip(), after, priority))
         return run_id
 
     def get_auth_code(self, login):
