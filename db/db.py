@@ -47,8 +47,8 @@ class DB ():
         if "mocknet" in hostname:
             sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
         else:
-            sql = "UPDATE tests SET started = now(), status = 'RUNNING', hostname=%s  WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and select_after < %s and @tmp_id := test_id ORDER BY test_id LIMIT 1 "
-        res = self.execute_sql(sql, (hostname, after))
+            sql = "UPDATE tests AS a, (SELECT test_id FROM tests WHERE status = 'PENDING' and name NOT LIKE '%mocknet%' and select_after < %s ORDER BY priority, test_id LIMIT 1) AS b SET a.started = now(), a.status = 'RUNNING', a.hostname=%s WHERE a.test_id=b.test_id and @tmp_id := b.test_id"
+        res = self.execute_sql(sql, (after, hostname))
         if res.rowcount == 0:
             return None
         sql = "SELECT t.test_id, t.run_id, r.sha, t.name FROM tests t, runs r WHERE t.test_id = @tmp_id and t.run_id = r.id"
