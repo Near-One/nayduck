@@ -176,23 +176,21 @@ def save_logs(server, test_id, dir_name):
     blob_size = 1024
     blob_service_client = BlobServiceClient.from_connection_string(AZURE)
     cnt_settings = ContentSettings(content_type="text/plain")
-
+    files = []
     for filename in os.listdir(dir_name):
+        if os.path.isdir(os.path.join(dir_name, filename)):
+            fl_name = filename.split('_')[0]
+            if os.path.exists(os.path.join(dir_name, filename, "remote.log")):
+                files.append((fl_name + "_remote", os.path.join(dir_name, filename, "remote.log")))
+            if os.path.exists(os.path.join(dir_name, filename, "companion.log")):
+                files.append((fl_name + "_companion", os.path.join(dir_name, filename, "companion.log")))
+            if os.path.exists(os.path.join(dir_name, filename, "stderr")):
+                files.append((fl_name, os.path.join(dir_name, filename, "stderr")))
+        elif filename in ["stderr", "stdout", "build_err", "build_out"]:
+            files.append((filename, os.path.join(dir_name, filename)))
+    for fl_name, fl in files:
         stack_trace = False
         data = ""
-        if os.path.isdir(os.path.join(dir_name, filename)) and ( 
-             os.path.exists(os.path.join(dir_name, filename, "stderr")) or 
-             os.path.exists(os.path.join(dir_name, filename, "remote.log"))):
-            if os.path.exists(os.path.join(dir_name, filename, "remote.log")):
-                fl = os.path.join(dir_name, filename, "remote.log")
-            else:
-                fl = os.path.join(dir_name, filename, "stderr")
-            fl_name = filename.split('_')[0]
-        elif filename in ["stderr", "stdout", "build_err", "build_out"]:
-            fl = os.path.join(dir_name, filename)
-            fl_name = filename
-        else:
-            continue
         file_size = prettify_size(os.path.getsize(fl))
         res = bash(f'''grep "stack backtrace:" {fl}''')
         if res.returncode == 0:
