@@ -50,7 +50,7 @@ function ARun (props) {
 
     return (
       <div>
-        <table style = {{"border" : "0px", "width": "40%"}}> <tbody>
+        <table style={{"border" : "0px", "width": "40%"}}> <tbody>
           <tr><td style={{"border": "0px"}}><NavLink to={"/"}> Back To All Runs</NavLink></td></tr>
         </tbody></table>
     
@@ -81,9 +81,12 @@ function ARun (props) {
             {RenderHistory(a_run)}
             </td>
             <td>
-              
                    {Object.entries(a_run.logs).map( ([type, value]) => 
-                 <a style={{"color": value.stack_trace ? "red" : "blue"}} href={value.storage}> {type + "(" + value.full_size + ")" } </a> 
+                 <a style={{"color": value.stack_trace ? "red" : 
+                                    String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}} 
+                  href={value.storage}> {type + "(" + value.full_size + ")" } 
+                 
+                 </a> 
               )}
             </td>
             <td>{a_run.test_time} / {a_run.run_time}</td>

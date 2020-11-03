@@ -9,11 +9,13 @@ import time
 from db_worker import DB
 from rc import bash, run
 from multiprocessing import Process
+import json
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
 
 DEFAULT_TIMEOUT = 180
 FAIL_PATTERNS = ['stack backtrace:']
+INTERESTING_PATTERNS = ["LONG DELAY"]
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
@@ -23,7 +25,7 @@ def enough_space(filename="/datadrive"):
         output = df.communicate()[0]
         pr = output.split()[11]
         n_pr = int(str(pr)[:-1])
-        if n_pr >= 80:
+        if n_pr >= 65:
             return False
         return True
     except:
@@ -73,7 +75,8 @@ def install_new_packages():
     except Exception as e:
         print(e)
 
-def run_test(dir_name, test):
+
+def run_test(thread_n, dir_name, test, remote=False):
     owd = os.getcwd()
     outcome = "FAILED"
     try:
@@ -87,6 +90,9 @@ def run_test(dir_name, test):
         if len(test) > 1 and test[1].startswith('--timeout='):
             timeout = int(test[1][10:])
             test = [test[0]] + test[2:]
+
+        if remote:
+            timeout += 60 * 15
 
         cmd = get_sequential_test_cmd(test)
 
@@ -128,6 +134,8 @@ def run_test(dir_name, test):
                             if line.strip() in FAIL_PATTERNS:
                                 outcome = 'FAILED'
                                 break
+            elif ret == 13:
+                return 'POSTPONE'
             else:
                 outcome = 'FAILED'
                 with open(os.path.join(dir_name, 'stdout')) as f:
@@ -168,22 +176,30 @@ def save_logs(server, test_id, dir_name):
     blob_size = 1024
     blob_service_client = BlobServiceClient.from_connection_string(AZURE)
     cnt_settings = ContentSettings(content_type="text/plain")
-
+    files = []
     for filename in os.listdir(dir_name):
+        if os.path.isdir(os.path.join(dir_name, filename)):
+            fl_name = filename.split('_')[0]
+            if os.path.exists(os.path.join(dir_name, filename, "remote.log")):
+                files.append((fl_name + "_remote", os.path.join(dir_name, filename, "remote.log")))
+            if os.path.exists(os.path.join(dir_name, filename, "companion.log")):
+                files.append((fl_name + "_companion", os.path.join(dir_name, filename, "companion.log")))
+            if os.path.exists(os.path.join(dir_name, filename, "stderr")):
+                files.append((fl_name, os.path.join(dir_name, filename, "stderr")))
+        elif filename in ["stderr", "stdout", "build_err", "build_out"]:
+            files.append((filename, os.path.join(dir_name, filename)))
+    for fl_name, fl in files:
         stack_trace = False
         data = ""
-        if os.path.isdir(os.path.join(dir_name, filename)) and os.path.exists(os.path.join(dir_name, filename, "stderr")):
-            fl = os.path.join(dir_name, filename, "stderr")
-            fl_name = filename.split('_')[0]
-        elif filename in ["stderr", "stdout", "build_err", "build_out"]:
-            fl = os.path.join(dir_name, filename)
-            fl_name = filename
-        else:
-            continue
         file_size = prettify_size(os.path.getsize(fl))
         res = bash(f'''grep "stack backtrace:" {fl}''')
         if res.returncode == 0:
             stack_trace = True
+        found_patterns = []
+        for pattern in INTERESTING_PATTERNS:
+            res = bash(f'''grep "{pattern}" {fl}''')
+            if res.returncode == 0:
+                found_patterns.append(pattern)
         blob_name = str(test_id) + "_" + fl_name
         s3 = ""
         with open(fl, 'rb') as f:
@@ -201,14 +217,86 @@ def save_logs(server, test_id, dir_name):
             blob_client.upload_blob(f, content_settings=cnt_settings)
             s3 = blob_client.url
         print(s3) 
-        server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace)
 
+        server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
+            
 def scp_build(run_id, ip):
     bash(f'''
     rm -rf nearcore
     scp -r -i ~/.ssh/nayduck_key.pem azureuser@{ip}:/datadriver/nayduck/workers/{run_id} nearcore''')
 
+<<<<<<< HEAD
 def keep_pulling():
+=======
+def build(sha, thread_n, outdir, build_before, hostname, remote, release):
+    already_exists = bash(f'''
+                    cd {thread_n}
+                    git rev-parse HEAD
+    ''')
+    print(already_exists)
+    sys.stdout.flush()
+    if already_exists.returncode == 0 and already_exists.stdout.strip() == sha and build_before:
+        print('Woohoo! Skipping the build.')
+        sys.stdout.flush()
+        return 0
+    if not enough_space():
+        print("Not enough space.")
+        bld = bash(f'''rm -rf {thread_n}''')
+    with open(str(outdir) + '/build_out', 'w') as fl_o:
+        with open(str(outdir) + '/build_err', 'w') as fl_e:
+            kwargs = {"stdout": fl_o, "stderr": fl_e}
+            bash('''docker build . -f pytest-runtime.Dockerfile -t pytest-runtime''')
+            print("Checkout")
+            bld = bash(f'''
+                cd {thread_n}
+                git fetch
+                git checkout {sha}
+            ''' , **kwargs, login=True)
+            print(bld)
+            if bld.returncode != 0:
+                print("Clone")
+                bld = bash(f'''
+                    rm -rf {thread_n}
+                    git clone https://github.com/nearprotocol/nearcore {thread_n}
+                    cd {thread_n}
+                    git checkout {sha}
+                ''' , **kwargs, login=True)
+                print(bld)
+                if bld.returncode != 0:
+                    return build_fail_cleanup(bld, thread_n)
+            if "mocknet" in hostname:
+                print("Skipping the build for mocknet tests")
+                return 0
+            if remote:
+                print("Build for remote.")
+                bld = bash(f'''
+                    cd {thread_n}
+                    cargo build -j2 -p neard --features adversarial
+                ''' , **kwargs, login=True)
+                if bld.returncode != 0:
+                    return build_fail_cleanup(bld, thread_n)
+                return 0
+            print("Build")
+            bld = bash(f'''
+                cd {thread_n}
+                cargo build -j2 -p neard --features adversarial {release}
+                cargo build -j2 -p genesis-populate {release}
+                cargo build -j2 -p restaked {release}
+            ''' , **kwargs, login=True)
+            print(bld)
+            if bld.returncode != 0:
+                return build_fail_cleanup(bld, thread_n)
+            bld = run(f'''cd {thread_n} && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive {release}''', **kwargs)
+            if bld.returncode != 0:
+                return build_fail_cleanup(bld, thread_n)
+            bld = run(f'''cd {thread_n} && cargo build -j2 -p neard --target-dir normal_target {release}''', **kwargs)
+            if bld.returncode != 0:
+                return build_fail_cleanup(bld, thread_n)
+            return 0    
+
+
+def keep_pulling(thread_n):
+>>>>>>> master
     hostname = socket.gethostname()
     while True:
         try:
@@ -222,10 +310,46 @@ def keep_pulling():
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
+<<<<<<< HEAD
             install_new_packages()
             server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(outdir, test['name'].strip().split(' '))
+=======
+            remote = False
+            config_override = {}
+            if "NEAR_PYTEST_CONFIG" in os.environ:
+                del os.environ["NEAR_PYTEST_CONFIG"]
+            if '--remote' in test['name']: 
+                remote = True
+                config_override['local'] = False
+                config_override['preexist'] = True
+                os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
+                test['name'] = test['name'].replace(' --remote', '')
+            release = ""
+            if '--release' in test['name']:
+                release = "--release"
+                config_override['release'] = True
+                os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
+                test['name'] = test['name'].replace(' --release', '')
+            if "NEAR_PYTEST_CONFIG" in os.environ:
+                with open("/datadrive/nayduck/.remote", "w") as f:
+                    json.dump(config_override, f)
+
+            code = build(test['sha'], thread_n, outdir, build_before, hostname, remote, release)
             server = DB()
+            if code != 0:
+                server.update_test_status('BUILD FAILED', test['test_id'])
+                save_logs(server, test['test_id'], outdir)
+                continue
+            build_before = True
+            install_new_packages(thread_n)
+            server.create_timestamp_for_test_started(test['test_id'])
+            code = run_test(thread_n, outdir, test['name'].strip().split(' '), remote)
+>>>>>>> master
+            server = DB()
+            if code == 'POSTPONE':
+                server.remark_test_pending(test['test_id'])
+                continue
             server.update_test_status(code, test['test_id'])
             save_logs(server, test['test_id'], outdir)
         except Exception as e:

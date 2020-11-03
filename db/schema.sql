@@ -6,6 +6,7 @@ CREATE TABLE `logs` (
   `full_size` varchar(50) DEFAULT NULL,
   `storage` varchar(200) DEFAULT NULL,
   `stack_trace` tinyint(1) DEFAULT '0',
+  `patterns` varchar(200) DEFAULT NULL,
   KEY `test_id` (`test_id`),
   KEY `test_id_2` (`test_id`,`type`),
   KEY `test_id_3` (`test_id`,`type`) USING BTREE
@@ -41,6 +42,8 @@ CREATE TABLE `tests` (
   `finished` timestamp NULL DEFAULT NULL,
   `hostname` varchar(50) DEFAULT NULL,
   `test_started` timestamp NULL DEFAULT NULL,
+  `select_after` int(11) DEFAULT NULL,
+  `priority` int(11) DEFAULT '0',
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),
   KEY `name` (`name`),
@@ -48,3 +51,10 @@ CREATE TABLE `tests` (
   CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7476 DEFAULT CHARSET=latin1;
 
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) DEFAULT NULL,
+  `name` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;

@@ -61,6 +61,14 @@ def cancel_the_run():
     server.cancel_the_run(run_id)
     return jsonify({})
 
+@app.route('/get_auth_code', methods=['POST', 'GET'])
+def get_auth_code():
+    request_json = request.get_json(force=True) 
+    login = request_json['github_login']
+    server = DB()
+    code = server.get_auth_code(login)
+    return jsonify({"code": code})
+
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=5005)
