@@ -3,42 +3,19 @@ import random
 
 import datetime
 import os
+import sys
 
+sys.path.append(os.path.abspath('../main_db'))
+import common_db
 
-class DB ():
+class MasterDB (common_db.DB):
 
     def __init__(self):
-        self.mydb, self.mycursor = self.connect()
-
-    def connect(self):
-        mydb = mysql.connector.connect(
-            host=os.environ['DB_HOST'],
-            user=os.environ['DB_USER'], 
-            passwd=os.environ['DB_PASSWD'], 
-            database=os.environ['DB']
-        )
-        mycursor = mydb.cursor(buffered=True, dictionary=True)
-        return mydb, mycursor
-
-    def execute_sql(self, sql, val):
-        try:
-            print(sql, val)
-            self.mycursor.execute(sql, val)
-            self.mydb.commit()
-        except mysql.connector.errors.DatabaseError as e:
-            try:
-                print(e)
-                self.mycursor.close()
-                self.mydb.close()
-            except Exception as ee:
-                print(ee)
-            self.mydb, self.mycursor = self.connect()
-            self.mycursor.execute(sql, val)
-            self.mydb.commit()
-        except Exception as e:
-            print(e)
-            raise e
-        return self.mycursor
+        self.host=os.environ['DB_HOST']
+        self.user=os.environ['DB_USER']
+        self.passwd=os.environ['DB_PASSWD']
+        self.database=os.environ['DB']
+        super().__init__(self.host, self.user, self.passwd, self.database)
     
     def get_new_run(self, ip_address):
         sql = "UPDATE runs SET build_started = now(), build_status = 'BUILDING', ip=%s  WHERE build_status = 'BUILD PENDING' and @tmp_id := id ORDER BY id LIMIT 1 "
@@ -62,16 +39,16 @@ class DB ():
         self.execute_sql(sql, (ip_address,))
 
     def get_all_finished_runs(self, ip_address):
-        sql = "SELECT id FROM runs WHERE ip = %s ORDER BY id desc LIMIT 20"
+        sql = "SELECT build_id FROM builds WHERE ip = %s ORDER BY build_id desc LIMIT 20"
         result = self.execute_sql(sql, (ip_address,))
-        runs = result.fetchall()
+        builds = result.fetchall()
         finished_runs = []
-        for run in runs:
-            sql = "SELECT count(IF(status='PENDING' or status='RUNNING',1,NULL)) AS still_going FROM tests WHERE run_id = %s"
-            result = self.execute_sql(sql, (run['id'],))
+        for build in builds:
+            sql = "SELECT count(IF(status='PENDING' or status='RUNNING',1,NULL)) AS still_going FROM tests WHERE build_id = %s"
+            result = self.execute_sql(sql, (build['build_id'],))
             going = result.fetchone()
             if going['still_going'] == 0:
-                finished_runs.append(run['id'])
+                finished_runs.append(build['build_id'])
         return finished_runs
 
     def save_build_logs(self, run_id, err, out):

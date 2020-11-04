@@ -6,7 +6,8 @@ import psutil
 import shutil
 from pathlib import Path, PurePath
 import time
-from db_master import DB
+import requests
+from db_master import MasterDB
 from rc import bash, run
 from multiprocessing import Process
 from azure.storage.blob import BlobServiceClient, ContentSettings
@@ -83,16 +84,17 @@ def cleanup_finished_runs(runs):
         ''')
 
 def keep_pulling():
-    hostname = socket.gethostname()
-    ip_address = socket.gethostbyname(hostname)
+    ip_address = requests.get('https://checkip.amazonaws.com').text.strip()
+    print(ip_address)
     while True:
+        time.sleep(5)
         try:
-            server = DB()
+            server = MasterDB()
             finished_runs = server.get_all_finished_runs(ip_address)
             cleanup_finished_runs(finished_runs)
             if not enough_space():
                 print("Not enough space. Waiting for clean up.")
-            time.sleep(5)
+                continue
             run = server.get_new_run(ip_address)
             print(run)
             if not run:

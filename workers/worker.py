@@ -225,78 +225,7 @@ def scp_build(run_id, ip):
     rm -rf nearcore
     scp -r -i ~/.ssh/nayduck_key.pem azureuser@{ip}:/datadriver/nayduck/workers/{run_id} nearcore''')
 
-<<<<<<< HEAD
 def keep_pulling():
-=======
-def build(sha, thread_n, outdir, build_before, hostname, remote, release):
-    already_exists = bash(f'''
-                    cd {thread_n}
-                    git rev-parse HEAD
-    ''')
-    print(already_exists)
-    sys.stdout.flush()
-    if already_exists.returncode == 0 and already_exists.stdout.strip() == sha and build_before:
-        print('Woohoo! Skipping the build.')
-        sys.stdout.flush()
-        return 0
-    if not enough_space():
-        print("Not enough space.")
-        bld = bash(f'''rm -rf {thread_n}''')
-    with open(str(outdir) + '/build_out', 'w') as fl_o:
-        with open(str(outdir) + '/build_err', 'w') as fl_e:
-            kwargs = {"stdout": fl_o, "stderr": fl_e}
-            bash('''docker build . -f pytest-runtime.Dockerfile -t pytest-runtime''')
-            print("Checkout")
-            bld = bash(f'''
-                cd {thread_n}
-                git fetch
-                git checkout {sha}
-            ''' , **kwargs, login=True)
-            print(bld)
-            if bld.returncode != 0:
-                print("Clone")
-                bld = bash(f'''
-                    rm -rf {thread_n}
-                    git clone https://github.com/nearprotocol/nearcore {thread_n}
-                    cd {thread_n}
-                    git checkout {sha}
-                ''' , **kwargs, login=True)
-                print(bld)
-                if bld.returncode != 0:
-                    return build_fail_cleanup(bld, thread_n)
-            if "mocknet" in hostname:
-                print("Skipping the build for mocknet tests")
-                return 0
-            if remote:
-                print("Build for remote.")
-                bld = bash(f'''
-                    cd {thread_n}
-                    cargo build -j2 -p neard --features adversarial
-                ''' , **kwargs, login=True)
-                if bld.returncode != 0:
-                    return build_fail_cleanup(bld, thread_n)
-                return 0
-            print("Build")
-            bld = bash(f'''
-                cd {thread_n}
-                cargo build -j2 -p neard --features adversarial {release}
-                cargo build -j2 -p genesis-populate {release}
-                cargo build -j2 -p restaked {release}
-            ''' , **kwargs, login=True)
-            print(bld)
-            if bld.returncode != 0:
-                return build_fail_cleanup(bld, thread_n)
-            bld = run(f'''cd {thread_n} && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive {release}''', **kwargs)
-            if bld.returncode != 0:
-                return build_fail_cleanup(bld, thread_n)
-            bld = run(f'''cd {thread_n} && cargo build -j2 -p neard --target-dir normal_target {release}''', **kwargs)
-            if bld.returncode != 0:
-                return build_fail_cleanup(bld, thread_n)
-            return 0    
-
-
-def keep_pulling(thread_n):
->>>>>>> master
     hostname = socket.gethostname()
     while True:
         try:
@@ -310,11 +239,11 @@ def keep_pulling(thread_n):
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
-<<<<<<< HEAD
+####
             install_new_packages()
             server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(outdir, test['name'].strip().split(' '))
-=======
+###
             remote = False
             config_override = {}
             if "NEAR_PYTEST_CONFIG" in os.environ:
@@ -345,7 +274,6 @@ def keep_pulling(thread_n):
             install_new_packages(thread_n)
             server.create_timestamp_for_test_started(test['test_id'])
             code = run_test(thread_n, outdir, test['name'].strip().split(' '), remote)
->>>>>>> master
             server = DB()
             if code == 'POSTPONE':
                 server.remark_test_pending(test['test_id'])

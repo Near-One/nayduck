@@ -24,13 +24,8 @@ class SchedulerDB (common_db.DB):
         result = self.execute_sql(sql, (branch, sha, user, title, requester))
         run_id = result.lastrowid
 
-        # Build for no features.
-        sql = "INSERT INTO builds (run_id, status, features) values (%s, %s, %s)"
-        result = self.execute_sql(sql, (run_id, "PENDING", ""))
-        build_id = result.lastrowid
-
-        builds = {"": build_id}
-
+        debug_builds = {}
+        release_builds = {}
 
         # Into Tests
         after = int(time.time())
@@ -43,13 +38,28 @@ class SchedulerDB (common_db.DB):
                 features = test[test.find('--features'):]
             else:
                 features = ""
-            if features not in builds:
-                sql = "INSERT INTO builds (run_id, status, features) values (%s, %s, %s)"
-                result = self.execute_sql(sql, (run_id, "PENDING", features))
-                build_id = result.lastrowid
-                builds[features] = build_id
-
-            sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority) values (%s, %s, %s, %s, %s, %s)"
-            self.execute_sql(sql, (run_id, builds[features], "PENDING", test.strip(), after, priority))
+            release = False
+            remote = False
+            if '--remote' in test:
+                remote = True
+            if '--release' in test:
+                release = True
+                if features not in release_builds:
+                    sql = "INSERT INTO builds (run_id, status, features, release) values (%s, %s, %s, %s)"
+                    result = self.execute_sql(sql, (run_id, "PENDING", features, 1))
+                    build_id = result.lastrowid
+                    release_builds[features] = build_id
+                else:
+                    build_id = release_builds[features]
+            else:
+                if features not in debug_builds:
+                    sql = "INSERT INTO builds (run_id, status, features) values (%s, %s, %s)"
+                    result = self.execute_sql(sql, (run_id, "PENDING", features))
+                    build_id = result.lastrowid
+                    debug_builds[features] = build_id
+                else:
+                    build_id = debug_builds[features]
+            sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority, release, remote) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+            self.execute_sql(sql, (run_id, build_id, "PENDING", test.strip(), after, priority, release, remote))
         return run_id
         
