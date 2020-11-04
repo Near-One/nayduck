@@ -3,43 +3,20 @@ import random
 
 import datetime
 import os
+import sys
 
+sys.path.append('main_db')
 
-class DB ():
+from main_db.main_db import MainDB
+
+class SchedulerDB (MainDB):
 
     def __init__(self):
-        self.mydb, self.mycursor = self.connect()
-
-    def connect(self):
-        mydb = mysql.connector.connect(
-            host=os.environ['DB_HOST'],
-            user=os.environ['DB_USER'], 
-            passwd=os.environ['DB_PASSWD'], 
-            database=os.environ['DB']
-        )
-        mycursor = mydb.cursor(buffered=True, dictionary=True)
-        return mydb, mycursor
-
-    def execute_sql(self, sql, val):
-        try:
-            print(sql, val)
-            self.mycursor.execute(sql, val)
-            self.mydb.commit()
-        except mysql.connector.errors.DatabaseError as e:
-            try:
-                print(e)
-                self.mycursor.close()
-                self.mydb.close()
-            except Exception as ee:
-                print(ee)
-            self.mydb, self.mycursor = self.connect()
-            self.mycursor.execute(sql, val)
-            self.mydb.commit()
-        except Exception as e:
-            print(e)
-            raise e
-        return self.mycursor
-
+        self.host=os.environ['NAYDUCK_DB_HOST']
+        self.user=os.environ['NAYDUCK_DB_USER']
+        self.passwd=os.environ['NAYDUCK_DB_PASSWD']
+        self.database=os.environ['NAYDUCK_DB']
+        super().__init__(self.host, self.user, self.passwd, self.database)
 
     def scheduling_a_run(self, branch, sha, user, title, tests, requester, run_type):
         sql = "INSERT INTO runs (branch, sha, user, title, requester, type, build_status, build_requested) values (%s, %s, %s, %s, %s, %s, %s, now())"

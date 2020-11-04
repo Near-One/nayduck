@@ -3,7 +3,7 @@ from rc import bash, ok
 import requests
 import os
 
-from db import DB
+from db import SchedulerDB
 
 app = Flask(__name__)
 
@@ -15,7 +15,7 @@ def request_a_run():
     # if not request_json['token']:
     #     resp = {'code': 1, 'response': 'Failure. Your client is too old. NayDuck requires Github auth. Sync your client to head.'}
     #     return jsonify(resp)
-    server = DB()
+    server = SchedulerDB()
     if 'token' in request_json:
         github_login = server.get_github_login(request_json['token'])
         if not github_login:
@@ -48,19 +48,19 @@ def request_a_run():
         run_type = 'unknown'
     
     fetch = bash(f'''
-            rm -rf {os.getenv('FOLDER')}
-            git clone {os.getenv('GIT_REPO')}
-            cd {os.getenv('FOLDER')}
+            rm -rf nearcore
+            git clone nearcore
+            cd nearcore
             git fetch 
             git checkout {request_json['sha']}
     ''')
     if fetch.returncode == 0:
         user = bash(f'''
-            cd {os.getenv('FOLDER')}
+            cd nearcore
             git log --format='%ae' {request_json['sha']}^!
         ''').stdout
         title = bash(f'''
-            cd {os.getenv('FOLDER')}
+            cd nearcore
             git log --format='%s' {request_json['sha']}^!
         ''').stdout
         tests = []

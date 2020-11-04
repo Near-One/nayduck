@@ -24,7 +24,7 @@ def enough_space(filename="/datadrive"):
     except:
         return False
 
-def build(sha, run_id, run_type, outdir):
+def build(sha, run_id, run_type, outdir, remote, release):
     with open(str(outdir) + '/build_out', 'w') as fl_o:
         with open(str(outdir) + '/build_err', 'w') as fl_e:
             kwargs = {"stdout": fl_o, "stderr": fl_e}
@@ -47,25 +47,32 @@ def build(sha, run_id, run_type, outdir):
                     return bld
             if 'mocknet' in run_type:
                 return bld
-            # print("Build")
-            # bld = bash(f'''
-            #     cd nearcore
-            #     cargo build -j2 -p neard --features adversarial
-            #     cargo build -j2 -p genesis-populate
-            #     cargo build -j2 -p restaked
-            # ''' , **kwargs, login=True)
-            # print(bld)
-            # if bld.returncode != 0:
-            #     bash(f'''rm -rf nearcore''')
-            #     return bld
-            # bld = run(f'''cd nearcore && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive''', **kwargs)
-            # if bld.returncode != 0:
-            #     bash(f'''rm -rf nearcore''')
-            #     return bld
-            # bld = run(f'''cd nearcore && cargo build -j2 -p neard --target-dir normal_target''', **kwargs)
-            # if bld.returncode != 0:
-            #     bash(f'''rm -rf nearcore''')
-            #     return bld
+            if remote:
+                print("Build for remote.")
+                bld = bash(f'''
+                    cd nearcore
+                    cargo build -j2 -p neard --features adversarial
+                ''' , **kwargs, login=True)
+                return bld
+            print("Build")
+            bld = bash(f'''
+                cd nearcore
+                cargo build -j2 -p neard --features adversarial {release}
+                cargo build -j2 -p genesis-populate {release}
+                cargo build -j2 -p restaked {release}
+            ''' , **kwargs, login=True)
+            print(bld)
+            if bld.returncode != 0:
+                bash(f'''rm -rf nearcore''')
+                return bld
+            bld = run(f'''cd nearcore && cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive''', **kwargs)
+            if bld.returncode != 0:
+                bash(f'''rm -rf nearcore''')
+                return bld
+            bld = run(f'''cd nearcore && cargo build -j2 -p neard --target-dir normal_target''', **kwargs)
+            if bld.returncode != 0:
+                bash(f'''rm -rf nearcore''')
+                return bld
             bld = bash(f'''cp -r nearcore {run_id}''')
             return bld
 
@@ -83,8 +90,8 @@ def keep_pulling():
             server = DB()
             finished_runs = server.get_all_finished_runs(ip_address)
             cleanup_finished_runs(finished_runs)
-            #if not enough_space():
-            #    print("Not enough space. Waiting for clean up.")
+            if not enough_space():
+                print("Not enough space. Waiting for clean up.")
             time.sleep(5)
             run = server.get_new_run(ip_address)
             print(run)
@@ -93,7 +100,7 @@ def keep_pulling():
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/')
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(run['sha'], run['id'], run['type'], outdir)
+            code = build(run['sha'], run['id'], run['type'], outdir, remote, release)
             server = DB()
             if code.returncode == 0:
                 server.update_run_status('BUILD DONE', run['id'])
