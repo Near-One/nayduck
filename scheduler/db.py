@@ -12,10 +12,10 @@ import common_db
 class SchedulerDB (common_db.DB):
 
     def __init__(self):
-        self.host=os.environ['NAYDUCK_DB_HOST']
-        self.user=os.environ['NAYDUCK_DB_USER']
-        self.passwd=os.environ['NAYDUCK_DB_PASSWD']
-        self.database=os.environ['NAYDUCK_DB']
+        self.host=os.environ['DB_HOST']
+        self.user=os.environ['DB_USER']
+        self.passwd=os.environ['DB_PASSWD']
+        self.database=os.environ['DB']
         super().__init__(self.host, self.user, self.passwd, self.database)
 
     def scheduling_a_run(self, branch, sha, user, title, tests, requester):
