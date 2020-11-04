@@ -35,7 +35,7 @@ CREATE TABLE `builds` (
   `stdout` blob,
   `ip` varchar(50) DEFAULT NULL,
   `features` varchar(250) DEFAULT NULL,
-  `release` tinyint(1) DEFAULT '0',
+  `is_release` tinyint(1) DEFAULT '0',
   PRIMARY KEY (`build_id`),
   CONSTRAINT `builds_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=latin1;
@@ -53,7 +53,7 @@ CREATE TABLE `tests` (
   `hostname` varchar(50) DEFAULT NULL,
   `select_after` int(11) DEFAULT NULL,
   `priority` int(11) DEFAULT '0',
-  `release` tinyint(1) DEFAULT '0',
+  `is_release` tinyint(1) DEFAULT '0',
   `remote` tinyint(1) DEFAULT '0',
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),

@@ -45,7 +45,7 @@ class SchedulerDB (common_db.DB):
             if '--release' in test:
                 release = True
                 if features not in release_builds:
-                    sql = "INSERT INTO builds (run_id, status, features, release) values (%s, %s, %s, %s)"
+                    sql = "INSERT INTO builds (run_id, status, features, is_release) values (%s, %s, %s, %s)"
                     result = self.execute_sql(sql, (run_id, "PENDING", features, 1))
                     build_id = result.lastrowid
                     release_builds[features] = build_id
@@ -59,7 +59,7 @@ class SchedulerDB (common_db.DB):
                     debug_builds[features] = build_id
                 else:
                     build_id = debug_builds[features]
-            sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority, release, remote) values (%s, %s, %s, %s, %s, %s, %s, %s)"
+            sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority, is_release, remote) values (%s, %s, %s, %s, %s, %s, %s, %s)"
             self.execute_sql(sql, (run_id, build_id, "PENDING", test.strip(), after, priority, release, remote))
         return run_id
         
