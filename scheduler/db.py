@@ -25,7 +25,7 @@ class SchedulerDB (common_db.DB):
         run_id = result.lastrowid
 
         # Build for no features.
-        sql = "INSERT INTO builds (run_id, build_status, features) values (%s, %s, %s)"
+        sql = "INSERT INTO builds (run_id, status, features) values (%s, %s, %s)"
         result = self.execute_sql(sql, (run_id, "PENDING", ""))
         build_id = result.lastrowid
 
@@ -44,7 +44,7 @@ class SchedulerDB (common_db.DB):
             else:
                 features = ""
             if features not in builds:
-                sql = "INSERT INTO builds (run_id, build_status, features) values (%s, %s, %s)"
+                sql = "INSERT INTO builds (run_id, status, features) values (%s, %s, %s)"
                 result = self.execute_sql(sql, (run_id, "PENDING", features))
                 build_id = result.lastrowid
                 builds[features] = build_id
