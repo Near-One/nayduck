@@ -25,7 +25,11 @@ def enough_space(filename="/datadrive"):
     except:
         return False
 
-def build(build_id, sha, outdir, features, release):
+def build(build_id, sha, outdir, features, is_release):
+    if is_release:
+        release = "--release"
+    else:
+        release = ""
     with open(str(outdir) + '/build_out', 'w') as fl_o:
         with open(str(outdir) + '/build_err', 'w') as fl_e:
             kwargs = {"stdout": fl_o, "stderr": fl_e}
