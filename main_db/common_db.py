@@ -9,20 +9,24 @@ import os
 
 class DB ():
 
-    def __init__(self):
-        self.mydb, self.mycursor = self.connect()
+    def __init__(self, host, user, passwd, database):
+        self.host=host
+        self.user=user 
+        self.passwd=passwd
+        self.database=database
+        self.mydb, self.mycursor = self.connect(host, user, passwd, database)
 
-    def connect(self):
+    def connect(self, host, user, passwd, database):
         mydb = mysql.connector.connect(
-            host=os.environ['DB_HOST'],
-            user=os.environ['DB_USER'], 
-            passwd=os.environ['DB_PASSWD'], 
-            database=os.environ['DB']
+            host=host,
+            user=user, 
+            passwd=passwd, 
+            database=database
         )
         mycursor = mydb.cursor(buffered=True, dictionary=True)
         return mydb, mycursor
 
-    def execute_sql(self, sql, val):
+    def execute_sql(self, sql, val=()):
         try:
             self.mycursor.execute(sql, val)
             self.mydb.commit()
@@ -34,7 +38,7 @@ class DB ():
                 self.mydb.close()
             except Exception as ee:
                 print(ee)
-            self.mydb, self.mycursor = self.connect()
+            self.mydb, self.mycursor = self.connect(self.host, self.user, self.passwd, self.database)
             self.mycursor.execute(sql, val)
             self.mydb.commit()
         except Exception as e:
