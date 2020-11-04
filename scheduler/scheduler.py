@@ -67,14 +67,16 @@ def request_a_run():
                         tests.extend([spl[1]] * int(spl[0]))
                     else:
                         tests.append(x)
-        
-        run_id = server.scheduling_a_run(branch=request_json['branch'],
+        try:
+            run_id = server.scheduling_a_run(branch=request_json['branch'],
                                   sha=request_json['sha'],
                                   user=user.split('@')[0],
                                   title=title,
                                   tests=tests,
-                                  requester=requester,
-                                  )
+                                  requester=requester)
+        except Exception as e:
+            return jsonify({'code': 1, 'response': 'Failure. %s' % str(e)})
+
         resp = {'code': 0, 'response': 'Success. ' + os.getenv('NAYDUCK_UI') + '/#/run/' + str(run_id)}
     else:
         resp = {'code': 1, 'response': 'Failure. ' + str(fetch.stderr)}
