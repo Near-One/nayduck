@@ -18,7 +18,7 @@ class MasterDB (common_db.DB):
         super().__init__(self.host, self.user, self.passwd, self.database)
     
     def get_new_build(self, ip_address):
-        sql = "UPDATE builds SET started = now(), status = 'BUILDING', ip=%s  WHERE status = 'PENDING' and @tmp_id := build_id ORDER BY id LIMIT 1 "
+        sql = "UPDATE builds SET started = now(), status = 'BUILDING', ip=%s  WHERE status = 'PENDING' and @tmp_id := build_id ORDER BY build_id LIMIT 1 "
         res = self.execute_sql(sql, (ip_address,))
         if res.rowcount == 0:
             return None
