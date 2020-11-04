@@ -8,9 +8,9 @@ import time
 
 sys.path.append('main_db')
 
-from main_db.main_db import MainDB
+from main_db import main_db
 
-class SchedulerDB (MainDB):
+class SchedulerDB (main_db.DB):
 
     def __init__(self):
         self.host=os.environ['NAYDUCK_DB_HOST']

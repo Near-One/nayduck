@@ -7,7 +7,7 @@ import datetime
 import os
 
 
-class MainDB ():
+class DB ():
 
     def __init__(self):
         self.mydb, self.mycursor = self.connect()
