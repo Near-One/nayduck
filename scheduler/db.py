@@ -6,11 +6,10 @@ import os
 import sys
 import time
 
-sys.path.append('main_db')
+sys.path.append(os.path.abspath('../main_db'))
+import common_db
 
-from main_db import main_db
-
-class SchedulerDB (main_db.DB):
+class SchedulerDB (common_db.DB):
 
     def __init__(self):
         self.host=os.environ['NAYDUCK_DB_HOST']
