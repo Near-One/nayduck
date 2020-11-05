@@ -25,7 +25,7 @@ class WorkerDB (common_db.DB):
         else:
             sql = '''UPDATE tests AS t, 
             (SELECT test_id FROM tests WHERE status = 'PENDING' and   
-                    build_id in (select build_id from builds where status = 'BUILD DONE') and
+                    build_id in (select build_id from builds where status = 'BUILD DONE' or status = 'SKIPPED') and
                 name NOT LIKE '%mocknet%' and select_after < %s ORDER BY priority, test_id LIMIT 1) AS id 
                 SET t.started = now(), t.status = 'RUNNING', t.hostname=%s WHERE t.test_id=id.test_id and 
                 @tmp_id := id.test_id'''

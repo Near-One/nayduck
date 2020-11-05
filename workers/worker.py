@@ -304,6 +304,7 @@ def keep_pulling():
             install_new_packages()
             server.test_started(test['test_id'])
             code = run_test(outdir, test_name.strip().split(' '), remote)
+            server = WorkerDB()
             if code == 'POSTPONE':
                 server.remark_test_pending(test['test_id'])
                 continue
