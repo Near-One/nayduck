@@ -63,12 +63,14 @@ def build(build_id, sha, outdir, features, is_release):
             if bld.returncode != 0:
                 bash(f'''rm -rf nearcore''')
                 return bld
-            if release:
-            else:
-                bld = bash(f'''
-                    cp -r nearcore/target/debug/neard {build_id}/debug/neard
-                    cp -r nearcore/target/debug/near {build_id}/debug/near
-                ''')
+            Path(f'{build_id}/target/debug/').mkdir(parents=True, exist_ok=True)
+            Path(f'{build_id}/target/release/').mkdir(parents=True, exist_ok=True)
+            bld = bash(f'''
+                    cp -r nearcore/target/debug/neard {build_id}/target/debug/neard
+                    cp -r nearcore/target/debug/near {build_id}/target/debug/near
+                    cp -r nearcore/target/release/neard {build_id}/target/release/neard
+                    cp -r nearcore/target/release/near {build_id}/target/release/near
+            ''')
             return bld
 
 def cleanup_finished_runs(runs):
@@ -91,6 +93,7 @@ def keep_pulling():
             cleanup_finished_runs(finished_runs)
             if not enough_space():
                 print("Not enough space. Waiting for clean up.")
+                bash(f''' rm -rf nearcore/target''')
                 continue
             new_build = server.get_new_build(ip_address)
             if not new_build:
