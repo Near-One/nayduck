@@ -21,7 +21,7 @@ class WorkerDB (common_db.DB):
     def get_pending_test(self, hostname):
         after = int(time.time())
         if "mocknet" in hostname:
-            sql = "UPDATE tests t SET t.started = now(), t.status = 'RUNNING', t.hostname=%s  WHERE t.run_id in (select id from runs where build_status = 'BUILD DONE') and t.status = 'PENDING' and t.name LIKE '%mocknet%' and @tmp_id := t.test_id ORDER BY t.test_id LIMIT 1;"
+            sql = "UPDATE tests t SET t.started = now(), t.status = 'RUNNING', t.hostname=%s  WHERE t.status = 'PENDING' and t.name LIKE '%mocknet%' and @tmp_id := t.test_id ORDER BY t.test_id LIMIT 1;"
         else:
             sql = '''UPDATE tests AS t, 
             (SELECT test_id FROM tests WHERE status = 'PENDING' and   
@@ -46,9 +46,9 @@ class WorkerDB (common_db.DB):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
         self.execute_sql(sql, (status, id))
 
-    def save_short_logs(self, test_id, filename, file_size, data, storage, stack_trace):
-        sql = "INSERT INTO logs (test_id, type, full_size, log, storage, stack_trace) VALUES (%s, %s, %s, %s, %s, %s)"
-        self.execute_sql(sql, (test_id, filename, file_size, data, storage, stack_trace))
+    def save_short_logs(self, test_id, filename, file_size, data, storage, stack_trace, found_patterns):
+        sql = "INSERT INTO logs (test_id, type, full_size, log, storage, stack_trace, patterns) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        self.execute_sql(sql, (test_id, filename, file_size, data, storage, stack_trace, found_patterns))
 
     def remark_test_pending(self, id):
         after = int(time.time()) + 3*60
