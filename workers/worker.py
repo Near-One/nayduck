@@ -222,7 +222,8 @@ def save_logs(server, test_id, dir_name):
             
 def scp_build(build_id, ip):
     bld = bash(f'''
-        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/ nearcore/target''')
+        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/debug nearcore/target/debug
+        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/release nearcore/target/release''')
     return bld
 
 def checkout(sha):
@@ -232,6 +233,8 @@ def checkout(sha):
         rm -rf target
         git checkout {sha}
         mkdir target
+        mkdir target/debug
+        mkdir target/release
     ''')
     if bld.returncode != 0:
         print("Clone")
@@ -241,6 +244,8 @@ def checkout(sha):
             cd nearcore
             git checkout {sha}
             mkdir target
+            mkdir target/debug
+            mkdir target/release
         ''')
         return bld
     return bld
