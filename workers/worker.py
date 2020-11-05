@@ -222,7 +222,7 @@ def save_logs(server, test_id, dir_name):
             
 def scp_build(build_id, ip):
     bld = bash(f'''
-        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/* nearcore/target''')
+        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/* nearcore/''')
     return bld
 
 def checkout(sha):

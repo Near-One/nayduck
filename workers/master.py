@@ -63,7 +63,12 @@ def build(build_id, sha, outdir, features, is_release):
             if bld.returncode != 0:
                 bash(f'''rm -rf nearcore''')
                 return bld
-            bld = bash(f'''cp -r nearcore {build_id}''')
+            if release:
+            else:
+                bld = bash(f'''
+                    cp -r nearcore/target/debug/neard {build_id}/debug/neard
+                    cp -r nearcore/target/debug/near {build_id}/debug/near
+                ''')
             return bld
 
 def cleanup_finished_runs(runs):
