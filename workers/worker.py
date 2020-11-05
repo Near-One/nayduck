@@ -200,7 +200,8 @@ def save_logs(server, test_id, dir_name):
             res = bash(f'''grep "{pattern}" {fl}''')
             if res.returncode == 0:
                 found_patterns.append(pattern)
-        blob_name = str(test_id) + "_" + fl_name
+        # REMOVE V2!
+        blob_name = str(test_id) + "_v2_" + fl_name
         s3 = ""
         with open(fl, 'rb') as f:
             f.seek(0)
