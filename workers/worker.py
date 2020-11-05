@@ -259,9 +259,9 @@ def keep_pulling():
         try:
             server = WorkerDB()
             test = server.get_pending_test(hostname)
-            test_name = test['name']
             if not test:
                 continue
+            test_name = test['name']
             print(test)
             chck = checkout(test['sha'])
             if chck.returncode != 0:
