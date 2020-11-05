@@ -221,8 +221,9 @@ def save_logs(server, test_id, dir_name):
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
 def scp_build(build_id, ip):
-    bash(f'''
-        scp -r -i ~/.ssh/nayduck_key.pem azureuser@{ip}:/datadriver/nayduck/workers/{build_id} nearcore/target''')
+    bld = bash(f'''
+        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/ nearcore/target''')
+    return bld
 
 def checkout(sha):
     print("Checkout")
@@ -231,7 +232,6 @@ def checkout(sha):
         rm -rf target
         git checkout {sha}
         mkdir target
-     
     ''')
     if bld.returncode != 0:
         print("Clone")
@@ -243,6 +243,7 @@ def checkout(sha):
             mkdir target
         ''')
         return bld
+    return bld
 
 def keep_pulling():
     hostname = socket.gethostname()
@@ -259,10 +260,14 @@ def keep_pulling():
             print(test)
             chck = checkout(test['sha'])
             if chck.returncode != 0:
+                print(chck)
                 # More logs!
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
-            scp_build(test['build_id'], test['ip'])
+            scp = scp_build(test['build_id'], test['ip'])
+            if scp.returncode != 0:
+                print(scp)
+                server.update_test_status("SCP FAILED", test['test_id'])
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
