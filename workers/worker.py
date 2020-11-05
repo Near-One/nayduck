@@ -6,7 +6,7 @@ import psutil
 import shutil
 from pathlib import Path, PurePath
 import time
-from db_worker import DB
+from db_worker import WorkerDB
 from rc import bash, run
 from multiprocessing import Process
 import json
@@ -76,7 +76,7 @@ def install_new_packages():
         print(e)
 
 
-def run_test(thread_n, dir_name, test, remote=False):
+def run_test(dir_name, test, remote=False):
     owd = os.getcwd()
     outcome = "FAILED"
     try:
@@ -220,61 +220,80 @@ def save_logs(server, test_id, dir_name):
 
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
-def scp_build(run_id, ip):
+def scp_build(build_id, ip):
     bash(f'''
-    rm -rf nearcore
-    scp -r -i ~/.ssh/nayduck_key.pem azureuser@{ip}:/datadriver/nayduck/workers/{run_id} nearcore''')
+        scp -r -i ~/.ssh/nayduck_key.pem azureuser@{ip}:/datadriver/nayduck/workers/{build_id} nearcore/target''')
+
+def checkout(sha):
+    print("Checkout")
+    bld = bash(f'''
+        cd nearcore
+        rm -rf target
+        git checkout {sha}
+        mkdir target
+     
+    ''')
+    if bld.returncode != 0:
+        print("Clone")
+        bld = bash(f'''
+            rm -rf nearcore
+            git clone https://github.com/nearprotocol/nearcore 
+            cd nearcore
+            git checkout {sha}
+            mkdir target
+        ''')
+        return bld
 
 def keep_pulling():
     hostname = socket.gethostname()
+    server = WorkerDB()
+    server.handle_restart(hostname)
     while True:
+        time.sleep(5)
         try:
-            server = DB()
-            time.sleep(5)
+            server = WorkerDB()
             test = server.get_pending_test(hostname)
+            test_name = test['name']
             if not test:
                 continue
             print(test)
-            scp_build(test['run_id'], test['ip'])
+            chck = checkout(test['sha'])
+            if chck.returncode != 0:
+                # More logs!
+                server.update_test_status("CHECKOUT FAILED", test['test_id'])
+                continue
+            scp_build(test['build_id'], test['ip'])
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
-            outdir = os.path.abspath('output/' + str(test['run_id']) + '/' + str(test['test_id']))
+            outdir = os.path.abspath('output/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
-####
-            install_new_packages()
-            server.create_timestamp_for_test_started(test['test_id'])
-            code = run_test(outdir, test['name'].strip().split(' '))
-###
+            
             remote = False
             config_override = {}
             if "NEAR_PYTEST_CONFIG" in os.environ:
-                del os.environ["NEAR_PYTEST_CONFIG"]
-            if '--remote' in test['name']: 
+                 del os.environ["NEAR_PYTEST_CONFIG"]
+            if '--remote' in test_name: 
                 remote = True
                 config_override['local'] = False
                 config_override['preexist'] = True
                 os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
-                test['name'] = test['name'].replace(' --remote', '')
-            release = ""
-            if '--release' in test['name']:
-                release = "--release"
+                test_name = test_name.replace(' --remote', '')
+            release = False
+            if '--release' in test_name:
+                release = True
                 config_override['release'] = True
                 os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
-                test['name'] = test['name'].replace(' --release', '')
+                test_name = test_name.replace(' --release', '')
             if "NEAR_PYTEST_CONFIG" in os.environ:
                 with open("/datadrive/nayduck/.remote", "w") as f:
                     json.dump(config_override, f)
+            
+            if '--features' in test_name:
+                test_name = test_name[:test_name.find('--features')]
 
-            code = build(test['sha'], thread_n, outdir, build_before, hostname, remote, release)
-            server = DB()
-            if code != 0:
-                server.update_test_status('BUILD FAILED', test['test_id'])
-                save_logs(server, test['test_id'], outdir)
-                continue
-            build_before = True
-            install_new_packages(thread_n)
-            server.create_timestamp_for_test_started(test['test_id'])
-            code = run_test(thread_n, outdir, test['name'].strip().split(' '), remote)
-            server = DB()
+
+            install_new_packages()
+            server.test_started(test['test_id'])
+            code = run_test(outdir, test_name.strip().split(' '), remote)
             if code == 'POSTPONE':
                 server.remark_test_pending(test['test_id'])
                 continue
@@ -284,6 +303,4 @@ def keep_pulling():
             print(e)
 
 if __name__ == "__main__":
-    server = DB()
-    server.handle_restart(socket.gethostname())
     keep_pulling()        

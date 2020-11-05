@@ -82,29 +82,29 @@ def keep_pulling():
         time.sleep(5)
         try:
             server = MasterDB()
-            finished_runs = server.get_all_finished_runs(ip_address)
+            finished_runs = server.get_builds_with_finished_tests(ip_address)
             cleanup_finished_runs(finished_runs)
             if not enough_space():
                 print("Not enough space. Waiting for clean up.")
                 continue
             new_build = server.get_new_build(ip_address)
-            print(new_build)
             if not new_build:
                 continue
+            print(new_build)
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/')
             Path(outdir).mkdir(parents=True, exist_ok=True)
             code = build(new_build['build_id'], new_build['sha'], outdir, new_build['features'], new_build['is_release'])
             server = MasterDB()
             if code.returncode == 0:
-                server.update_run_status('BUILD DONE', new_build['build_id'])
+                status = 'BUILD DONE'
             else:
-                server.update_run_status('BUILD FAILED', new_build['build_id'])
+                status = 'BUILD FAILED'
             fl_err = os.path.join(outdir, "build_err")
             fl_out = os.path.join(outdir, "build_out")
             err = open(fl_err, 'r').read()
-            out = open(fl_out, 'r').read()
-            server.save_build_logs(new_build['build_id'], err, out)
+            out = open(fl_out, 'r').read()           
+            server.update_run_status(new_build['build_id'], status, err, out)
         except Exception as e:
             print(e)
 

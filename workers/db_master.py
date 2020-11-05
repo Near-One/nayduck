@@ -27,9 +27,9 @@ class MasterDB (common_db.DB):
         new_run = result.fetchone()
         return new_run
 
-    def update_run_status(self, status, build_id):
-        sql = "UPDATE builds SET finished = now(), status = %s WHERE build_id=%s"
-        self.execute_sql(sql, (status, build_id))
+    def update_run_status(self, build_id, status, err, out):
+        sql = "UPDATE builds SET finished = now(), status = %s, stderr=%s, stdout = %s WHERE build_id=%s"
+        self.execute_sql(sql, (status, err, out, build_id))
         if status == "BUILD FAILED":
             sql = "UPDATE tests SET status = 'CANCELED' WHERE build_id=%s and status='PENDING'"
             self.execute_sql(sql, (build_id,))
@@ -38,8 +38,8 @@ class MasterDB (common_db.DB):
         sql = "UPDATE builds SET started = null, status = 'PENDING', ip=null  WHERE status = 'BUILDING' and ip=%s"
         self.execute_sql(sql, (ip_address,))
 
-    def get_all_finished_runs(self, ip_address):
-        sql = "SELECT build_id FROM builds WHERE ip = %s ORDER BY build_id desc LIMIT 20"
+    def get_builds_with_finished_tests(self, ip_address):
+        sql = "SELECT build_id FROM builds WHERE ip=%s ORDER BY build_id desc LIMIT 20"
         result = self.execute_sql(sql, (ip_address,))
         builds = result.fetchall()
         finished_runs = []
@@ -51,7 +51,4 @@ class MasterDB (common_db.DB):
                 finished_runs.append(build['build_id'])
         return finished_runs
 
-    def save_build_logs(self, build_id, err, out):
-        sql = "UPDATE builds SET stderr=%s, stdout = %s WHERE build_id=%s"
-        self.execute_sql(sql, (err, out, build_id)) 
        
