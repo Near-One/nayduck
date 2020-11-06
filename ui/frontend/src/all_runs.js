@@ -42,6 +42,7 @@ function AllRuns () {
               }).then((response) => response.json())
               .then(data => {
               setAllRuns(data);
+              console.log(data);
               setFilteredRuns(data)
             })
             
@@ -97,9 +98,7 @@ function AllRuns () {
             <th>User
             <input style={{"width":"100%"}} type="text" name="filters" id="requester" onChange={filterHandler} onClick={filterClick}/>
             </th>
-            <th>Run Type
-            <input style={{"width":"100%"}} type="text" name="filters" id="type" onChange={filterHandler} onClick={filterClick}/>
-            </th>
+            <th>Builds</th>
             
             <th width="40%">Status</th>
             { member > 0 ? <th>x</th>:''}

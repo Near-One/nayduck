@@ -64,14 +64,14 @@ class UIDB (common_db.DB):
         return self.get_test_history(res["name"], res["branch"])
         
     def get_test_history(self, test_name, branch):
-        sql = "SELECT t.test_id, r.user, r.title, t.status, t.started, t.finished, t.test_started, r.branch, r.sha FROM tests as t, runs as r WHERE name=%s and t.run_id = r.id and r.branch=%s ORDER BY t.test_id desc LIMIT 30"
+        sql = "SELECT t.test_id, r.user, r.title, t.status, t.started, t.finished, r.branch, r.sha FROM tests as t, runs as r WHERE name=%s and t.run_id = r.id and r.branch=%s ORDER BY t.test_id desc LIMIT 30"
         result = self.execute_sql(sql, (test_name, branch))
         tests = result.fetchall()
         for test in tests:
             if test["finished"] != None and test["started"] != None:
                 test["run_time"] = str(test["finished"] - test["started"])
-            if test["test_started"] != None and test["finished"] != None:
-                test["test_time"] = str(test["finished"] - test["test_started"])
+            if test["started"] != None and test["finished"] != None:
+                test["test_time"] = str(test["finished"] - test["started"])
             sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
             res = self.execute_sql(sql, (test["test_id"],))
             logs = res.fetchall()
@@ -115,8 +115,8 @@ class UIDB (common_db.DB):
         test["test"] = ' '.join(test_l)
         if test["finished"] != None and test["started"] != None:
             test["run_time"] = str(test["finished"] - test["started"])
-        if test["test_started"] != None and test["finished"] != None:
-            test["test_time"] = str(test["finished"] - test["test_started"])
+        if test["started"] != None and test["finished"] != None:
+            test["test_time"] = str(test["finished"] - test["started"])
         history = self.get_test_history(test["name"], branch)
         test["history"] = self.history_stats(history)
         return test
