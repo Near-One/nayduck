@@ -49,12 +49,21 @@ class UIDB (common_db.DB):
         res = self.execute_sql(sql, ())
         all = res.fetchall()
         all_runs = []
-        for a in all:
-            sql = "select count(IF(status='PENDING',1,NULL)) AS pending,  count(IF(status='RUNNING',1,NULL)) AS running,  count(IF(status='PASSED',1,NULL)) AS passed,  count(IF(status='IGNORED',1,NULL)) AS ignored,  count(IF(status='FAILED',1,NULL)) AS failed,  count(IF(status='BUILD FAILED',1,NULL)) AS build_failed,  count(IF(status='CANCELED',1,NULL)) AS canceled,  count(IF(status='TIMEOUT',1,NULL)) AS timeout from tests where run_id = %s"
-            res = self.execute_sql(sql, (a['id'],))
-            counts = res.fetchone()
-            a.update(counts)
-            all_runs.append(a)
+        for run in all:
+            sql = "SELECT build_id, status, is_release, features FROM builds WHERE run_id=%s"
+            res = self.execute_sql(sql, (run['id'],))
+            builds = res.fetchall()
+            for build in builds:
+                sql = '''select count(IF(status='PENDING',1,NULL)) AS pending,  count(IF(status='RUNNING',1,NULL)) AS running,  
+                                 count(IF(status='PASSED',1,NULL)) AS passed,  count(IF(status='IGNORED',1,NULL)) AS ignored,  
+                                 count(IF(status='FAILED',1,NULL)) AS failed,  count(IF(status='BUILD FAILED',1,NULL)) AS build_failed,  
+                                 count(IF(status='CANCELED',1,NULL)) AS canceled,  count(IF(status='TIMEOUT',1,NULL)) AS timeout 
+                                 from tests where build_id = %s'''
+                res = self.execute_sql(sql, (build['build_id'],))
+                tests = res.fetchone()
+                build['tests'] = tests
+            run['builds'] = builds
+            all_runs.append(run)
         return all_runs
 
     def get_test_history_by_id(self, test_id):
