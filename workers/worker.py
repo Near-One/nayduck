@@ -221,9 +221,17 @@ def save_logs(server, test_id, dir_name):
 
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
-def scp_build(build_id, ip):
-    bld = bash(f'''
-        scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/* nearcore/''')
+def scp_build(build_id, ip, test_name, build_type="debug"):
+    Path(f'nearcore/target/{build_type}/').mkdir(parents=True, exist_ok=True)
+    Path(f'nearcore/target-expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
+    if 'expensive' in test_name:
+        bld = bash(f'''
+            scp -o StrictHostKeyChecking=no -r 
+            azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target-expensive/{build_type}/deps/* nearcore/target-expensive/{build_type}/''')
+    else:
+        bld = bash(f'''
+            scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/near* 
+            nearcore/target/{build_type}/''')
     return bld
 
 def checkout(sha):
@@ -231,10 +239,9 @@ def checkout(sha):
     bld = bash(f'''
         cd nearcore
         rm -rf target
+        rm -rf target-expensive
+        rm -rf normal_target
         git checkout {sha}
-        mkdir target
-        mkdir target/debug
-        mkdir target/release
     ''')
     if bld.returncode != 0:
         print("Clone")
@@ -243,9 +250,6 @@ def checkout(sha):
             git clone https://github.com/nearprotocol/nearcore 
             cd nearcore
             git checkout {sha}
-            mkdir target
-            mkdir target/debug
-            mkdir target/release
         ''')
         return bld
     return bld
@@ -269,7 +273,10 @@ def keep_pulling():
                 # More logs!
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
-            scp = scp_build(test['build_id'], test['ip'])
+            build_type = "debug"
+            if test['is_release']:
+                build_type = "release"
+            scp = scp_build(test['build_id'], test['ip'], test_name, build_type)
             if scp.returncode != 0:
                 print(scp)
                 server.update_test_status("SCP FAILED", test['test_id'])

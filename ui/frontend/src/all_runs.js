@@ -24,12 +24,13 @@ function AllRuns () {
     })
     .then(response => response.json())
     .then(data => {
-     for (var d of data) {
-        if (d["login"] === "nearprotocol") {
-            console.log("Welcome to Nay!");
-            setMember(true);
-        }
-     }
+     //for (var d of data) {
+
+       // if (d["login"] === "nearprotocol") {
+       //     console.log("Welcome to Nay!");
+       //     setMember(true);
+       // }
+     //}
     });
   
     
@@ -60,14 +61,29 @@ function AllRuns () {
     }
 
     var filterHandler = event => {
-      const fltr = event.target.value.toLowerCase();
-      var id = event.target.id;
-      setFilteredRuns(
+      var fltr = document.getElementById('branch').value.toLowerCase();
+      var filtered = (
         allRuns.filter(
           item =>
-            (String(item[id]).toLowerCase().includes(fltr)) 
+            (item['branch'].toLowerCase().includes(fltr) || item['sha'].toLowerCase().includes(fltr))
         )
       );
+      fltr = document.getElementById('title').value.toLowerCase();
+      filtered = (
+        filtered.filter(
+          item =>
+            (item['title'].toLowerCase().includes(fltr)) 
+        )
+      );
+      fltr = document.getElementById('requester').value.toLowerCase();
+      filtered = (
+        filtered.filter(
+          item =>
+            (item['requester'].toLowerCase().includes(fltr)) 
+        )
+      );
+
+      setFilteredRuns(filtered);
     };
 
     var cancelRun = id => event => {
@@ -90,16 +106,14 @@ function AllRuns () {
           <table className="big"><tbody>
           <tr>
             <th>Branch
-            <input style={{"width":"100%"}} type="text" name="filters" id="branch" onChange={filterHandler} onClick={filterClick}/>
+            <input style={{"width":"100%"}} type="text" name="filters" id="branch" onChange={filterHandler}/>
             </th>
             <th style={{"width": "30%"}}>Title
-            <input style={{"width":"100%"}} type="text" name="filters" id="title" onChange={filterHandler} onClick={filterClick}/>
+            <input style={{"width":"100%"}} type="text" name="filters" id="title" onChange={filterHandler}/>
             </th>
             <th>User
-            <input style={{"width":"100%"}} type="text" name="filters" id="requester" onChange={filterHandler} onClick={filterClick}/>
+            <input style={{"width":"100%"}} type="text" name="filters" id="requester" onChange={filterHandler}/>
             </th>
-            <th>Builds</th>
-            
             <th width="40%">Status</th>
             { member > 0 ? <th>x</th>:''}
               
@@ -115,23 +129,36 @@ function AllRuns () {
                 <NavLink to={"/run/" + a_run.id} name="title">{a_run.title}</NavLink>
               </td>
               <td style={{"font-size": "x-small"}}>{a_run.requester}</td>
-              <td style={{"font-size": "x-small"}}>{a_run.type}
               
-              {a_run.builds.map((build,j) => build.status
-          
-              )}
-              
-              </td>
               <td >
-          
-              { a_run.passed > 0 ? <div class="status" style={{"background": "green", }}>{a_run.passed} passed</div> : ''}
-              { a_run.failed > 0 ? <div class="status" style={{"background": "red" , }}>{a_run.failed} failed </div> : ''}
-              { a_run.timeout > 0 ? <div class="status" style={{"background": "#f0a3aa", }}>{a_run.timeout} timeout </div> : ''}
-              { a_run.build_failed > 0 ? <div class="status" style={{"background": "#864E4E", }}>{a_run.build_failed} build failed </div> : ''}
-              { a_run.canceled > 0 ? <div class="status" style={{"background": "#FCF88C",}}> {a_run.canceled} canceled </div> : ''}
-              { a_run.ignored > 0 ? <div class="status" style={{"background": "grey", }}>{a_run.ignored} ignored</div> : ''}
-              { a_run.pending > 0 ? <div class="status" style={{"background": "#ED8CFC"}}> {a_run.pending} pending </div> : ''}
-              { a_run.running > 0 ? <div class="status" style={{"background": "#697DCB", }}>{a_run.running} running</div> : ''}
+                {a_run.builds.map((build,j) => 
+                <div class="one_build">
+                    <div class="build_status" style={{"background": build.status == "PENDING" ? "FF99FF" : 
+                                                            build.status == "BUILDING" ? "#9999FF":
+                                                            build.status == "BUILD DONE" ? "#CCFFCC":
+                                                            build.status == "BUILD FAILED" ? "#FFCCCC": 
+                                                            build.status == "SKIPPED" ? "#f0a3aa": "E0E0E0"}}>
+                      <NavLink className="build_link" to={"/build/" + build.build_id} >
+                      <b>{build.is_release == 0 ? 'Debug' : 'Release'}  
+                        {build.features == "" ? " ": "/"}
+                        {build.features == "--features nightly_protocol --features nightly_protocol_features" 
+                          ? 'Nightly ' : build.features + " "}
+                      </b>
+                      {build.status} 
+                      </NavLink>
+                    </div>
+                    <div>
+                    { build.tests.passed > 0 ? <div class="status" style={{"background": "green", }}>{build.tests.passed} passed</div> : ''}
+                    { build.tests.failed > 0 ? <div class="status" style={{"background": "red" , }}>{build.tests.failed} failed </div> : ''}
+                    { build.tests.timeout > 0 ? <div class="status" style={{"background": "#f0a3aa", }}>{build.tests.timeout} timeout </div> : ''}
+                    { build.tests.build_failed > 0 ? <div class="status" style={{"background": "#864E4E", }}>{build.tests.build_failed} build failed </div> : ''}
+                    { build.tests.canceled > 0 ? <div class="status" style={{"background": "#FCF88C",}}> {build.tests.canceled} canceled </div> : ''}
+                    { build.tests.ignored > 0 ? <div class="status" style={{"background": "grey", }}>{build.tests.ignored} ignored</div> : ''}
+                    { build.tests.pending > 0 ? <div class="status" style={{"background": "#ED8CFC"}}> {build.tests.pending} pending </div> : ''}
+                    { build.tests.running > 0 ? <div class="status" style={{"background": "#697DCB", }}>{build.tests.running} running</div> : ''}
+                    </div>
+                </div>
+                )}
               </td> 
               { member > 0 ? <td><button style={{"border-radius": "4px", "cursor": "pointer"}}onClick={cancelRun(a_run.id)}>x</button></td> : ''}
             </tr>)

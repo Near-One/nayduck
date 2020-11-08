@@ -19,7 +19,7 @@ def get_runs():
 
 @app.route('/run', methods=['POST', 'GET'])
 def get_a_run():
-    request_json = request.get_json(force=True) 
+    request_json = request.get_json(force=True)
     run_id = request_json['run_id']
     server = UIDB()
     a_run = server.get_one_run(run_id)
@@ -32,6 +32,15 @@ def get_a_test():
     test_id = request_json['test_id']
     server = UIDB()
     a_test = server.get_one_test(test_id)
+    return jsonify(a_test)
+
+
+@app.route('/build', methods=['POST', 'GET'])
+def get_build_info():
+    request_json = request.get_json(force=True) 
+    build_id = request_json['build_id']
+    server = UIDB()
+    a_test = server.get_build_info(build_id)
     return jsonify(a_test)
 
 

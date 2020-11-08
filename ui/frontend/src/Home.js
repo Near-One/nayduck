@@ -7,6 +7,7 @@ import ARun from "./a_run";
 import AllRuns from "./all_runs";
 import ATest from "./a_test";
 import TestHistory from "./test_history";
+import Build from "./Build";
   
 export default function Home() {
   const { state, dispatch } = useContext(AuthContext);
@@ -29,6 +30,7 @@ export default function Home() {
             <Route path="/run/:run_id" component={ARun}/>
             <Route path="/test/:test_id" component={ATest}/>
             <Route path="/test_history/:test_id" component={TestHistory}/>
+            <Route path="/build/:build_id" component={Build}/>
         </div>
       </HashRouter>
   </div>

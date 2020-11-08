@@ -58,8 +58,7 @@ function ATest (props) {
             {a_test.title}<br/>
              requested by {a_test.requester}
             </td></tr>
-            <tr><td>Test</td><td>{a_test.name}</td></tr>
-            <tr><td>Run Time</td><td>{a_test.run_time}</td></tr>
+            <tr><td>Test</td><td>{a_test.cmd}</td></tr>
             <tr><td>Test Time</td><td>{a_test.test_time}</td></tr>
             <tr><td>Finished</td><td>{a_test.finished}</td></tr>
             <tr><td>Started</td><td>{a_test.started}</td></tr>

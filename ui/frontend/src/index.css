@@ -54,6 +54,26 @@ table th {
   padding-right: 5px;
 }
 
+.build_status {
+  display: inline-block;
+  margin: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  border-radius: 10px;
+  padding-right: 5px;
+  cursor: pointer;
+
+}
+
+.one_build {
+  margin: 2px;
+  padding: 2px;
+  padding-left: 5px;
+  border-radius: 10px;
+  padding-right: 5px;
+  border: 1px solid grey;
+}
+
 .logout{
   all: unset;
   width: 100px;
@@ -135,4 +155,13 @@ table th {
   100% {
     transform: rotate(360deg);
   }
+}
+
+select{
+  width: 100%;
+  text-overflow: ellipsis;
+}
+
+.build_link {
+  color:black;
 }

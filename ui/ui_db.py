@@ -53,13 +53,19 @@ class UIDB (common_db.DB):
             sql = "SELECT build_id, status, is_release, features FROM builds WHERE run_id=%s"
             res = self.execute_sql(sql, (run['id'],))
             builds = res.fetchall()
+            # For older runs, to be able to get older data.
+            if not builds:
+                builds = [{'build_id': 0, 'status': 'TEST SPECIFIC', 'is_release': False, 'features': ''}] 
             for build in builds:
                 sql = '''select count(IF(status='PENDING',1,NULL)) AS pending,  count(IF(status='RUNNING',1,NULL)) AS running,  
                                  count(IF(status='PASSED',1,NULL)) AS passed,  count(IF(status='IGNORED',1,NULL)) AS ignored,  
                                  count(IF(status='FAILED',1,NULL)) AS failed,  count(IF(status='BUILD FAILED',1,NULL)) AS build_failed,  
                                  count(IF(status='CANCELED',1,NULL)) AS canceled,  count(IF(status='TIMEOUT',1,NULL)) AS timeout 
-                                 from tests where build_id = %s'''
-                res = self.execute_sql(sql, (build['build_id'],))
+                                 from tests where {} = %s'''
+                if build['build_id'] == 0:
+                    res = self.execute_sql(sql.format('run_id'), (run['id'],))
+                else:
+                    res = self.execute_sql(sql.format('build_id'), (build['build_id'],))
                 tests = res.fetchone()
                 build['tests'] = tests
             run['builds'] = builds
@@ -73,29 +79,36 @@ class UIDB (common_db.DB):
         return self.get_test_history(res["name"], res["branch"])
         
     def get_test_history(self, test_name, branch):
-        sql = "SELECT t.test_id, r.user, r.title, t.status, t.started, t.finished, r.branch, r.sha FROM tests as t, runs as r WHERE name=%s and t.run_id = r.id and r.branch=%s ORDER BY t.test_id desc LIMIT 30"
+        sql = "SELECT t.test_id, r.requester, r.title, t.status, t.started, t.finished, r.branch, r.sha FROM tests as t, runs as r WHERE name=%s and t.run_id = r.id and r.branch=%s ORDER BY t.test_id desc LIMIT 30"
         result = self.execute_sql(sql, (test_name, branch))
         tests = result.fetchall()
         for test in tests:
             if test["finished"] != None and test["started"] != None:
                 test["run_time"] = str(test["finished"] - test["started"])
-            if test["started"] != None and test["finished"] != None:
-                test["test_time"] = str(test["finished"] - test["started"])
             sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
             res = self.execute_sql(sql, (test["test_id"],))
             logs = res.fetchall()
-            test["logs"] = []
-            for l in logs:
-                test["logs"].append(l)
+            test["logs"] = logs
+            # for l in logs:
+            #     test["logs"].append(l)
         return tests
             
     def get_one_run(self, run_id):
         run_data = self.get_data_about_run(run_id)
         branch = run_data["branch"] 
+        
+        sql = "SELECT * FROM builds WHERE run_id=%s"
+        res = self.execute_sql(sql, (run_id,))
+        builds = res.fetchall()
+        builds_dict = {}
+        for build in builds:
+            builds_dict[build['build_id']] = build
+
         sql = "SELECT * FROM tests WHERE run_id=%s"
         res = self.execute_sql(sql, (run_id,))
         a_run = res.fetchall()
         for test in a_run:
+            test['build'] = builds_dict[test['build_id']]
             test.update(self.get_data_about_test(test, branch, blob=False))
         return a_run
 
@@ -111,22 +124,18 @@ class UIDB (common_db.DB):
             if "log" in l:
                 l["log"] = l["log"].decode()
             test["logs"][l["type"]] = l
+        test['cmd'] = test["name"]
+        if '--features' in test["name"]:
+            test["name"] =  test["name"][ : test["name"].find('--features')]
         spl = test["name"].split(' ')
-        test["type"] = spl[0]
-        args = []
         test_l = []
         for s in spl:
-            if s.startswith("--"):
-                args.append(s)
-            else:
+            if not s.startswith("--"):
                 test_l.append(s)
-        test["args"] = ' '.join(args)
-        test["test"] = ' '.join(test_l)
+        test["name"] = ' '.join(test_l)
         if test["finished"] != None and test["started"] != None:
-            test["run_time"] = str(test["finished"] - test["started"])
-        if test["started"] != None and test["finished"] != None:
             test["test_time"] = str(test["finished"] - test["started"])
-        history = self.get_test_history(test["name"], branch)
+        history = self.get_test_history(test['name'], branch)
         test["history"] = self.history_stats(history)
         return test
 
@@ -135,6 +144,18 @@ class UIDB (common_db.DB):
         res = self.execute_sql(sql, (run_id,))
         r = res.fetchone()
         return r
+                    
+    def get_build_info(self, build_id):
+        sql = "SELECT * from builds WHERE build_id = %s"
+        res = self.execute_sql(sql, (build_id,))
+        build = res.fetchone()
+        if build["finished"] != None and build["started"] != None:
+            build["build_time"] = str(build["finished"] - build["started"])
+        run = self.get_data_about_run(build['run_id'])
+        build.update(run)
+
+        
+        return build
                     
     def get_histoty_for_base_branch(self, test_id, branch):
         sql = "SELECT name FROM tests WHERE test_id=%s"

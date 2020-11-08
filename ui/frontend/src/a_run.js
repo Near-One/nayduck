@@ -29,23 +29,35 @@ function ARun (props) {
         });
     }, []);
 
-    var filterClick = event  => {
-      var filters = document.getElementsByName("filters");
-      for (var item of filters) {
-        item.value = "";
-      }
-      setFilteredRuns(aRun);
-    }
-
-    var filterHandler = event => {
-      const fltr = event.target.value.toLowerCase();
-      var id = event.target.id;
-      setFilteredRuns(
+    var filterByAll = event => {
+      var fltr = document.getElementById('build_fltr').value.toLowerCase();
+      var filtered = (
         aRun.filter(
-          item =>
-            (item[id].toLowerCase().includes(fltr)) 
+          item => (fltr == 'debug' ? item.is_release == 0 : 
+                   fltr == 'release' ? item.is_release == 1 : item.is_release > -1 ) 
         )
       );
+      fltr = document.getElementById('features_fltr').value.toLowerCase();
+      console.log(filtered);
+      filtered = (
+        filtered.filter(
+          item => (item['build']['features'] ? item['build']['features'].toLowerCase().includes(fltr): "".includes(fltr))
+        )
+      );
+      fltr = document.getElementById('name_fltr').value.toLowerCase();
+      filtered = (
+        filtered.filter(
+          item => (item['name'].toLowerCase().includes(fltr))
+        )
+      );
+      fltr = document.getElementById('status_fltr').value.toLowerCase();
+      filtered = (
+        filtered.filter(
+          item => (item['status'].toLowerCase().includes(fltr))
+        )
+      );
+      setFilteredRuns(filtered);
+
     };
 
     return (
@@ -56,26 +68,39 @@ function ARun (props) {
     
         <table  className="big"><tbody>
           <tr>
-            <th>Type
-            <input style={{"width":"100%"}} type="text"  name="filters" id="type" onChange={filterHandler} onClick={filterClick}/>
+            <th>Build
+            <select class="dropdown" onChange={filterByAll} id="build_fltr" name="filters">
+              <option value=" "> </option>
+              <option value="debug">Debug</option>
+              <option value="release">Release</option>
+            </select>
+            </th>
+            <th>Features
+            <input style={{"width":"100%"}} type="text"  name="filters" id="features_fltr" onChange={filterByAll} />
             </th>
             <th style={{"width": "40%"}}>Test
-            <input style={{"width":"100%"}} type="text"  name="filters" id="name" onChange={filterHandler} onClick={filterClick}/>
+            <input style={{"width":"100%"}} type="text"  name="filters" id="name_fltr" onChange={filterByAll} />
             </th>
             <th>Status
-            <input style={{"width":"100%"}} type="text"  name="filters" id="status" onChange={filterHandler} onClick={filterClick}/>
+            <input style={{"width":"100%"}} type="text"  name="filters" id="status_fltr" onChange={filterByAll} />
             </th>
             <th>Logs
             </th>
-            <th>Test Time / Run Time</th>
+            <th>Test Time</th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
         {filteredRuns.map((a_run,i) =>
             <tr key={a_run.test_id}>
-            <td>{a_run.type}</td>
+            <td style={{"font-size": "x-small", "margin":"0"}}>
+              {a_run.build.is_release == 0 ? 'Debug' : 'Release'}  
+            </td>
+            <td style={{"font-size": "x-small", "margin":"0"}}>
+               {a_run.build.features}
+            
+            </td>
             <td style={{"width": "30%"}}>
-                <NavLink to={"/test/" + a_run.test_id} >{a_run.test}</NavLink>
+                <NavLink to={"/test/" + a_run.test_id} >{a_run.name}</NavLink>
             </td>
             <td style={{"color": StatusColor(a_run.status)}}>{a_run.status}<br/>
             {RenderHistory(a_run)}
@@ -89,8 +114,7 @@ function ARun (props) {
                  </a> 
               )}
             </td>
-            <td>{a_run.test_time} / {a_run.run_time}</td>
-                
+            <td>{a_run.test_time} </td>
             <td>{a_run.started}</td>
             <td>{a_run.finished}</td>
             </tr>  

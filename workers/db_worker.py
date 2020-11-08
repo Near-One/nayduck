@@ -32,7 +32,7 @@ class WorkerDB (common_db.DB):
         res = self.execute_sql(sql, (after, hostname,))
         if res.rowcount == 0:
             return None
-        sql = f'''SELECT t.test_id, t.run_id, t.build_id, r.sha, t.name, b.ip FROM tests t, runs r, builds b 
+        sql = f'''SELECT t.test_id, t.run_id, t.build_id, r.sha, t.name, b.ip, b.is_release FROM tests t, runs r, builds b 
                   WHERE t.test_id = @tmp_id and t.run_id = r.id and  t.build_id = b.build_id'''
         result = self.execute_sql(sql, ())
         pending_test = result.fetchone()
