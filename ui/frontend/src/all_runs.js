@@ -52,14 +52,6 @@ function AllRuns () {
             });
     }, []);
 
-    var filterClick = event  => {
-      var filters = document.getElementsByName("filters");
-      for (var item of filters) {
-        item.value = "";
-      }
-      setFilteredRuns(allRuns);
-    }
-
     var filterHandler = event => {
       var fltr = document.getElementById('branch').value.toLowerCase();
       var filtered = (

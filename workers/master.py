@@ -28,6 +28,7 @@ def enough_space(filename="/datadrive"):
         return False
 
 def cp(build_id, build_type):
+        bash(f'''rm -rf {build_id}''')
         Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
         Path(f'{build_id}/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
         bld_cp = bash(f'''
@@ -35,7 +36,7 @@ def cp(build_id, build_type):
             cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
             cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
-            cp -r nearcore/target_expensive/{build_type}/deps {build_id}/target_expensive/{build_type}/deps
+            cp -r nearcore/target_expensive/{build_type}/deps/* {build_id}/target_expensive/{build_type}/deps
         ''')
         print(bld_cp)
             
