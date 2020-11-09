@@ -11,6 +11,7 @@ from rc import bash, run
 from multiprocessing import Process
 import json
 from azure.storage.blob import BlobServiceClient, ContentSettings
+from os.path import expanduser
 
 
 DEFAULT_TIMEOUT = 180
@@ -188,6 +189,15 @@ def save_logs(server, test_id, dir_name):
                 files.append((fl_name, os.path.join(dir_name, filename, "stderr")))
         elif filename in ["stderr", "stdout", "build_err", "build_out"]:
             files.append((filename, os.path.join(dir_name, filename)))
+    home = expanduser("~")
+    if os.path.isdir(os.path.join(home, ".rainbow", "logs")):
+        for folder in os.listdir(os.path.join(home, ".rainbow", "logs")):
+            for filename in os.listdir(os.path.join(home, ".rainbow", "logs", folder)):
+                if "err" in filename:
+                    files.append((f"{folder}_err", os.path.join(home, ".rainbow", "logs", folder, filename)))
+                if "out" in filename:
+                    files.append((f"{folder}_out", os.path.join(home, ".rainbow", "logs", folder, filename)))
+
     for fl_name, fl in files:
         stack_trace = False
         data = ""
@@ -225,8 +235,9 @@ def scp_build(build_id, ip, test_name, build_type="debug"):
     Path(f'nearcore/target/{build_type}/').mkdir(parents=True, exist_ok=True)
     Path(f'nearcore/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
     if 'expensive' in test_name:
+        test_spl = test_name.split(' ')
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/* nearcore/target_expensive/{build_type}/deps''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_spl[2]}* nearcore/target_expensive/{build_type}/deps''')
     else:
         print()
         bld = bash(f'''

@@ -60,6 +60,10 @@ function ARun (props) {
 
     };
 
+    var orderByTestTime = _ => {
+    
+    }
+
     return (
       <div>
         <table style={{"border" : "0px", "width": "40%"}}> <tbody>
@@ -86,7 +90,7 @@ function ARun (props) {
             </th>
             <th>Logs
             </th>
-            <th>Test Time</th>
+            <th>Test Time <button onClick={orderByTestTime}>v</button></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>

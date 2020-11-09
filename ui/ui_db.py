@@ -76,21 +76,22 @@ class UIDB (common_db.DB):
         sql = "SELECT t.name, r.branch FROM tests as t, runs as r WHERE t.test_id=%s and r.id = t.run_id"
         result = self.execute_sql(sql, (test_id,))
         res = result.fetchone()
-        return self.get_test_history(res["name"], res["branch"])
+        return self.get_test_history(res["name"], res["branch"], interested_in_logs=True)
         
-    def get_test_history(self, test_name, branch):
+    def get_test_history(self, test_name, branch, interested_in_logs=False):
         sql = "SELECT t.test_id, r.requester, r.title, t.status, t.started, t.finished, r.branch, r.sha FROM tests as t, runs as r WHERE name=%s and t.run_id = r.id and r.branch=%s ORDER BY t.test_id desc LIMIT 30"
         result = self.execute_sql(sql, (test_name, branch))
         tests = result.fetchall()
         for test in tests:
             if test["finished"] != None and test["started"] != None:
                 test["run_time"] = str(test["finished"] - test["started"])
-            sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
-            res = self.execute_sql(sql, (test["test_id"],))
-            logs = res.fetchall()
-            test["logs"] = logs
-            # for l in logs:
-            #     test["logs"].append(l)
+            if interested_in_logs:
+                sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
+                res = self.execute_sql(sql, (test["test_id"],))
+                logs = res.fetchall()
+                test["logs"] = logs
+                # for l in logs:
+                #     test["logs"].append(l)
         return tests
             
     def get_one_run(self, run_id):
@@ -106,7 +107,7 @@ class UIDB (common_db.DB):
         for build in builds:
             builds_dict[build['build_id']] = build
 
-        sql = "SELECT * FROM tests WHERE run_id=%s"
+        sql = "SELECT * FROM tests WHERE run_id=%s ORDER BY FIELD(status, 'FAILED', 'TIMEOUT', 'IGNORED' , 'PASSED', 'CANCELED', 'RUNNING', 'PENDING'), started"
         res = self.execute_sql(sql, (run_id,))
         a_run = res.fetchall()
         for test in a_run:
