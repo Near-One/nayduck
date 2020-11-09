@@ -223,7 +223,7 @@ def save_logs(server, test_id, dir_name):
             
 def scp_build(build_id, ip, test_name, build_type="debug"):
     Path(f'nearcore/target/{build_type}/').mkdir(parents=True, exist_ok=True)
-    Path(f'nearcore/target-expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
+    Path(f'nearcore/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
     if 'expensive' in test_name:
         bld = bash(f'''
             scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/* nearcore/target_expensive/{build_type}/''')
