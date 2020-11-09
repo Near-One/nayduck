@@ -155,6 +155,14 @@ class UIDB (common_db.DB):
         build = res.fetchone()
         if build["finished"] != None and build["started"] != None:
             build["build_time"] = str(build["finished"] - build["started"])
+        try:
+            build["stderr"] =  build["stderr"].decode()
+        except:
+            pass
+        try:
+            build["stdout"] =  build["stdout"].decode()
+        except:
+            pass
         run = self.get_data_about_run(build['run_id'])
         build.update(run)
         return build
