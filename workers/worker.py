@@ -227,7 +227,7 @@ def scp_build(build_id, ip, test_name, build_type="debug"):
     if 'expensive' in test_name:
         bld = bash(f'''
             scp -o StrictHostKeyChecking=no -r 
-            azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target-expensive/{build_type}/deps/* nearcore/target-expensive/{build_type}/''')
+            azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/* nearcore/target_expensive/{build_type}/''')
     else:
         bld = bash(f'''
             scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/near* 
@@ -239,7 +239,7 @@ def checkout(sha):
     bld = bash(f'''
         cd nearcore
         rm -rf target
-        rm -rf target-expensive
+        rm -rf target_expensive
         rm -rf normal_target
         git checkout {sha}
     ''')
