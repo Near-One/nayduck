@@ -97,7 +97,7 @@ class UIDB (common_db.DB):
         run_data = self.get_data_about_run(run_id)
         branch = run_data["branch"] 
         
-        sql = "SELECT * FROM builds WHERE run_id=%s"
+        sql = "SELECT build_id, is_release, features FROM builds WHERE run_id=%s"
         res = self.execute_sql(sql, (run_id,))
         builds = res.fetchall()
         if not builds:
