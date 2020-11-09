@@ -36,8 +36,9 @@ def cp(build_id, build_type):
             cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
             cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
-            cp -r nearcore/target_expensive/{build_type}/deps/!(*.*) {build_id}/target_expensive/{build_type}/deps
         ''')
+        bld_cp = bash(f'''find nearcore/target_expensive/{build_type}/deps/* -perm /a+x -exec cp -r'''+ " {} " +f'''{build_id}/target_expensive/{build_type}/deps \;''')
+
         print(bld_cp)
             
 
