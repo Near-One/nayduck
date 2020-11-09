@@ -100,6 +100,8 @@ class UIDB (common_db.DB):
         sql = "SELECT * FROM builds WHERE run_id=%s"
         res = self.execute_sql(sql, (run_id,))
         builds = res.fetchall()
+        if not builds:
+            builds = [{'build_id': 0, 'status': 'TEST SPECIFIC', 'is_release': False, 'features': ''}] 
         builds_dict = {}
         for build in builds:
             builds_dict[build['build_id']] = build
@@ -108,6 +110,8 @@ class UIDB (common_db.DB):
         res = self.execute_sql(sql, (run_id,))
         a_run = res.fetchall()
         for test in a_run:
+            if test['build_id'] == None:
+                 test['build_id'] = 0
             test['build'] = builds_dict[test['build_id']]
             test.update(self.get_data_about_test(test, branch, blob=False))
         return a_run
@@ -153,8 +157,6 @@ class UIDB (common_db.DB):
             build["build_time"] = str(build["finished"] - build["started"])
         run = self.get_data_about_run(build['run_id'])
         build.update(run)
-
-        
         return build
                     
     def get_histoty_for_base_branch(self, test_id, branch):
