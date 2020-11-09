@@ -226,12 +226,11 @@ def scp_build(build_id, ip, test_name, build_type="debug"):
     Path(f'nearcore/target-expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
     if 'expensive' in test_name:
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no -r 
-            azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/* nearcore/target_expensive/{build_type}/''')
+            scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/* nearcore/target_expensive/{build_type}/''')
     else:
+        print()
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/near* 
-            nearcore/target/{build_type}/''')
+            scp -o StrictHostKeyChecking=no -r azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/near* nearcore/target/{build_type}/''')
     return bld
 
 def checkout(sha):

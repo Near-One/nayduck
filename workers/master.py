@@ -30,6 +30,7 @@ def build(build_id, sha, outdir, features, is_release):
         release = "--release"
     else:
         release = ""
+    
     with open(str(outdir) + '/build_out', 'w') as fl_o:
         with open(str(outdir) + '/build_err', 'w') as fl_e:
             kwargs = {"stdout": fl_o, "stderr": fl_e}
@@ -106,6 +107,7 @@ def keep_pulling():
             if not enough_space():
                 print("Not enough space. Waiting for clean up.")
                 bash(f''' rm -rf nearcore/target''')
+                bash(f''' rm -rf nearcore/target_expensive''')
                 continue
             new_build = server.get_new_build(ip_address)
             if not new_build:
