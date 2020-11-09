@@ -11,6 +11,8 @@ from db_master import MasterDB
 from rc import bash, run
 from multiprocessing import Process
 from azure.storage.blob import BlobServiceClient, ContentSettings
+from multiprocessing import Pool                                                
+
 
 
 def enough_space(filename="/datadrive"):
@@ -24,6 +26,19 @@ def enough_space(filename="/datadrive"):
         return True
     except:
         return False
+
+def cp(build_id, build_type):
+        Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
+        Path(f'{build_id}/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
+        bld_cp = bash(f'''
+            cp -r nearcore/target/{build_type}/neard {build_id}/target/{build_type}/neard
+            cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
+            cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
+            cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
+            cp -r nearcore/target_expensive/{build_type}/deps {build_id}/target_expensive/{build_type}/deps
+        ''')
+        print(bld_cp)
+            
 
 def build(build_id, sha, outdir, features, is_release):
     if is_release:
@@ -64,26 +79,11 @@ def build(build_id, sha, outdir, features, is_release):
             if bld.returncode != 0:
                 bash(f'''rm -rf nearcore''')
                 return bld
-            Path(f'{build_id}/target/debug/').mkdir(parents=True, exist_ok=True)
-            Path(f'{build_id}/target_expensive/debug/deps').mkdir(parents=True, exist_ok=True)
-            Path(f'{build_id}/target/release/').mkdir(parents=True, exist_ok=True)
-            Path(f'{build_id}/target_expensive/release/deps').mkdir(parents=True, exist_ok=True)
-            bld_cp = bash(f'''
-                    cp -r nearcore/target/debug/neard {build_id}/target/debug/neard
-                    cp -r nearcore/target/debug/near {build_id}/target/debug/near
-                    cp -r nearcore/target/debug/genesis-populate {build_id}/target/debug/genesis-populate
-                    cp -r nearcore/target/debug/restaked {build_id}/target/debug/restaked
-                    cp -r nearcore/target_expensive/debug/deps {build_id}/target_expensive/debug/deps
-            ''', **kwargs, login=True)
-            print(bld_cp)
-            bld_cp = bash(f'''            
-                    cp -r nearcore/target/release/neard {build_id}/target/release/neard
-                    cp -r nearcore/target/release/near {build_id}/target/release/near
-                    cp -r nearcore/target_expensive/release/deps {build_id}/target_expensive/release/deps
-                    cp -r nearcore/target/release/genesis-populate {build_id}/target/release/genesis-populate
-                    cp -r nearcore/target/release/restaked {build_id}/target/release/restaked
-            ''', **kwargs, login=True)
-            print(bld_cp)
+            if is_release:
+                cp(build_id, "release")
+            else:
+                cp(build_id, "debug")
+
             return bld
 
 def cleanup_finished_runs(runs):
