@@ -59,7 +59,7 @@ class UIDB (common_db.DB):
             for build in builds:
                 sql = '''select count(IF(status='PENDING',1,NULL)) AS pending,  count(IF(status='RUNNING',1,NULL)) AS running,  
                                  count(IF(status='PASSED',1,NULL)) AS passed,  count(IF(status='IGNORED',1,NULL)) AS ignored,  
-                                 count(IF(status='FAILED',1,NULL)) AS failed,  count(IF(status='BUILD FAILED',1,NULL)) AS build_failed,  
+                                 count(IF(status LIKE '%FAILED%',1,NULL)) AS failed,  count(IF(status='BUILD FAILED',1,NULL)) AS build_failed,  
                                  count(IF(status='CANCELED',1,NULL)) AS canceled,  count(IF(status='TIMEOUT',1,NULL)) AS timeout 
                                  from tests where {} = %s'''
                 if build['build_id'] == 0:

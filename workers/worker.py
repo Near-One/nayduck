@@ -238,9 +238,9 @@ def scp_build(build_id, ip, test, build_type="debug"):
     Path(f'nearcore/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
     if test[0] == "expensive":
         if test[1].startswith('--'):
-            test_name = test[2]
+            test_name = test[3]
         else:
-            test_name = test[1]
+            test_name = test[2]
         bld = bash(f'''
             scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}* nearcore/target_expensive/{build_type}/deps''')
     else:

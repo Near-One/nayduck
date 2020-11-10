@@ -26,7 +26,7 @@ function AllRuns () {
     .then(data => {
      //for (var d of data) {
 
-       // if (d["login"] === "nearprotocol") {
+       // if (d["login"] === "nearprotocol" || d["login"] === "near") {
        //     console.log("Welcome to Nay!");
        //     setMember(true);
        // }

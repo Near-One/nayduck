@@ -28,11 +28,11 @@ def request_a_run():
             github_req = f'''https://api.github.com/users/{github_login}/orgs'''
             response = requests.get(github_req)
             for org in response.json():
-                if "login" in org and org['login'] == 'nearprotocol':
+                if "login" in org and (org['login'] == 'nearprotocol' or org['login'] == 'near'):
                     allowed = True
                     break
             if not allowed:
-                resp = {'code': 1, 'response': f'''Failure. {github_login} is not part of NearProtocol org.'''}
+                resp = {'code': 1, 'response': f'''Failure. {github_login} is not part of NearProtocol or Near orgs.'''}
                 return jsonify(resp)
     if not request_json['branch'] or not request_json['sha']:
         resp = {'code': 1, 'response': 'Failure. Branch and/or git sha were not provided.'}
