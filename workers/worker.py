@@ -50,7 +50,7 @@ def get_sequential_test_cmd(test, build_type):
         elif test[0] == 'expensive':
             fls = os.listdir(os.path.join("nearcore", "target_expensive", build_type, "deps"))
             for f in fls:
-                if test_name[2] in f:
+                if test[2] in f:
                     return [os.path.join("./nearcore", "target_expensive", build_type, "deps", f)]
         elif test[0] == 'lib':
             return ["cargo", "test", "--target-dir", "target_expensive", "-j2", "--color=always", "--package", test[1], "--lib", test[2],
@@ -98,7 +98,7 @@ def run_test(dir_name, test, remote=False, build_type="debug"):
             timeout += 60 * 15
 
         cmd = get_sequential_test_cmd(test, build_type)
-
+        print(cmd)
         if test[0] == 'pytest':
             node_dirs = subprocess.check_output("find ~/.near/test* -maxdepth 0 || true", shell=True).decode('utf-8').strip().split('\n')
             for node_dir in node_dirs:

@@ -42,6 +42,8 @@ def cp(build_id, build_type):
         exe_files = bld_cp.stdout.split('\n')
         fls = {}
         for f in exe_files:
+            if not f:
+                continue
             base = os.path.basename(f)
             test_name = base.split('-')[0]
             if test_name in fls:

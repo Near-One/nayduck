@@ -7,6 +7,7 @@ import { StatusColor, RenderHistory, ServerIp }  from "./common"
 
 
 function ARun (props) {
+    const [orderDescTestTime, setOrderDescTestTime] = useState(true);
     const [aRun, setARun] = useState([]);
     const [filteredRuns, setFilteredRuns] = useState([])
 
@@ -61,13 +62,22 @@ function ARun (props) {
     };
 
     var orderByTestTime = event => {
-      var filtered = [...aRun] 
-      var filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
-      console.log(filtered)
+      var filtered = [...aRun];
+      if (orderDescTestTime) {
+        var filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      } else {
+        var filtered = filtered.sort((a, b) => a.test_time < b.test_time ? 1 : -1);
+      }
       setARun(filtered);
       filtered = [...filteredRuns] 
-      filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      if (orderDescTestTime) {
+        filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      } else {
+        filtered = filtered.sort((a, b) => a.test_time < b.test_time ? 1 : -1);
+      }
       setFilteredRuns(filtered);
+      setOrderDescTestTime(!orderDescTestTime);
+      console.log(orderDescTestTime);
     }
 
     return (
@@ -96,7 +106,7 @@ function ARun (props) {
             </th>
             <th>Logs
             </th>
-            <th>Test Time <button onClick={orderByTestTime}>&#8597;</button></th>
+            <th>Test Time <a href="javascript:;" style={{"text-decoration":"none"}} onClick={orderByTestTime}>&#8597;</a></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
