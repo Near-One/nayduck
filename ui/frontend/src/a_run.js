@@ -96,7 +96,7 @@ function ARun (props) {
             </th>
             <th>Logs
             </th>
-            <th>Test Time <button onClick={orderByTestTime}>v</button></th>
+            <th>Test Time <button onClick={orderByTestTime}>&#8597;</button></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>

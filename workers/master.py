@@ -44,7 +44,7 @@ def cp(build_id, build_type):
         for f in exe_files:
             base = os.path.basename(f)
             test_name = base.split('-')[0]
-            if test_name[0] in fls:
+            if test_name in fls:
                 if os.path.getctime(fls[test_name]) < os.path.getctime(f):
                     fls[test_name] = f
             else:
