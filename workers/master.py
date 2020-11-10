@@ -45,6 +45,8 @@ def cp(build_id, build_type):
             if not f:
                 continue
             base = os.path.basename(f)
+            if "." in base:
+                continue
             test_name = base.split('-')[0]
             if test_name in fls:
                 if os.path.getctime(fls[test_name]) < os.path.getctime(f):

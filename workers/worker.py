@@ -48,10 +48,11 @@ def get_sequential_test_cmd(test, build_type):
         if test[0] == 'pytest' or test[0] == 'mocknet':
             return ["python", "tests/" + test[1]] + test[2:]
         elif test[0] == 'expensive':
-            fls = os.listdir(os.path.join("nearcore", "target_expensive", build_type, "deps"))
+            fls = os.listdir(os.path.join("target_expensive", build_type, "deps"))
+            print(fls)
             for f in fls:
                 if test[2] in f:
-                    return [os.path.join("./nearcore", "target_expensive", build_type, "deps", f)]
+                    return [os.path.join("./target_expensive", build_type, "deps", f)]
         elif test[0] == 'lib':
             return ["cargo", "test", "--target-dir", "target_expensive", "-j2", "--color=always", "--package", test[1], "--lib", test[2],
                     "--all-features", "--", "--exact", "--nocapture"]
