@@ -60,8 +60,14 @@ function ARun (props) {
 
     };
 
-    var orderByTestTime = _ => {
-    
+    var orderByTestTime = event => {
+      console.log("sort")
+      var filtered = aRun.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      console.log(filtered)
+      setARun(filtered);
+      filtered = filteredRuns.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      setFilteredRuns(filtered);
+      
     }
 
     return (

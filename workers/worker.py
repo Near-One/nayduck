@@ -43,13 +43,15 @@ def prettify_size(size):
     return "%sG" % size
 
 
-def get_sequential_test_cmd(test):
+def get_sequential_test_cmd(test, build_type):
     try:
         if test[0] == 'pytest' or test[0] == 'mocknet':
             return ["python", "tests/" + test[1]] + test[2:]
         elif test[0] == 'expensive':
-            return ["cargo", "test", "--target-dir", "target_expensive", "-j2", "--color=always", "--package", test[1], "--test", test[2], test[3], 
-                    "--all-features", "--", "--exact", "--nocapture"]
+            fls = os.listdir(os.path.join("nearcore", "target_expensive", build_type, "deps"))
+            for f in fls:
+                if test_name[2] in f:
+                    return [os.path.join("./nearcore", "target_expensive", build_type, "deps", f)]
         elif test[0] == 'lib':
             return ["cargo", "test", "--target-dir", "target_expensive", "-j2", "--color=always", "--package", test[1], "--lib", test[2],
                     "--all-features", "--", "--exact", "--nocapture"]
@@ -77,7 +79,7 @@ def install_new_packages():
         print(e)
 
 
-def run_test(dir_name, test, remote=False):
+def run_test(dir_name, test, remote=False, build_type="debug"):
     owd = os.getcwd()
     outcome = "FAILED"
     try:
@@ -95,7 +97,7 @@ def run_test(dir_name, test, remote=False):
         if remote:
             timeout += 60 * 15
 
-        cmd = get_sequential_test_cmd(test)
+        cmd = get_sequential_test_cmd(test, build_type)
 
         if test[0] == 'pytest':
             node_dirs = subprocess.check_output("find ~/.near/test* -maxdepth 0 || true", shell=True).decode('utf-8').strip().split('\n')
@@ -320,7 +322,7 @@ def keep_pulling():
 
             install_new_packages()
             server.test_started(test['test_id'])
-            code = run_test(outdir, test_name.strip().split(' '), remote)
+            code = run_test(outdir, test_name.strip().split(' '), remote, "release" if release else "debug")
             server = WorkerDB()
             if code == 'POSTPONE':
                 server.remark_test_pending(test['test_id'])
