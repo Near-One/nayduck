@@ -61,13 +61,13 @@ function ARun (props) {
     };
 
     var orderByTestTime = event => {
-      console.log("sort")
-      var filtered = aRun.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      var filtered = [...aRun] 
+      var filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
       console.log(filtered)
       setARun(filtered);
-      filtered = filteredRuns.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+      filtered = [...filteredRuns] 
+      filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
       setFilteredRuns(filtered);
-      
     }
 
     return (

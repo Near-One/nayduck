@@ -37,8 +37,8 @@ def cp(build_id, build_type):
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
             cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
         ''')
-        '''find nearcore/target_expensive/{build_type}/deps/* -perm /a+x'''
         bld_cp = bash(f'''find nearcore/target_expensive/{build_type}/deps/* -perm /a+x''')
+        print(bld_cp)
         exe_files = bld_cp.stdout.split('\n')
         fls = {}
         for f in exe_files:
@@ -49,10 +49,10 @@ def cp(build_id, build_type):
                     fls[test_name] = f
             else:
                 fls[test_name] = f
+        print(len(fls))
         for fl in fls.values():
             bld_cp = bash(f'''cp {fl} {build_id}/target_expensive/{build_type}/deps/''')
-
-        print(bld_cp)
+            print(bld_cp)
             
 
 def build(build_id, sha, outdir, features, is_release):
