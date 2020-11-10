@@ -52,7 +52,7 @@ def get_sequential_test_cmd(test, build_type):
             print(fls)
             for f in fls:
                 if test[2] in f:
-                    return [os.path.join("./target_expensive", build_type, "deps", f)]
+                    return [os.path.join("./target_expensive", build_type, "deps", f), test[3]]
         elif test[0] == 'lib':
             return ["cargo", "test", "--target-dir", "target_expensive", "-j2", "--color=always", "--package", test[1], "--lib", test[2],
                     "--all-features", "--", "--exact", "--nocapture"]
