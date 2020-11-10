@@ -233,13 +233,16 @@ def save_logs(server, test_id, dir_name):
 
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
-def scp_build(build_id, ip, test_name, build_type="debug"):
+def scp_build(build_id, ip, test, build_type="debug"):
     Path(f'nearcore/target/{build_type}/').mkdir(parents=True, exist_ok=True)
     Path(f'nearcore/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
-    if 'expensive' in test_name:
-        test_spl = test_name.split(' ')
+    if test[0] == "expensive":
+        if test[1].startswith('--'):
+            test_name = test[2]
+        else:
+            test_name = test[1]
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_spl[2]}* nearcore/target_expensive/{build_type}/deps''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}* nearcore/target_expensive/{build_type}/deps''')
     else:
         print()
         bld = bash(f'''
@@ -285,13 +288,6 @@ def keep_pulling():
                 # More logs!
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
-            build_type = "debug"
-            if test['is_release']:
-                build_type = "release"
-            scp = scp_build(test['build_id'], test['ip'], test_name, build_type)
-            if scp.returncode != 0:
-                print(scp)
-                server.update_test_status("SCP FAILED", test['test_id'])
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
@@ -319,7 +315,12 @@ def keep_pulling():
             if '--features' in test_name:
                 test_name = test_name[:test_name.find('--features')]
 
-
+            scp = scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
+            if scp.returncode != 0:
+                print(scp)
+                server.update_test_status("SCP FAILED", test['test_id'])
+                continue
+            
             install_new_packages()
             server.test_started(test['test_id'])
             code = run_test(outdir, test_name.strip().split(' '), remote, "release" if release else "debug")
