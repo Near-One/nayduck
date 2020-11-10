@@ -42,7 +42,13 @@ app.post("/authenticate", (req, res) => {
 
       // Request to return data of a user that has been authenticated
       return fetch(
-        `https://api.github.com/user?access_token=${access_token}&scope=${scope}&token_type=${token_type}`
+        `https://api.github.com/user?scope=${scope}&token_type=${token_type}`, 
+        {
+          method: "POST",
+          headers: {
+            'Authorization': 'token '+ access_token,
+          }
+        }
       );
     })
     .then(response => response.json())
