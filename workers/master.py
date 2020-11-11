@@ -63,10 +63,7 @@ def cp(build_id, build_type):
             cmds.append(f'cp {f} {build_id}/target_expensive/{build_type}/deps/')
         p = Pool(10)
         p.map(cp_exe, cmds)
-
-        # for fl in fls.values():
-        #     bld_cp = bash(f'''cp {fl} {build_id}/target_expensive/{build_type}/deps/''')
-        #     print(bld_cp)
+        p.close()
             
 
 def build(build_id, sha, outdir, features, is_release):
