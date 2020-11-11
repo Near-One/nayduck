@@ -247,7 +247,7 @@ def scp_build(build_id, ip, test, build_type="debug"):
     else:
         print()
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/near* nearcore/target/{build_type}/''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/* nearcore/target/{build_type}/''')
     return bld
 
 def checkout(sha):

@@ -97,13 +97,13 @@ function AllRuns () {
         <HashRouter>
           <table className="big"><tbody>
           <tr>
-            <th>Branch
+            <th style={{"width": "10%"}}>Branch
             <input style={{"width":"100%"}} type="text" name="filters" id="branch" onChange={filterHandler}/>
             </th>
             <th style={{"width": "30%"}}>Title
             <input style={{"width":"100%"}} type="text" name="filters" id="title" onChange={filterHandler}/>
             </th>
-            <th>User
+            <th style={{"width": "10%"}}>User
             <input style={{"width":"100%"}} type="text" name="filters" id="requester" onChange={filterHandler}/>
             </th>
             <th width="40%">Status</th>
@@ -124,7 +124,7 @@ function AllRuns () {
               
               <td >
                 {a_run.builds.map((build,j) => 
-                <div class="one_build">
+                <div class="">
                     <div class="build_status" style={{"background": build.status == "PENDING" ? "FF99FF" : 
                                                             build.status == "BUILDING" ? "#9999FF":
                                                             build.status == "BUILD DONE" ? "#CCFFCC":
