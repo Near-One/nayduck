@@ -27,6 +27,10 @@ def enough_space(filename="/datadrive"):
     except:
         return False
 
+def cp_exe(cmd):
+    b = bash(cmd)
+    print(b)
+
 def cp(build_id, build_type):
         bash(f'''rm -rf {build_id}''')
         Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
@@ -54,14 +58,12 @@ def cp(build_id, build_type):
             else:
                 fls[test_name] = f
         
-        print(len(fls))
-        def cp_exe(fl):
-            bld_cp = bash(f'''cp {fl} {build_id}/target_expensive/{build_type}/deps/''')
-            print(bld_cp)
-        
+        cmds = []
+        for f in fls.values():
+            cmds.append(f'cp {f} {build_id}/target_expensive/{build_type}/deps/')
         p = Pool(10)
-        p.map(cp_exe, fls)
-            
+        p.map(cp_exe, cmds)
+
         # for fl in fls.values():
         #     bld_cp = bash(f'''cp {fl} {build_id}/target_expensive/{build_type}/deps/''')
         #     print(bld_cp)
