@@ -18,4 +18,5 @@ base58
 prometheus-client
 tqdm
 deepdiff
-
+pip3 install github
+semver

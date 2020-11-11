@@ -99,6 +99,11 @@ def build(build_id, sha, outdir, features, is_release):
                 cargo build -j2 -p genesis-populate {features} {release}
                 cargo build -j2 -p restaked {features} {release}
                 cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive
+                cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive --package near-client 
+                cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive --package nearcore
+                cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive --package near-chunks 
+                cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive --package neard 
+                cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive --package near-chain
                 cargo build -j2 -p neard --target-dir normal_target
             ''' , **kwargs, login=True)
             print(bld)
@@ -148,6 +153,7 @@ def keep_pulling():
                 status = 'BUILD DONE'
             else:
                 status = 'BUILD FAILED'
+            
             fl_err = os.path.join(outdir, "build_err")
             fl_out = os.path.join(outdir, "build_out")
             err = open(fl_err, 'r').read()

@@ -52,10 +52,11 @@ def get_sequential_test_cmd(test, build_type):
             print(fls)
             for f in fls:
                 if test[2] in f:
-                    return [os.path.join("./target_expensive", build_type, "deps", f), test[3]]
+                    return [os.path.join("./target_expensive", build_type, "deps", f), test[3], "--exact", "--nocapture"]
         elif test[0] == 'lib':
-            return ["cargo", "test", "--target-dir", "target_expensive", "-j2", "--color=always", "--package", test[1], "--lib", test[2],
-                    "--all-features", "--", "--exact", "--nocapture"]
+            for f in fls:
+                if test[1] in f:
+                    return [os.path.join("./target_expensive", build_type, "deps", f), test[2], "--exact", "--nocapture"]
         else:
             assert False, test
     except:
@@ -98,8 +99,10 @@ def run_test(dir_name, test, remote=False, build_type="debug"):
         if remote:
             timeout += 60 * 15
 
+        
         cmd = get_sequential_test_cmd(test, build_type)
         print(cmd)
+
         if test[0] == 'pytest':
             node_dirs = subprocess.check_output("find ~/.near/test* -maxdepth 0 || true", shell=True).decode('utf-8').strip().split('\n')
             for node_dir in node_dirs:
@@ -274,6 +277,7 @@ def keep_pulling():
     hostname = socket.gethostname()
     server = WorkerDB()
     server.handle_restart(hostname)
+    home = expanduser("~")
     while True:
         time.sleep(5)
         try:
@@ -281,6 +285,7 @@ def keep_pulling():
             test = server.get_pending_test(hostname)
             if not test:
                 continue
+            
             test_name = test['name']
             print(test)
             chck = checkout(test['sha'])
@@ -290,6 +295,7 @@ def keep_pulling():
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
+            shutil.rmtree(os.path.join(home, ".rainbow"), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
             
