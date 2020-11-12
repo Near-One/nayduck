@@ -56,7 +56,7 @@ def get_sequential_test_cmd(test, build_type):
         elif test[0] == 'lib':
             fls = os.listdir(os.path.join("target_expensive", build_type, "deps"))
             for f in fls:
-                if test[1] in f:
+                if test[1].replace('-', '_') in f:
                     return [os.path.join("./target_expensive", build_type, "deps", f), test[2], "--exact", "--nocapture"]
         else:
             assert False, test
