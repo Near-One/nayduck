@@ -44,7 +44,7 @@ function ATest (props) {
       {aTest.map((a_test,i) =>
         <div>
         <table style={{"border" : "0px", "width": "40%"}}> <tbody>
-          <tr><td style={{"border": "0px"}}><NavLink to={"/run/" + a_test.run_id}> Back To Run</NavLink></td>
+          <tr><td style={{"border": "0px"}}><NavLink to={"/run/" + a_test.run_id}> Back To A Run</NavLink></td>
           <td style={{"border": "0px", "font-size":"10px"}}>{RenderHistory(a_test, ("This test history for branch " + a_test.branch))}</td>
           {baseBranch === a_test.branch ? (null) : 
           baseBranchHistory.map((base_test,j) => <td style={{"border": "0px", "font-size":"10px"}}>{RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
