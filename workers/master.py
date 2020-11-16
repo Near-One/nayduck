@@ -9,11 +9,9 @@ import time
 import requests
 from db_master import MasterDB
 from rc import bash, run
-from multiprocessing import Process
+from multiprocessing import Process, Queue, Pool
 from azure.storage.blob import BlobServiceClient, ContentSettings
-from multiprocessing import Pool                                                
-
-
+                                       
 
 def enough_space(filename="/datadrive"):
     try:
@@ -65,7 +63,30 @@ def cp(build_id, build_type):
         p.map(cp_exe, cmds)
         p.close()
             
+def build_target(queue, features, release):
+    print("Build target")
+    bld = bash(f'''
+            cd nearcore
+            cargo build -j2 -p neard --features adversarial {features} {release}
+            cargo build -j2 -p genesis-populate {features} {release}
+            cargo build -j2 -p restaked {features} {release}
+    ''', login=True)
+    queue.put(bld)
+            
 
+def build_target_expensive(queue):
+    print("Build expensive")
+    bld = bash(f'''
+            cd nearcore
+            cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive
+            cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-client 
+            cargo test -j2 --no-run --all-features --target-dir target_expensive --package nearcore
+            cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-chunks 
+            cargo test -j2 --no-run --all-features --target-dir target_expensive --package neard 
+            cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-chain
+    ''' , login=True)
+    queue.put(bld)
+            
 def build(build_id, sha, outdir, features, is_release):
     if is_release:
         release = "--release"
@@ -91,31 +112,30 @@ def build(build_id, sha, outdir, features, is_release):
                 ''' , **kwargs, login=True)
                 print(bld)
                 if bld.returncode != 0:
-                    return bld
+                    return bld.returncode
             print("Build")
-            bld = bash(f'''
-                cd nearcore
-                cargo build -j2 -p neard --features adversarial {features} {release}
-                cargo build -j2 -p genesis-populate {features} {release}
-                cargo build -j2 -p restaked {features} {release}
-                cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive
-                cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-client 
-                cargo test -j2 --no-run --all-features --target-dir target_expensive --package nearcore
-                cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-chunks 
-                cargo test -j2 --no-run --all-features --target-dir target_expensive --package neard 
-                cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-chain
-                cargo build -j2 -p neard --target-dir normal_target
-            ''' , **kwargs, login=True)
-            print(bld)
-            if bld.returncode != 0:
+            queue = Queue()
+            p1 = Process(target=build_target, args=(queue, features, release))
+            p1.start()
+            p2 = Process(target=build_target_expensive, args=(queue,))
+            p2.start()
+            p1.join()
+            bld1 = queue.get()
+            p2.join()
+            bld2 = queue.get()
+            fl_e.write(bld1.stderr)
+            fl_e.write(bld2.stderr)
+            fl_o.write(bld1.stdout)
+            fl_o.write(bld2.stdout)
+            if bld1.returncode != 0 or bld2.returncode != 0:
                 bash(f'''rm -rf nearcore''')
-                return bld
+                return bld1.returncode if bld1.returncode != 0 else bld2.returncode
             if is_release:
                 cp(build_id, "release")
             else:
                 cp(build_id, "debug")
 
-            return bld
+            return bld.returncode
 
 def cleanup_finished_runs(runs):
     for run in runs:
@@ -149,7 +169,7 @@ def keep_pulling():
             Path(outdir).mkdir(parents=True, exist_ok=True)
             code = build(new_build['build_id'], new_build['sha'], outdir, new_build['features'], new_build['is_release'])
             server = MasterDB()
-            if code.returncode == 0:
+            if code == 0:
                 status = 'BUILD DONE'
             else:
                 status = 'BUILD FAILED'
