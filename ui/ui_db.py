@@ -140,7 +140,7 @@ class UIDB (common_db.DB):
         test["name"] = ' '.join(test_l)
         if test["finished"] != None and test["started"] != None:
             test["test_time"] = str(test["finished"] - test["started"])
-        history = self.get_test_history(test['name'], branch)
+        history = self.get_test_history(test["cmd"], branch)
         test["history"] = self.history_stats(history)
         return test
 
