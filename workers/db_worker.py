@@ -21,7 +21,10 @@ class WorkerDB (common_db.DB):
     def get_pending_test(self, hostname):
         after = int(time.time())
         if "mocknet" in hostname:
-            sql = "UPDATE tests t SET t.started = now(), t.status = 'RUNNING', t.hostname=%s  WHERE t.status = 'PENDING' and t.name LIKE '%mocknet%' and @tmp_id := t.test_id ORDER BY t.test_id LIMIT 1;"
+            sql = '''UPDATE tests t SET t.started = now(), t.status = 'RUNNING', t.hostname=%s  WHERE t.status = 'PENDING' and 
+                     build_id in (select build_id from builds where status = 'SKIPPED') and
+                     t.name LIKE '%mocknet%' and @tmp_id := t.test_id ORDER BY t.test_id LIMIT 1;'''
+            vals =  (hostname,)
         else:
             sql = '''UPDATE tests AS t, 
             (SELECT test_id FROM tests WHERE status = 'PENDING' and   
@@ -29,7 +32,8 @@ class WorkerDB (common_db.DB):
                 name NOT LIKE '%mocknet%' and select_after < %s ORDER BY priority, test_id LIMIT 1) AS id 
                 SET t.started = now(), t.status = 'RUNNING', t.hostname=%s WHERE t.test_id=id.test_id and 
                 @tmp_id := id.test_id'''
-        res = self.execute_sql(sql, (after, hostname,))
+            vals = (after, hostname)
+        res = self.execute_sql(sql, vals)
         if res.rowcount == 0:
             return None
         sql = f'''SELECT t.test_id, t.run_id, t.build_id, r.sha, t.name, b.ip, b.is_release FROM tests t, runs r, builds b 
