@@ -331,11 +331,12 @@ def keep_pulling():
             if '--features' in test_name:
                 test_name = test_name[:test_name.find('--features')]
 
-            scp = scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
-            if scp.returncode != 0:
-                print(scp)
-                server.update_test_status("SCP FAILED", test['test_id'])
-                continue
+            if not remote:
+                scp = scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
+                if scp.returncode != 0:
+                    print(scp)
+                    server.update_test_status("SCP FAILED", test['test_id'])
+                    continue
             
             install_new_packages()
             server.test_started(test['test_id'])
