@@ -24,13 +24,13 @@ function AllRuns () {
     })
     .then(response => response.json())
     .then(data => {
-     //for (var d of data) {
-
-       // if (d["login"] === "nearprotocol" || d["login"] === "near") {
-       //     console.log("Welcome to Nay!");
-       //     setMember(true);
-       // }
-     //}
+     console.log(data);
+     for (var d of data) {
+        if (d["login"] === "nearprotocol" || d["login"] === "near") {
+            console.log("Welcome to Nay!");
+            setMember(true);
+        }
+      }
     });
   
     
