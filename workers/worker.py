@@ -331,7 +331,7 @@ def keep_pulling():
             if '--features' in test_name:
                 test_name = test_name[:test_name.find('--features')]
 
-            if not remote:
+            if not (remote or 'mocknet' in test_name):
                 scp = scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
                 if scp.returncode != 0:
                     print(scp)
