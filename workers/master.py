@@ -153,8 +153,8 @@ def keep_pulling():
         time.sleep(5)
         try:
             server = MasterDB()
-            #finished_runs = server.get_builds_with_finished_tests(ip_address)
-            #cleanup_finished_runs(finished_runs)
+            finished_runs = server.get_builds_with_finished_tests(ip_address)
+            cleanup_finished_runs(finished_runs)
             if not enough_space():
                 print("Not enough space. Waiting for clean up.")
                 bash(f''' rm -rf nearcore/target''')

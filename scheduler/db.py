@@ -62,6 +62,6 @@ class SchedulerDB (common_db.DB):
                 else:
                     build_id = debug_builds[features]
             sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority, is_release, remote) values (%s, %s, %s, %s, %s, %s, %s, %s)"
-            self.execute_sql(sql, (run_id, build_id, build_status, test.strip(), after, priority, release, remote))
+            self.execute_sql(sql, (run_id, build_id, "PENDING", test.strip(), after, priority, release, remote))
         return run_id
         
