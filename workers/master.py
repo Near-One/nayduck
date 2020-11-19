@@ -67,7 +67,7 @@ def build_target(queue, features, release):
     print("Build target")
     bld = bash(f'''
             cd nearcore
-            cargo build -j2 -p neard -p genesis-populate -p restaked --features adversarial {features} {release}
+            cargo build -j8 -p neard -p genesis-populate -p restaked --features adversarial {features} {release}
     ''', login=True)
     queue.put(bld)
             
@@ -76,8 +76,8 @@ def build_target_expensive(queue):
     print("Build expensive")
     bld = bash(f'''
             cd nearcore
-            cargo test -j2 --workspace --no-run --all-features --target-dir target_expensive
-            cargo test -j2 --no-run --all-features --target-dir target_expensive --package near-client --package nearcore --package near-chunks --package neard --package near-chain
+            cargo test -j8 --workspace --no-run --all-features --target-dir target_expensive
+            cargo test -j8 --no-run --all-features --target-dir target_expensive --package near-client --package nearcore --package near-chunks --package neard --package near-chain
     ''' , login=True)
     queue.put(bld)
             
