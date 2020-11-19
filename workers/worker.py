@@ -305,6 +305,7 @@ def keep_pulling():
                 continue
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             shutil.rmtree(os.path.join(home, ".rainbow"), ignore_errors=True)
+            shutil.rmtree(os.path.join(home, ".rainbow-bridge"), ignore_errors=True)
             outdir = os.path.abspath('output/' + str(test['test_id']))
             Path(outdir).mkdir(parents=True, exist_ok=True)
             
