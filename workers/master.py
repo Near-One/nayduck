@@ -81,7 +81,7 @@ def build_target_expensive(queue):
     ''' , login=True)
     queue.put(bld)
             
-def build(build_id, sha, outdir, features, is_release):
+def build(build_id, sha, outdir, features, is_release, pytest, expensive):
     if is_release:
         release = "--release"
     else:
@@ -109,27 +109,34 @@ def build(build_id, sha, outdir, features, is_release):
                     return bld.returncode
             print("Build")
             queue = Queue()
-            p1 = Process(target=build_target, args=(queue, features, release))
-            p1.start()
-            p2 = Process(target=build_target_expensive, args=(queue,))
-            p2.start()
-            p1.join()
-            bld1 = queue.get()
-            p2.join()
-            bld2 = queue.get()
-            fl_e.write(bld1.stderr)
-            fl_e.write(bld2.stderr)
-            fl_o.write(bld1.stdout)
-            fl_o.write(bld2.stdout)
-            if bld1.returncode != 0 or bld2.returncode != 0:
+            if pytest > 0:
+                p1 = Process(target=build_target, args=(queue, features, release))
+                p1.start()
+            if expensive > 0:
+                p2 = Process(target=build_target_expensive, args=(queue,))
+                p2.start()
+            if pytest > 0:
+                p1.join()
+                bld1 = queue.get()
+                fl_e.write(bld1.stderr)
+                fl_o.write(bld1.stdout)
+            if expensive > 0:
+                p2.join()
+                bld2 = queue.get()
+                fl_e.write(bld2.stderr)
+                fl_o.write(bld2.stdout)
+            if pytest > 0 and bld1.returncode != 0:
                 bash(f'''rm -rf nearcore''')
-                return bld1.returncode if bld1.returncode != 0 else bld2.returncode
+                return bld1.returncode
+            if expensive > 0 and bld2.returncode != 0:
+                bash(f'''rm -rf nearcore''')
+                return bld2.returncode
             if is_release:
                 cp(build_id, "release")
             else:
                 cp(build_id, "debug")
 
-            return bld.returncode
+            return 0
 
 def cleanup_finished_runs(runs):
     for run in runs:
@@ -161,7 +168,8 @@ def keep_pulling():
             shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
             outdir = os.path.abspath('output/')
             Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(new_build['build_id'], new_build['sha'], outdir, new_build['features'], new_build['is_release'])
+            code = build(new_build['build_id'], new_build['sha'], outdir, new_build['features'], new_build['is_release'],
+                         new_build['pytest'], new_build['expensive'])
             server = MasterDB()
             if code == 0:
                 status = 'BUILD DONE'

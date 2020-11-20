@@ -22,7 +22,9 @@ class MasterDB (common_db.DB):
         res = self.execute_sql(sql, (ip_address,))
         if res.rowcount == 0:
             return None
-        sql = "SELECT b.build_id, r.sha, b.features, b.is_release FROM builds as b, runs as r WHERE b.build_id = @tmp_id and b.run_id = r.id"
+        sql = '''SELECT b.build_id, r.sha, b.features, b.is_release, count(IF(t.name LIKE "%pytest %",1,NULL)) as pytest,   
+                 count(IF(t.name LIKE "%expensive %",1,NULL)) as expensive
+                 FROM builds as b, runs as r, tests as t WHERE b.build_id = @tmp_id and b.run_id = r.id and t.build_id = b.build_id'''
         result = self.execute_sql(sql, ())
         new_run = result.fetchone()
         return new_run
