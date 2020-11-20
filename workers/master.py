@@ -29,39 +29,40 @@ def cp_exe(cmd):
     b = bash(cmd)
     print(b)
 
-def cp(build_id, build_type):
+def cp(build_id, build_type, pytest, expensive):
         bash(f'''rm -rf {build_id}''')
-        Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
-        Path(f'{build_id}/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
-        bld_cp = bash(f'''
+        if pytest > 0:
+            Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
+            bld_cp = bash(f'''
             cp -r nearcore/target/{build_type}/neard {build_id}/target/{build_type}/neard
             cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
             cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
         ''')
-        bld_cp = bash(f'''find nearcore/target_expensive/{build_type}/deps/* -perm /a+x''')
-        print(bld_cp)
-        exe_files = bld_cp.stdout.split('\n')
-        fls = {}
-        for f in exe_files:
-            if not f:
-                continue
-            base = os.path.basename(f)
-            if "." in base:
-                continue
-            test_name = base.split('-')[0]
-            if test_name in fls:
-                if os.path.getctime(fls[test_name]) < os.path.getctime(f):
+        if expensive > 0:
+            Path(f'{build_id}/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
+            bld_cp = bash(f'''find nearcore/target_expensive/{build_type}/deps/* -perm /a+x''')
+            exe_files = bld_cp.stdout.split('\n')
+            fls = {}
+            for f in exe_files:
+                if not f:
+                    continue
+                base = os.path.basename(f)
+                if "." in base:
+                    continue
+                test_name = base.split('-')[0]
+                if test_name in fls:
+                    if os.path.getctime(fls[test_name]) < os.path.getctime(f):
+                        fls[test_name] = f
+                else:
                     fls[test_name] = f
-            else:
-                fls[test_name] = f
-        
-        cmds = []
-        for f in fls.values():
-            cmds.append(f'cp {f} {build_id}/target_expensive/{build_type}/deps/')
-        p = Pool(10)
-        p.map(cp_exe, cmds)
-        p.close()
+            
+            cmds = []
+            for f in fls.values():
+                cmds.append(f'cp {f} {build_id}/target_expensive/{build_type}/deps/')
+            p = Pool(10)
+            p.map(cp_exe, cmds)
+            p.close()
             
 def build_target(queue, features, release):
     print("Build target")
@@ -132,9 +133,9 @@ def build(build_id, sha, outdir, features, is_release, pytest, expensive):
                 bash(f'''rm -rf nearcore''')
                 return bld2.returncode
             if is_release:
-                cp(build_id, "release")
+                cp(build_id, "release", pytest, expensive)
             else:
-                cp(build_id, "debug")
+                cp(build_id, "debug", pytest, expensive)
 
             return 0
 
