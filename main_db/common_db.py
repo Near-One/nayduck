@@ -30,7 +30,7 @@ class DB ():
         try:
             self.mycursor.execute(sql, val)
             self.mydb.commit()
-        except mysql.connector.errors.DatabaseError as e:
+        except Exception as e:
             try:
                 print(sql, val)
                 print(e)
@@ -38,12 +38,10 @@ class DB ():
                 self.mydb.close()
             except Exception as ee:
                 print(ee)
+                raise ee
             self.mydb, self.mycursor = self.connect(self.host, self.user, self.passwd, self.database)
             self.mycursor.execute(sql, val)
             self.mydb.commit()
-        except Exception as e:
-            print(e)
-            raise e
         return self.mycursor
  
     def get_github_login(self, token):
