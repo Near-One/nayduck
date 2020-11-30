@@ -20,6 +20,9 @@ class SchedulerDB (common_db.DB):
 
     def scheduling_a_run(self, branch, sha, user, title, tests, requester):
         # Into Runs
+        sql = "START TRANSACTION"
+        result = self.execute_sql(sql)
+        
         sql = "INSERT INTO runs (branch, sha, user, title, requester, timestamp) values (%s, %s, %s, %s, %s, now())"
         result = self.execute_sql(sql, (branch, sha, user, title, requester))
         run_id = result.lastrowid
@@ -63,5 +66,7 @@ class SchedulerDB (common_db.DB):
                     build_id = debug_builds[features]
             sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority, is_release, remote) values (%s, %s, %s, %s, %s, %s, %s, %s)"
             self.execute_sql(sql, (run_id, build_id, "PENDING", test.strip(), after, priority, release, remote))
+        sql = "COMMIT"
+        result = self.execute_sql(sql)
         return run_id
         
