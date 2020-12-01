@@ -42,7 +42,7 @@ class DB ():
             except Exception as ee:
                 print(ee)
                 raise ee
-            self.mydb, self.mycursor = self.connect(self.host, self.user, self.passwd, self.database)
+            self.mydb, self.mycursor = self.connect()
             self.mycursor.execute(sql, val)
             if self.commit:
                 self.mydb.commit()
