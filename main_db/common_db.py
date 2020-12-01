@@ -9,19 +9,21 @@ import os
 
 class DB ():
 
-    def __init__(self, host, user, passwd, database):
+    def __init__(self, host, user, passwd, database, commit=True):
         self.host=host
         self.user=user 
         self.passwd=passwd
         self.database=database
-        self.mydb, self.mycursor = self.connect(host, user, passwd, database)
+        self.commit = commit
+        self.mydb, self.mycursor = self.connect()
 
-    def connect(self, host, user, passwd, database):
+    def connect(self):
         mydb = mysql.connector.connect(
-            host=host,
-            user=user, 
-            passwd=passwd, 
-            database=database
+            host=self.host,
+            user=self.user, 
+            passwd=self.passwd, 
+            database=self.database,
+            autocommit=self.commit,
         )
         mycursor = mydb.cursor(buffered=True, dictionary=True)
         return mydb, mycursor
@@ -29,7 +31,8 @@ class DB ():
     def execute_sql(self, sql, val=()):
         try:
             self.mycursor.execute(sql, val)
-            self.mydb.commit()
+            if self.commit:
+                self.mydb.commit()
         except Exception as e:
             try:
                 print(sql, val)
@@ -41,7 +44,8 @@ class DB ():
                 raise ee
             self.mydb, self.mycursor = self.connect(self.host, self.user, self.passwd, self.database)
             self.mycursor.execute(sql, val)
-            self.mydb.commit()
+            if self.commit:
+                self.mydb.commit()
         return self.mycursor
  
     def get_github_login(self, token):

@@ -16,12 +16,11 @@ class SchedulerDB (common_db.DB):
         self.user=os.environ['DB_USER']
         self.passwd=os.environ['DB_PASSWD']
         self.database=os.environ['DB']
-        super().__init__(self.host, self.user, self.passwd, self.database)
+        super().__init__(self.host, self.user, self.passwd, self.database, commit=False)
 
     def scheduling_a_run(self, branch, sha, user, title, tests, requester):
         # Into Runs
-        sql = "START TRANSACTION"
-        result = self.execute_sql(sql)
+        self.mydb.start_transaction()
         
         sql = "INSERT INTO runs (branch, sha, user, title, requester, timestamp) values (%s, %s, %s, %s, %s, now())"
         result = self.execute_sql(sql, (branch, sha, user, title, requester))
@@ -66,7 +65,6 @@ class SchedulerDB (common_db.DB):
                     build_id = debug_builds[features]
             sql = "INSERT INTO tests (run_id, build_id, status, name, select_after, priority, is_release, remote) values (%s, %s, %s, %s, %s, %s, %s, %s)"
             self.execute_sql(sql, (run_id, build_id, "PENDING", test.strip(), after, priority, release, remote))
-        sql = "COMMIT"
-        result = self.execute_sql(sql)
+        self.mydb.commit()
         return run_id
         
