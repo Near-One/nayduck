@@ -28,6 +28,7 @@ function AllRuns () {
     })
     .then(response => response.json())
     .then(data => {
+    try {
      console.log(data);
      for (var d of data) {
         if (d["login"] === "nearprotocol" || d["login"] === "near") {
@@ -35,6 +36,9 @@ function AllRuns () {
             setMember(true);
         }
       }
+    } catch (error) {
+      console.log(error);
+    }
     });
   
     
