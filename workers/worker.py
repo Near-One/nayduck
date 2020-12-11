@@ -249,7 +249,7 @@ def scp_build(build_id, ip, test, build_type="debug"):
             test_name = test[2].replace('-', '_')
         bld = bash(f'''
             scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* nearcore/target_expensive/{build_type}/deps''')
-    elif test[0] == "lib":
+    elif test[0] == "lib" or test[0] == "package":
         if test[1].startswith('--'):
             test_name = test[2].replace('-', '_')
         else:
