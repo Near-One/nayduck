@@ -338,7 +338,7 @@ def keep_pulling():
                     print(scp)
                     server.update_test_status("SCP FAILED", test['test_id'])
                     continue
-            elif remote in test_name:
+            elif remote:
                 print("Build for remote.")
                 bld = bash(f'''
                     cd nearcore
