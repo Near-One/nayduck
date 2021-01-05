@@ -338,6 +338,15 @@ def keep_pulling():
                     print(scp)
                     server.update_test_status("SCP FAILED", test['test_id'])
                     continue
+            elif remote in test_name:
+                print("Build for remote.")
+                bld = bash(f'''
+                    cd nearcore
+                    cargo build -j2 -p neard --features adversarial
+                ''')
+                if bld.returncode != 0:
+                    server.update_test_status("BUILD FAILED", test['test_id'])
+                    continue
             
             install_new_packages()
             server.test_started(test['test_id'])
