@@ -332,20 +332,11 @@ def keep_pulling():
             if '--features' in test_name:
                 test_name = test_name[:test_name.find('--features')]
 
-            if not (remote or 'mocknet' in test_name):
+            if not ('mocknet' in test_name):
                 scp = scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
                 if scp.returncode != 0:
                     print(scp)
                     server.update_test_status("SCP FAILED", test['test_id'])
-                    continue
-            elif remote:
-                print("Build for remote.")
-                bld = bash(f'''
-                    cd nearcore
-                    cargo build -j2 -p neard --features adversarial
-                ''')
-                if bld.returncode != 0:
-                    server.update_test_status("BUILD FAILED", test['test_id'])
                     continue
             
             install_new_packages()
