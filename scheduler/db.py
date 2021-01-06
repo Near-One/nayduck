@@ -47,6 +47,7 @@ class SchedulerDB (common_db.DB):
             if '--remote' in test: 
                 remote = True
             if 'mocknet' in test:
+                remote = True
                 build_status = 'SKIPPED'
             if '--release' in test:
                 release = True
