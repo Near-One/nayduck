@@ -323,6 +323,7 @@ def keep_pulling():
             if '--release' in test_name:
                 release = True
                 config_override['release'] = True
+                config_override['near_root'] = '../target/release/'
                 os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
                 test_name = test_name.replace(' --release', '')
             if "NEAR_PYTEST_CONFIG" in os.environ:
