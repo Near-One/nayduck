@@ -31,9 +31,8 @@ def cp_exe(cmd):
 
 def cp(build_id, build_type, pytest, expensive):
         bash(f'''rm -rf {build_id}''')
-        if pytest > 0:
-            Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
-            bld_cp = bash(f'''
+        Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
+        bld_cp = bash(f'''
             cp -r nearcore/target/{build_type}/neard {build_id}/target/{build_type}/neard
             cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
@@ -110,23 +109,22 @@ def build(build_id, sha, outdir, features, is_release, pytest, expensive):
                     return bld.returncode
             print("Build")
             queue = Queue()
-            if pytest > 0:
-                p1 = Process(target=build_target, args=(queue, features, release))
-                p1.start()
+            
+            p1 = Process(target=build_target, args=(queue, features, release))
+            p1.start()
             if expensive > 0:
                 p2 = Process(target=build_target_expensive, args=(queue,))
                 p2.start()
-            if pytest > 0:
-                p1.join()
-                bld1 = queue.get()
-                fl_e.write(bld1.stderr)
-                fl_o.write(bld1.stdout)
+            p1.join()
+            bld1 = queue.get()
+            fl_e.write(bld1.stderr)
+            fl_o.write(bld1.stdout)
             if expensive > 0:
                 p2.join()
                 bld2 = queue.get()
                 fl_e.write(bld2.stderr)
                 fl_o.write(bld2.stdout)
-            if pytest > 0 and bld1.returncode != 0:
+            if bld1.returncode != 0:
                 bash(f'''rm -rf nearcore''')
                 return bld1.returncode
             if expensive > 0 and bld2.returncode != 0:
