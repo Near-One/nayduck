@@ -242,6 +242,8 @@ def save_logs(server, test_id, dir_name):
 def scp_build(build_id, ip, test, build_type="debug"):
     Path(f'nearcore/target/{build_type}/').mkdir(parents=True, exist_ok=True)
     Path(f'nearcore/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
+    bld = bash(f'''
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/* nearcore/target/{build_type}/''')
     if test[0] == "expensive":
         if test[1].startswith('--'):
             test_name = test[3].replace('-', '_')
@@ -256,10 +258,6 @@ def scp_build(build_id, ip, test, build_type="debug"):
             test_name = test[1].replace('-', '_')
         bld = bash(f'''
             scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* nearcore/target_expensive/{build_type}/deps''')
-    else:
-        print()
-        bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/* nearcore/target/{build_type}/''')
     return bld
 
 def checkout(sha):

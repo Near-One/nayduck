@@ -72,12 +72,13 @@ def build_target(queue, features, release):
     queue.put(bld)
             
 
-def build_target_expensive(queue):
+def build_target_expensive(queue, release):
     print("Build expensive")
     bld = bash(f'''
             cd nearcore
-            cargo test -j8 --workspace --no-run --all-features --target-dir target_expensive
-            cargo test -j8 --no-run --all-features --target-dir target_expensive --package near-client --package nearcore --package near-chunks --package neard --package near-chain
+            cargo test -j8 --workspace --no-run --all-features --target-dir target_expensive {release}
+            cargo test -j8 --no-run --all-features --target-dir target_expensive --package near-client --package near-chunks --package neard --package near-chain {release}
+            cargo test -j8 --no-run --features=expensive_tests --workspace --target-dir target_expensive --package nearcore {release}
     ''' , login=True)
     queue.put(bld)
             
@@ -113,7 +114,7 @@ def build(build_id, sha, outdir, features, is_release, pytest, expensive):
             p1 = Process(target=build_target, args=(queue, features, release))
             p1.start()
             if expensive > 0:
-                p2 = Process(target=build_target_expensive, args=(queue,))
+                p2 = Process(target=build_target_expensive, args=(queue, release))
                 p2.start()
             p1.join()
             bld1 = queue.get()
