@@ -20,7 +20,7 @@ import { ServerIp }  from "./common"
       .then(data => {
       console.log(data);
       for (var d of data) {
-          if (d["login"] === "nearprotocol") {
+          if (d["login"] === "nearprotocol" || d["login"] === "near") {
               console.log("Welcome to Nay!");
               setMember(true);
               fetch(ServerIp() + '/get_auth_code', {
