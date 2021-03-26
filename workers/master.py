@@ -37,6 +37,7 @@ def cp(build_id, build_type, pytest, expensive):
             cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
             cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
+            cp -r nearcore/target/{build_type}/near-test-contracts {build_id}/target/{build_type}/near-test-contracts
         ''')
         if expensive > 0:
             Path(f'{build_id}/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
@@ -67,7 +68,7 @@ def build_target(queue, features, release):
     print("Build target")
     bld = bash(f'''
             cd nearcore
-            cargo build -j8 -p neard -p genesis-populate -p restaked --features adversarial {features} {release}
+            cargo build -j8 -p neard -p genesis-populate -p restaked -p near-test-contracts --features adversarial {features} {release}
     ''', login=True)
     queue.put(bld)
             
