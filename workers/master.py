@@ -38,7 +38,6 @@ def cp(build_id, build_type, pytest, expensive):
             cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
             cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
             cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
-            cp -r nearcore/target/{build_type}/near-test-contracts {build_id}/target/{build_type}/near-test-contracts
             cp -r nearcore/runtime/near-test-contracts/res/* {build_id}/near-test-contracts/
         ''')
         if expensive > 0:
