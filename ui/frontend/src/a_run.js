@@ -25,7 +25,6 @@ function ARun (props) {
           .then(data => {
           setARun(data);
           setFilteredRuns(data)
-          console.log(data);
           
         });
     }, []);
@@ -39,10 +38,11 @@ function ARun (props) {
         )
       );
       fltr = document.getElementById('features_fltr').value.toLowerCase();
-      console.log(filtered);
       filtered = (
         filtered.filter(
-          item => (item['build']['features'] ? item['build']['features'].toLowerCase().includes(fltr): "".includes(fltr))
+          item => ( fltr == " " ? 
+            item['build']['features'] ? "".includes(fltr): true: 
+            item['build']['features'] ? item['build']['features'].toLowerCase().includes(fltr): "".includes(fltr))
         )
       );
       fltr = document.getElementById('name_fltr').value.toLowerCase();
