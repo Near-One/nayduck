@@ -20,19 +20,6 @@ INTERESTING_PATTERNS = ["LONG DELAY"]
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
-def enough_space(filename="/datadrive"):
-    try:
-        df = subprocess.Popen(["df", filename], stdout=subprocess.PIPE, universal_newlines=True)
-        output = df.communicate()[0]
-        pr = output.split()[11]
-        n_pr = int(str(pr)[:-1])
-        if n_pr >= 65:
-            return False
-        return True
-    except:
-        return False
-
-
 def prettify_size(size):
     if size < 1024: return size
     size //= 1024
