@@ -10,13 +10,8 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class SchedulerDB (common_db.DB):
-
     def __init__(self):
-        self.host=os.environ['DB_HOST']
-        self.user=os.environ['DB_USER']
-        self.passwd=os.environ['DB_PASSWD']
-        self.database=os.environ['DB']
-        super().__init__(self.host, self.user, self.passwd, self.database, commit=False)
+        super().__init__(commit=False)
 
     def scheduling_a_run(self, branch, sha, user, title, tests, requester):
         # Into Runs

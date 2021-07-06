@@ -10,14 +10,6 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class WorkerDB (common_db.DB):
-
-    def __init__(self):
-        self.host=os.environ['DB_HOST']
-        self.user=os.environ['DB_USER']
-        self.passwd=os.environ['DB_PASSWD']
-        self.database=os.environ['DB']
-        super().__init__(self.host, self.user, self.passwd, self.database)
-    
     def get_pending_test(self, hostname):
         after = int(time.time())
         if "mocknet" in hostname:

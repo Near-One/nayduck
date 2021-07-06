@@ -9,14 +9,6 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class MasterDB (common_db.DB):
-
-    def __init__(self):
-        self.host=os.environ['DB_HOST']
-        self.user=os.environ['DB_USER']
-        self.passwd=os.environ['DB_PASSWD']
-        self.database=os.environ['DB']
-        super().__init__(self.host, self.user, self.passwd, self.database)
-    
     def get_new_build(self, ip_address):
         sql = "UPDATE builds SET started = now(), status = 'BUILDING', ip=%s  WHERE status = 'PENDING' and @tmp_id := build_id ORDER BY build_id LIMIT 1 "
         res = self.execute_sql(sql, (ip_address,))

@@ -8,12 +8,11 @@ import os
 
 
 class DB ():
-
-    def __init__(self, host, user, passwd, database, commit=True):
-        self.host=host
-        self.user=user 
-        self.passwd=passwd
-        self.database=database
+    def __init__(self, *, commit=True):
+        self.host = os.environ['DB_HOST']
+        self.user = os.environ['DB_USER']
+        self.passwd = os.environ['DB_PASSWD']
+        self.database = os.environ['DB']
         self.commit = commit
         self.mydb, self.mycursor = self.connect()
 

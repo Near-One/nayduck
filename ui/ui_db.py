@@ -11,15 +11,6 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class UIDB (common_db.DB):
-
-    def __init__(self):
-        self.host=os.environ['DB_HOST']
-        self.user=os.environ['DB_USER']
-        self.passwd=os.environ['DB_PASSWD']
-        self.database=os.environ['DB']
-        super().__init__(self.host, self.user, self.passwd, self.database)
-
-
     def cancel_the_run(self, run_id, status="CANCELED"):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE run_id= %s and status='PENDING'"
         self.execute_sql(sql, (status, run_id))
