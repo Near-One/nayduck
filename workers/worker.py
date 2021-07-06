@@ -20,24 +20,26 @@ INTERESTING_PATTERNS = ["LONG DELAY"]
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
-def get_sequential_test_cmd(test, build_type):
+def get_sequential_test_cmd(cwd: Path,
+                            test: typing.Sequence[str],
+                            build_type: str) -> typing.Sequence[str]:
     try:
         if test[0] == 'pytest' or test[0] == 'mocknet':
             return ["python", "tests/" + test[1]] + test[2:]
-        elif test[0] == 'expensive':
-            fls = os.listdir(os.path.join("target_expensive", build_type, "deps"))
+        deps_path = cwd / 'target_expensive' / build_type / 'deps'
+        if test[0] == 'expensive':
+            fls = os.listdir(deps_path)
             print(fls)
             for f in fls:
                 if test[2].replace('-', '_') + '-' in f:
-                    return [os.path.join("./target_expensive", build_type, "deps", f), test[3], "--exact", "--nocapture"]
+                    return [deps_path / f, test[3], '--exact', '--nocapture']
         elif test[0] == 'lib':
-            fls = os.listdir(os.path.join("target_expensive", build_type, "deps"))
+            fls = os.listdir(deps_path)
             print(fls)
             for f in fls:
                 if test[1].replace('-', '_')  + '-' in f:
-                    return [os.path.join("./target_expensive", build_type, "deps", f), test[2], "--exact", "--nocapture"]
-        else:
-            assert False, test
+                    return [deps_path / f, test[2], '--exact', '--nocapture']
+        assert False, test
     except:
         print(test)
         raise
@@ -61,14 +63,12 @@ def install_new_packages():
 
 
 def run_test(dir_name, test, remote=False, build_type="debug"):
-    owd = os.getcwd()
+    cwd = Path.cwd() / 'nearcore'
+    if test[0] in ('pytest', 'mocknet'):
+        cwd = cwd / 'pytest'
+
     outcome = "FAILED"
     try:
-        if test[0] == 'pytest' or test[0] == 'mocknet':
-            os.chdir(os.path.join('nearcore', 'pytest'))
-        else:
-            os.chdir('nearcore')
-
         timeout = DEFAULT_TIMEOUT
 
         if len(test) > 1 and test[1].startswith('--timeout='):
@@ -79,7 +79,7 @@ def run_test(dir_name, test, remote=False, build_type="debug"):
             timeout += 60 * 15
 
         
-        cmd = get_sequential_test_cmd(test, build_type)
+        cmd = get_sequential_test_cmd(cwd, test, build_type)
         print(cmd)
 
         if test[0] == 'pytest':
@@ -97,7 +97,8 @@ def run_test(dir_name, test, remote=False, build_type="debug"):
         env = os.environ.copy()
         env["RUST_BACKTRACE"] = "1"
 
-        handle = subprocess.Popen(cmd, stdout=stdout, stderr=stderr, env=env)
+        handle = subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
+                                  env=env, cwd=cwd)
         try:
             ret = handle.wait(timeout)
             if ret == 0:
@@ -155,7 +156,6 @@ def run_test(dir_name, test, remote=False, build_type="debug"):
         sys.stdout.flush()
     except Exception as ee:
         print(ee)
-    os.chdir(owd)
     return outcome
 
 def save_logs(server, test_id, dir_name):
