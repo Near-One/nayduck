@@ -164,9 +164,7 @@ class UIDB (common_db.DB):
         sql = '''SELECT *
                    FROM tests
                   WHERE run_id = %s
-                  ORDER BY FIELD(status, 'FAILED', 'TIMEOUT', 'IGNORED',
-                                 'PASSED', 'CANCELED', 'RUNNING', 'PENDING'),
-                           started'''
+                  ORDER BY status, started'''
         res = self._execute_sql(sql, (run_id,))
         a_run = res.fetchall()
         for test in a_run:

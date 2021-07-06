@@ -32,12 +32,15 @@ class MasterDB (common_db.DB):
         This method must be run inside of a transaction because it uses
         variables and so we cannot tolerate disconnects between the two queries.
         """
+        # We are filtering on `master_ip = 0` in the query so that we can use
+        # a (master_ip, status) index we have on builds table.  Without that we
+        # would need to create a new index on just the status column.
         sql = '''UPDATE builds
                     SET started = NOW(),
                         status = 'BUILDING',
                         master_ip = %s,
                         build_id = (@build_id := build_id)
-                    WHERE status = 'PENDING'
+                    WHERE master_ip = 0 AND status = 'PENDING'
                     ORDER BY priority, build_id
                     LIMIT 1'''
         result = self._execute_sql(sql, (ipv4,))

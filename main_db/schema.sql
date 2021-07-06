@@ -1,73 +1,74 @@
 DROP TABLE IF EXISTS `logs`;
 CREATE TABLE `logs` (
-  `test_id` int(11) DEFAULT NULL,
-  `type` varchar(50) DEFAULT NULL,
-  `log` blob,
+  `test_id` int(11) NOT NULL,
+  `type` varchar(50) NOT NULL,
+  `log` blob NOT NULL,
   `size` bigint(20) unsigned NOT NULL,
-  `storage` varchar(200) DEFAULT NULL,
-  `stack_trace` tinyint(1) DEFAULT '0',
-  `patterns` varchar(200) DEFAULT NULL,
-  KEY `test_id` (`test_id`),
-  KEY `test_id_2` (`test_id`,`type`),
-  KEY `test_id_3` (`test_id`,`type`) USING BTREE
+  `storage` varchar(200) NOT NULL DEFAULT '',
+  `stack_trace` tinyint(1) NOT NULL DEFAULT '0',
+  `patterns` varchar(200) NOT NULL DEFAULT '',
+  PRIMARY KEY (`test_id`,`type`),
+  CONSTRAINT `logs_ibfk_1` FOREIGN KEY (`test_id`) REFERENCES `tests` (`test_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `runs`;
 CREATE TABLE `runs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `branch` varchar(50) DEFAULT NULL,
-  `sha` varchar(50) DEFAULT NULL,
-  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `user` varchar(50) DEFAULT NULL,
-  `title` varchar(200) DEFAULT NULL,
-  `requester` varchar(50) DEFAULT NULL,
+  `branch` varchar(100) NOT NULL,
+  `sha` char(40) NOT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `user` varchar(50) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `requester` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `builds`;
 CREATE TABLE `builds` (
   `build_id` int(11) NOT NULL AUTO_INCREMENT,
-  `run_id` int(11) DEFAULT NULL,
-  `status` varchar(50) DEFAULT NULL,
+  `run_id` int(11) NOT NULL,
+  `status` enum('PENDING','BUILDING','BUILD DONE','BUILD FAILED','SKIPPED') NOT NULL,
   `started` timestamp NULL DEFAULT NULL,
   `finished` timestamp NULL DEFAULT NULL,
   `stderr` blob,
   `stdout` blob,
-  `features` varchar(250) DEFAULT NULL,
-  `is_release` tinyint(1) DEFAULT '0',
+  `features` varchar(250) NOT NULL DEFAULT '',
+  `is_release` tinyint(1) NOT NULL DEFAULT '0',
   `priority` tinyint(4) NOT NULL DEFAULT '0',
   `master_ip` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`build_id`),
-  CONSTRAINT `builds_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=latin1;
+  KEY `builds_ibfk_1` (`run_id`),
+  KEY `builds_done` (`master_ip`,`status`),
+  CONSTRAINT `builds_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `tests`;
 CREATE TABLE `tests` (
   `test_id` int(11) NOT NULL AUTO_INCREMENT,
-  `run_id` int(11) DEFAULT NULL,
-  `build_id` int(11) NOT NULL AUTO_INCREMENT,
-  `status` varchar(50) DEFAULT NULL,
-  `name` varchar(200) DEFAULT NULL,
+  `run_id` int(11) NOT NULL,
+  `build_id` int(11) DEFAULT NULL,
+  `status` enum('FAILED','BUILD FAILED','CHECKOUT FAILED','SCP FAILED','TIMEOUT','PASSED','IGNORED','CANCELED','SKIPPED','RUNNING','PENDING') NOT NULL DEFAULT 'PENDING',
+  `name` varchar(200) NOT NULL,
   `started` timestamp NULL DEFAULT NULL,
   `finished` timestamp NULL DEFAULT NULL,
-  `select_after` int(11) DEFAULT NULL,
-  `priority` int(11) DEFAULT '0',
-  `is_release` tinyint(1) DEFAULT '0',
-  `remote` tinyint(1) DEFAULT '0',
+  `select_after` int(11) NOT NULL DEFAULT '0',
+  `priority` tinyint(4) NOT NULL,
+  `is_release` tinyint(1) NOT NULL,
+  `remote` tinyint(1) NOT NULL,
   `worker_ip` int(10) unsigned NOT NULL DEFAULT '0',
   `category` enum('pytest','mocknet','lib','expensive') NOT NULL,
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),
-  KEY `run_id` (`build_id`),  
+  KEY `build_id` (`build_id`),
   KEY `name` (`name`),
-  CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`),
-  CONSTRAINT `tests_ibfk_2` FOREIGN KEY (`build_id`) REFERENCES `builds` (`build_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7476 DEFAULT CHARSET=latin1;
+  KEY `tests_pick` (`status`,`build_id`,`select_after`,`category`),
+  CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `tests_ibfk_2` FOREIGN KEY (`build_id`) REFERENCES `builds` (`build_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `code` varchar(50) DEFAULT NULL,
-  `name` varchar(50) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `code` varchar(50) NOT NULL,
+  `name` varchar(50) NOT NULL,
+  PRIMARY KEY (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
