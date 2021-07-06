@@ -19,7 +19,7 @@ app.use((req, res, next) => {
 });
 
 app.post("/authenticate", (req, res) => {
-   
+
   const { client_id, redirect_uri, client_secret, code } = req.body;
 
   const data = new FormData();
@@ -38,11 +38,11 @@ app.post("/authenticate", (req, res) => {
       access_token = params.get("access_token");
       const scope = params.get("scope");
       const token_type = params.get("token_type");
-      
+
 
       // Request to return data of a user that has been authenticated
       return fetch(
-        `https://api.github.com/user`, 
+        `https://api.github.com/user`,
         {
           method: "GET",
           headers: {

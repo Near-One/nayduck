@@ -7,14 +7,14 @@ import { ServerIp }  from "./common"
 
  export default function LocalAuthConfirmed() {
   const { state, dispatch } = useContext(AuthContext);
-  
+
   const [member, setMember] = useState(false);
   const [code, setCode] = useState();
 
   const { user } = state
   useEffect(() => {
     fetch(
-      user.organizations_url, {  
+      user.organizations_url, {
     })
       .then(response => response.json())
       .then(data => {
@@ -24,7 +24,7 @@ import { ServerIp }  from "./common"
               console.log("Welcome to Nay!");
               setMember(true);
               fetch(ServerIp() + '/get_auth_code', {
-                headers : { 
+                headers : {
                   'Content-Type': 'application/json',
                   'Accept': 'application/json'
                 },
@@ -50,7 +50,7 @@ import { ServerIp }  from "./common"
       dispatch({
         type: "LOGOUT"
       });
-    } 
+    }
 
     if (!state.isLoggedIn) {
       return <Redirect to="/login" />;

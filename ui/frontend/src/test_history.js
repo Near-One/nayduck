@@ -25,7 +25,7 @@ function TestHistory (props) {
     useEffect(() => {
 
         fetch(ServerIp() + '/test_history', {
-          headers : { 
+          headers : {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
            },
@@ -38,7 +38,7 @@ function TestHistory (props) {
           if (data[0]["branch"]) {
             setCurrentBranch(data[0]["branch"]);
             fetch(ServerIp() + '/branch_history', {
-            headers : { 
+            headers : {
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
@@ -52,7 +52,7 @@ function TestHistory (props) {
         }
         });
         fetch(ServerIp() + '/branch_history', {
-          headers : { 
+          headers : {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
            },
@@ -68,10 +68,10 @@ function TestHistory (props) {
     return (
       <div>
         <table style={{"border" : "0px", "width": "40%"}}> <tbody><tr>
-          {currentBranchHistory.map((current_test,j) => 
+          {currentBranchHistory.map((current_test,j) =>
           <td style={{"border": "0px", "font-size":"10px"}}>{
             RenderHistory(current_test, ("This test history for branch " + currentBranch))}</td>)}
-          {baseBranch === currentBranch ? (null) : 
+          {baseBranch === currentBranch ? (null) :
             baseBranchHistory.map((base_test,j) =>
             <td style={{"border": "0px", "font-size":"10px"}}>{RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
           }
@@ -95,20 +95,20 @@ function TestHistory (props) {
             <td>{a_test.user}</td>
             <td style={{"color": status_color(a_test.status)}}>{a_test.status}</td>
             <td>
-                {a_test.logs.map((log,j) => 
-                <a style={{"color": log.stack_trace ? "red" : "blue"}} href={log.storage}> {log.type + "(" + log.full_size + ")" } </a> 
+                {a_test.logs.map((log,j) =>
+                <a style={{"color": log.stack_trace ? "red" : "blue"}} href={log.storage}> {log.type + "(" + log.full_size + ")" } </a>
                 )}
 
-             
+
             </td>
             <td>{a_test.test_time} / {a_test.run_time}</td>
             <td>{a_test.started}</td>
             <td>{a_test.finished}</td>
-            </tr>  
+            </tr>
         )}
         </tbody></table>
       </div>
     );
 }
- 
+
 export default TestHistory;

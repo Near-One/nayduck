@@ -14,11 +14,11 @@ function AllRuns () {
     const { state } = useContext(AuthContext);
 
     const [allRuns, setAllRuns] = useState([]);
-    
+
     const [member, setMember] = useState([]);
-    
+
     const [filteredRuns, setFilteredRuns] = useState([])
-    
+
     const { organizations_url, token } = state.user
     fetch(organizations_url,  {
           method: "GET",
@@ -40,11 +40,11 @@ function AllRuns () {
       console.log(error);
     }
     });
-  
-    
+
+
     useEffect(() => {
             fetch(ServerIp(), {
-              headers : { 
+              headers : {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
                }
@@ -54,7 +54,7 @@ function AllRuns () {
               console.log(data);
               setFilteredRuns(data)
             })
-            
+
             .catch(function(err) {
               console.log('Fetch Error :-S', err);
             });
@@ -72,14 +72,14 @@ function AllRuns () {
       filtered = (
         filtered.filter(
           item =>
-            (item['title'].toLowerCase().includes(fltr)) 
+            (item['title'].toLowerCase().includes(fltr))
         )
       );
       fltr = document.getElementById('requester').value.toLowerCase();
       filtered = (
         filtered.filter(
           item =>
-            (item['requester'].toLowerCase().includes(fltr)) 
+            (item['requester'].toLowerCase().includes(fltr))
         )
       );
 
@@ -88,7 +88,7 @@ function AllRuns () {
 
     var cancelRun = id => event => {
       fetch(ServerIp() + '/cancel_the_run', {
-        headers : { 
+        headers : {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
          },
@@ -116,7 +116,7 @@ function AllRuns () {
             </th>
             <th width="40%">Status</th>
             { member > 0 ? <th>x</th>:''}
-              
+
           </tr>
           {filteredRuns.map((a_run,i) =>
             <tr key={a_run.id}>
@@ -129,22 +129,22 @@ function AllRuns () {
                 <NavLink to={"/run/" + a_run.id} name="title">{a_run.title}</NavLink>
               </td>
               <td style={{"font-size": "x-small"}}>{a_run.requester}</td>
-              
+
               <td >
-                {a_run.builds.map((build,j) => 
+                {a_run.builds.map((build,j) =>
                 <div class="">
-                    <div class="build_status" style={{"background": build.status == "PENDING" ? "FF99FF" : 
+                    <div class="build_status" style={{"background": build.status == "PENDING" ? "FF99FF" :
                                                             build.status == "BUILDING" ? "#9999FF":
                                                             build.status == "BUILD DONE" ? "#CCFFCC":
-                                                            build.status == "BUILD FAILED" ? "#FFCCCC": 
+                                                            build.status == "BUILD FAILED" ? "#FFCCCC":
                                                             build.status == "SKIPPED" ? "#f0a3aa": "E0E0E0"}}>
                       <NavLink className="build_link" to={"/build/" + build.build_id} >
-                      <b>{build.is_release == 0 ? 'Debug' : 'Release'}  
+                      <b>{build.is_release == 0 ? 'Debug' : 'Release'}
                         {build.features == "" ? " ": "/"}
                         {build.features == "--features nightly_protocol --features nightly_protocol_features" || build.features == "--features nightly_protocol,nightly_protocol_features"
                           ? 'Nightly ' : build.features == "--features sandbbox" ? 'Sandbox ' : build.features.substr(11) + " "}
                       </b>
-                      {build.status} 
+                      {build.status}
                       </NavLink>
                     </div>
                     <div>
@@ -159,7 +159,7 @@ function AllRuns () {
                     </div>
                 </div>
                 )}
-              </td> 
+              </td>
               { member > 0 ? <td><button style={{"border-radius": "4px", "cursor": "pointer"}}onClick={cancelRun(a_run.id)}>x</button></td> : ''}
             </tr>)
           }
@@ -168,5 +168,5 @@ function AllRuns () {
         </div>
         );
 }
-  
+
 export default AllRuns;

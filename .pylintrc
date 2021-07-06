@@ -1,0 +1,21 @@
+[MASTER]
+ignore = .git
+init-hook = 'import sys, os; sys.path.append(os.getcwd() + "/main_db")'
+load-plugins = pylint_quotes
+
+[MESSAGES CONTROL]
+enable = all
+disable = missing-module-docstring,
+          missing-class-docstring,
+          missing-function-docstring,
+          too-few-public-methods,
+          too-many-arguments,
+          locally-disabled,
+          suppressed-message,
+          broad-except
+
+[BASIC]
+good-names = i, j, k, ex, fd, rd, wr, ok, _
+
+[SIMILARITIES]
+ignore-imports = yes

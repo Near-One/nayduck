@@ -11,11 +11,11 @@ function ARun (props) {
     const [aRun, setARun] = useState([]);
     const [filteredRuns, setFilteredRuns] = useState([])
 
-  
+
     useEffect(() => {
 
         fetch(ServerIp() + '/run', {
-          headers : { 
+          headers : {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
            },
@@ -25,7 +25,7 @@ function ARun (props) {
           .then(data => {
           setARun(data);
           setFilteredRuns(data)
-          
+
         });
     }, []);
 
@@ -33,15 +33,15 @@ function ARun (props) {
       var fltr = document.getElementById('build_fltr').value.toLowerCase();
       var filtered = (
         aRun.filter(
-          item => (fltr == 'debug' ? item.is_release == 0 : 
-                   fltr == 'release' ? item.is_release == 1 : item.is_release > -1 ) 
+          item => (fltr == 'debug' ? item.is_release == 0 :
+                   fltr == 'release' ? item.is_release == 1 : item.is_release > -1 )
         )
       );
       fltr = document.getElementById('features_fltr').value.toLowerCase();
       filtered = (
         filtered.filter(
-          item => ( fltr == " " ? 
-            item['build']['features'] ? "".includes(fltr): true: 
+          item => ( fltr == " " ?
+            item['build']['features'] ? "".includes(fltr): true:
             item['build']['features'] ? item['build']['features'].toLowerCase().includes(fltr): "".includes(fltr))
         )
       );
@@ -69,7 +69,7 @@ function ARun (props) {
         var filtered = filtered.sort((a, b) => a.test_time < b.test_time ? 1 : -1);
       }
       setARun(filtered);
-      filtered = [...filteredRuns] 
+      filtered = [...filteredRuns]
       if (orderDescTestTime) {
         filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
       } else {
@@ -85,7 +85,7 @@ function ARun (props) {
         <table style={{"border" : "0px", "width": "40%"}}> <tbody>
           <tr><td style={{"border": "0px"}}><NavLink to={"/"}> Back To All Runs</NavLink></td></tr>
         </tbody></table>
-    
+
         <table  className="big"><tbody>
           <tr>
             <th>Build
@@ -113,11 +113,11 @@ function ARun (props) {
         {filteredRuns.map((a_run,i) =>
             <tr key={a_run.test_id}>
             <td style={{"font-size": "x-small", "margin":"0"}}>
-              {a_run.build.is_release == 0 ? 'Debug' : 'Release'}  
+              {a_run.build.is_release == 0 ? 'Debug' : 'Release'}
             </td>
             <td style={{"font-size": "x-small", "margin":"0"}}>
                {a_run.build.features}
-            
+
             </td>
             <td style={{"width": "30%"}}>
                 <NavLink to={"/test/" + a_run.test_id} >{a_run.name}</NavLink>
@@ -126,22 +126,22 @@ function ARun (props) {
             {RenderHistory(a_run)}
             </td>
             <td>
-                   {Object.entries(a_run.logs).map( ([type, value]) => 
-                 <a style={{"color": value.stack_trace ? "red" : 
-                                    String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}} 
-                  href={value.storage}> {type + "(" + value.full_size + ")" } 
-                 
-                 </a> 
+                   {Object.entries(a_run.logs).map( ([type, value]) =>
+                 <a style={{"color": value.stack_trace ? "red" :
+                                    String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}}
+                  href={value.storage}> {type + "(" + value.full_size + ")" }
+
+                 </a>
               )}
             </td>
             <td>{a_run.test_time} </td>
             <td>{a_run.started}</td>
             <td>{a_run.finished}</td>
-            </tr>  
+            </tr>
         )}
         </tbody></table>
       </div>
     );
 }
- 
+
 export default ARun;

@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db  # pylint: disable=wrong-import-position
 
 
-class MasterDB (common_db.DB):
+class MasterDB(common_db.DB):
     def get_new_build(
             self, ipv4: int
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:

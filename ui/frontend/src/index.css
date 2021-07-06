@@ -17,7 +17,7 @@ table {
   font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
   border-collapse: collapse;
   width: 100%;
-  table-layout: fixed; 
+  table-layout: fixed;
   word-wrap: break-word;
 }
 
@@ -119,7 +119,7 @@ table th {
   text-transform: uppercase;
   cursor: pointer;
   display: flex;
-  align-items: center;          
+  align-items: center;
   margin-left: 5px;
   margin-right: 5px;
 }
@@ -127,7 +127,7 @@ table th {
 .loader-container {
   display: flex;
   justify-content: center;
-  align-items: center;          
+  align-items: center;
   height: 40px;
 }
 

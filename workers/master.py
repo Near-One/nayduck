@@ -174,7 +174,7 @@ def keep_pulling():
 
     server = MasterDB()
     server.handle_restart(ipv4)
-  
+
     while True:
         time.sleep(5)
         wait_for_free_space(server, ipv4)
@@ -197,4 +197,3 @@ def keep_pulling():
 
 if __name__ == '__main__':
     keep_pulling()
-        

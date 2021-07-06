@@ -108,6 +108,7 @@ def branch_history():
     history = [server.get_histoty_for_base_branch(test_id, branch)]
     return flask.jsonify(history)
 
+
 @app.route('/cancel_the_run', methods=['POST', 'GET'])
 def cancel_the_run():
     request_json = flask.request.get_json(force=True)
@@ -115,6 +116,7 @@ def cancel_the_run():
     server = UIDB()
     server.cancel_the_run(run_id)
     return flask.jsonify({})
+
 
 @app.route('/get_auth_code', methods=['POST', 'GET'])
 def get_auth_code():
@@ -143,4 +145,3 @@ def request_a_run():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5005)
-    

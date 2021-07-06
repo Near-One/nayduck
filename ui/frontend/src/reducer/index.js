@@ -9,7 +9,7 @@ export const initialState = {
     client_secret_local: process.env.REACT_APP_CLIENT_SECRET_LOCAL,
     proxy_url: process.env.REACT_APP_PROXY_URL
   };
-  
+
   export const reducer = (state, action) => {
     switch (action.type) {
       case "LOGIN": {

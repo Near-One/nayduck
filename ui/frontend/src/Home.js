@@ -8,7 +8,7 @@ import AllRuns from "./all_runs";
 import ATest from "./a_test";
 import TestHistory from "./test_history";
 import Build from "./Build";
-  
+
 export default function Home() {
   const { state, dispatch } = useContext(AuthContext);
 
@@ -20,7 +20,7 @@ export default function Home() {
     dispatch({
       type: "LOGOUT"
     });
-  } 
+  }
   return (
       <div className="container">
         <button class="logout" onClick={()=> handleLogout()}>Logout</button>

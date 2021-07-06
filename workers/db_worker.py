@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db  # pylint: disable=wrong-import-position
 
 
-class WorkerDB (common_db.DB):
+class WorkerDB(common_db.DB):
     def get_pending_test(
             self, include_mocknet: bool, ipv4: int
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:

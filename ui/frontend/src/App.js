@@ -1,7 +1,7 @@
 import React, { createContext, useReducer }  from 'react';
 import {
   Route,
-  BrowserRouter as Router, 
+  BrowserRouter as Router,
   Switch
 } from "react-router-dom";
 import Login from "./Login";
@@ -19,9 +19,9 @@ export const AuthContext = createContext();
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  
 
-  return ( 
+
+  return (
 <AuthContext.Provider
       value={{
         state,
@@ -34,7 +34,7 @@ function App() {
         <Route path="/local_auth" component={LocalAuth}/>
         <Route path="/local_auth_confirmed" component={LocalAuthConfirmed}/>
         <Route path="/" component={Home}/>
-        
+
       </Switch>
     </Router>
     </AuthContext.Provider>

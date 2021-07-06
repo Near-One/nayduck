@@ -22,7 +22,7 @@ def _prettify_size(size: int) -> str:
     return str(size) + 'Y'
 
 
-class UIDB (common_db.DB):
+class UIDB(common_db.DB):
     def cancel_the_run(self, run_id, status='CANCELED'):
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
@@ -36,16 +36,17 @@ class UIDB (common_db.DB):
         if user:
             code = user['code']
         else:
-            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=20))
+            alphabet = string.ascii_uppercase + string.digits
+            code = ''.join(random.choices(alphabet, k=20))
             self._insert('users', name=login, code=code)
         return code
- 
+
     def get_github_login(self, token):
         sql = 'SELECT name FROM users WHERE code = %s LIMIT 1'
         result = self._execute_sql(sql, (token,))
         login = result.fetchone()
         if login:
-            return login['name']  
+            return login['name']
         return None
 
     _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
@@ -121,8 +122,9 @@ class UIDB (common_db.DB):
                   LIMIT 1'''
         result = self._execute_sql(sql, (test_id,))
         res = result.fetchone()
-        return self.get_test_history(res['name'], res['branch'], interested_in_logs=True)
-        
+        return self.get_test_history(res['name'], res['branch'],
+                                     interested_in_logs=True)
+
     def get_test_history(self, test_name, branch, interested_in_logs=False):
         sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
                         t.finished, r.branch, r.sha
@@ -145,11 +147,11 @@ class UIDB (common_db.DB):
                 for log in logs:
                     log['full_size'] = _prettify_size(log.pop('size'))
         return tests
-            
+
     def get_one_run(self, run_id):
         run_data = self.get_data_about_run(run_id)
         branch = run_data['branch']
-        
+
         sql = '''SELECT build_id, is_release, features
                    FROM builds
                   WHERE run_id = %s'''
@@ -165,7 +167,7 @@ class UIDB (common_db.DB):
         a_run = res.fetchall()
         for test in a_run:
             if test['build_id'] is None:
-                 test['build_id'] = 0
+                test['build_id'] = 0
             test['build'] = builds_dict[test['build_id']]
             test.update(self.get_data_about_test(test, branch, blob=False))
         return a_run
@@ -197,7 +199,7 @@ class UIDB (common_db.DB):
         sql = 'SELECT * FROM runs WHERE id = %s LIMIT 1'
         res = self._execute_sql(sql, (run_id,))
         return res.fetchone()
-                    
+
     def get_build_info(self, build_id):
         sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
         res = self._execute_sql(sql, (build_id,))
@@ -209,7 +211,7 @@ class UIDB (common_db.DB):
         run = self.get_data_about_run(build['run_id'])
         build.update(run)
         return build
-                    
+
     def get_histoty_for_base_branch(self, test_id, branch):
         sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
         res = self._execute_sql(sql, (test_id,))
@@ -219,9 +221,13 @@ class UIDB (common_db.DB):
             test_id_base_branch = history[0]['test_id']
         else:
             test_id_base_branch = -1
-        return {'history': self.history_stats(history), 'test_id': test_id_base_branch}
-        
-    def history_stats(self, history):
+        return {
+            'history': self.history_stats(history),
+            'test_id': test_id_base_branch
+        }
+
+    @classmethod
+    def history_stats(cls, history):
         res = {'PASSED': 0, 'FAILED': 0, 'OTHER': 0}
         for hist in history:
             if hist['status'] == 'PASSED':
@@ -231,16 +237,17 @@ class UIDB (common_db.DB):
             else:
                 res['OTHER'] += 1
         return res
-        
+
     def get_one_test(self, test_id):
         sql = 'SELECT * FROM tests WHERE test_id = %s'
         res = self._execute_sql(sql, (test_id,))
         tests = res.fetchall()
         for test in tests:
             run_data = self.get_data_about_run(test['run_id'])
-            new_data = self.get_data_about_test(test, run_data['branch'], blob=True)
+            new_data = self.get_data_about_test(test, run_data['branch'],
+                                                blob=True)
             test.update(new_data)
-            test.update(run_data)       
+            test.update(run_data)
         return tests
 
     class BuildSpec:

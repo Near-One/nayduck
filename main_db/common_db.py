@@ -5,7 +5,7 @@ import typing
 import mysql.connector
 
 
-class DB ():
+class DB:
     def __init__(self):
         self.host = os.environ['DB_HOST']
         self.user = os.environ['DB_USER']
@@ -14,8 +14,8 @@ class DB ():
 
         self.mydb = mysql.connector.connect(
             host=self.host,
-            user=self.user, 
-            passwd=self.passwd, 
+            user=self.user,
+            passwd=self.passwd,
             database=self.database,
             autocommit=True,
         )

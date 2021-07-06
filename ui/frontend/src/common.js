@@ -25,9 +25,9 @@ export function HistorySwitchText(status, count) {
 }
 
 export function RenderHistory(a_run, title) {
-    return ( 
+    return (
         <NavLink to={"/test_history/" + a_run.test_id}>{title}<table style={{"border": "0px"}}><tbody><tr>
-            {Object.entries(a_run.history).map( ([key, value]) => 
+            {Object.entries(a_run.history).map( ([key, value]) =>
                 <td style={{"border": "0px",
                             "padding": "0px",
                             "fontSize": "10px",

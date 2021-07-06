@@ -9,11 +9,11 @@ function ATest (props) {
     const [aTest, setATest] = useState([]);
     const [baseBranchHistory, setBaseBranchHistory] = useState([]);
     const baseBranch = "master";
-  
+
     useEffect(() => {
 
         fetch(ServerIp() + '/test', {
-          headers : { 
+          headers : {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
            },
@@ -23,10 +23,10 @@ function ATest (props) {
           .then(data => {
           setATest(data);
           console.log(data);
-          
+
         });
         fetch(ServerIp() + '/branch_history', {
-          headers : { 
+          headers : {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
            },
@@ -46,7 +46,7 @@ function ATest (props) {
         <table style={{"border" : "0px", "width": "40%"}}> <tbody>
           <tr><td style={{"border": "0px"}}><NavLink to={"/run/" + a_test.run_id}> Back To A Run</NavLink></td>
           <td style={{"border": "0px", "font-size":"10px"}}>{RenderHistory(a_test, ("This test history for branch " + a_test.branch))}</td>
-          {baseBranch === a_test.branch ? (null) : 
+          {baseBranch === a_test.branch ? (null) :
           baseBranchHistory.map((base_test,j) => <td style={{"border": "0px", "font-size":"10px"}}>{RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
           }
           </tr>
@@ -66,18 +66,18 @@ function ATest (props) {
         </tbody></table>
         <table><tbody>
         {Object.entries(a_test.logs).map( ([key, value]) =>
-        
+
         <tr><td style={{"width":"20%"}}>
-            <a style={{"color": value.stack_trace ? "red" : 
+            <a style={{"color": value.stack_trace ? "red" :
                   String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}} href={value.storage}>{key}</a></td>
-            <td><textarea style={{"width":"100%", "height": "300px"}}>{value.log}</textarea></td></tr> 
-        
+            <td><textarea style={{"width":"100%", "height": "300px"}}>{value.log}</textarea></td></tr>
+
         )}
         </tbody></table>
         </div>
-        )}  
+        )}
     </div>
     );
 }
- 
+
 export default ATest;
