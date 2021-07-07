@@ -1,10 +1,13 @@
 import os
+import pathlib
+import shlex
+import shutil
+import subprocess
 import typing
 import traceback
 
 import requests
 import flask
-from rc import bash
 
 from db import SchedulerDB
 
@@ -22,6 +25,29 @@ class Failure(Exception):
     def to_response(self) -> typing.Dict[str, typing.Union[int, str]]:
         """Returns a JSON object intended to return to the caller on failure."""
         return {'code': 1, 'response': self.args[0]}
+
+
+def run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
+    """Executes a command; returns its output as "bytes"; raises on failure.
+
+    Args:
+        cmd: The command to execute as a positional arguments of command line
+            arguments.  Running through shell is not supported by design since
+            it too easily leads to vulnerabilities.
+    Returns:
+        A bytes containing the standard output of the command.
+    Raises:
+        Failure: if the command fails to execute (e.g. command not found) or
+            returns non-zero exit status.
+    """
+    try:
+        return subprocess.check_output(cmd, cwd=cwd, input=None,
+                                       stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as ex:
+        command = ' '.join(shlex.quote(arg) for arg in cmd)
+        stderr = ex.stderr.decode('utf-8', 'replace')
+        raise Failure('Command <{}> terminated with exit code {}:\n{}'.format(
+            command, ex.returncode, stderr)) from ex
 
 
 def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
@@ -54,24 +80,12 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
 
     requester = request_json.get('requester', 'unknown')
 
-    fetch = bash(f'''
-            rm -rf nearcore
-            git clone https://github.com/near/nearcore
-            cd nearcore
-            git fetch 
-            git checkout {request_json['sha']}
-    ''')
-    if fetch.returncode != 0:
-        raise Failure(fetch.stderr)
-
-    user = bash(f'''
-        cd nearcore
-        git log --format='%ae' {request_json['sha']}^!
-    ''').stdout
-    title = bash(f'''
-        cd nearcore
-        git log --format='%s' {request_json['sha']}^!
-    ''').stdout
+    repo_dir = pathlib.Path('nearcore.git').resolve()
+    shutil.rmtree(repo_dir, ignore_errors=True)
+    run('git', 'clone', '--mirror', 'https://github.com/near/nearcore')
+    sha, user, title = run(
+        'git', 'log', '--format=%H\n%ae\n%s', '-n1', request_json['sha'],
+        cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
     tests = []
     for test in request_json['tests']:
         spl = test.split(maxsplit=1)
@@ -80,12 +94,9 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
                 tests.extend(spl[1:] * int(spl[0]))
             else:
                 tests.append(test.strip())
-    return server.scheduling_a_run(branch=request_json['branch'],
-                                   sha=request_json['sha'],
-                                   user=user.split('@')[0],
-                                   title=title,
-                                   tests=tests,
-                                   requester=requester)
+    return server.scheduling_a_run(branch=request_json['branch'], sha=sha,
+                                   user=user.split('@')[0], title=title,
+                                   tests=tests, requester=requester)
 
 
 @app.route('/request_a_run', methods=['POST', 'GET'])
