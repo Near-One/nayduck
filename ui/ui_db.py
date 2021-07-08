@@ -87,7 +87,7 @@ class UIDB (common_db.DB):
         result = self._execute_sql(sql, (test_name, branch))
         tests = result.fetchall()
         for test in tests:
-            if test["finished"] != None and test["started"] != None:
+            if test["finished"] is not None and test["started"] is not None:
                 test["run_time"] = str(test["finished"] - test["started"])
             if interested_in_logs:
                 sql = '''SELECT type, size, storage, stack_trace, patterns
@@ -117,7 +117,7 @@ class UIDB (common_db.DB):
         res = self._execute_sql(sql, (run_id,))
         a_run = res.fetchall()
         for test in a_run:
-            if test['build_id'] == None:
+            if test['build_id'] is None:
                  test['build_id'] = 0
             test['build'] = builds_dict[test['build_id']]
             test.update(self.get_data_about_test(test, branch, blob=False))
@@ -143,7 +143,7 @@ class UIDB (common_db.DB):
             if not s.startswith("--"):
                 test_l.append(s)
         test["name"] = ' '.join(test_l)
-        if test["finished"] != None and test["started"] != None:
+        if test["finished"] is not None and test["started"] is not None:
             test["test_time"] = str(test["finished"] - test["started"])
         history = self.get_test_history(test["cmd"], branch)
         test["history"] = self.history_stats(history)
@@ -159,7 +159,7 @@ class UIDB (common_db.DB):
         sql = "SELECT * from builds WHERE build_id = %s"
         res = self._execute_sql(sql, (build_id,))
         build = res.fetchone()
-        if build["finished"] != None and build["started"] != None:
+        if build["finished"] is not None and build["started"] is not None:
             build["build_time"] = str(build["finished"] - build["started"])
         try:
             build["stderr"] =  build["stderr"].decode()
