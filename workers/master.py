@@ -114,22 +114,25 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
 def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
     print('Building {}target'.format('expensive ' if spec.is_expensive else ''))
 
-    def cargo(*cmd):
-        cmd = ['cargo', *cmd, *spec.features]
+    def cargo(*cmd, add_features=True):
+        cmd = ['cargo', *cmd]
+        if add_features:
+            cmd.extend(spec.features)
         if spec.is_release:
             cmd.append('--release')
         return runner(cmd, cwd=Path('nearcore'))
 
     ok = True
-    ok = ok and cargo('build', '-p', 'neard', '-p', 'genesis-populate',
-                      '-p', 'restaked', '-p', 'near-test-contracts',
-                      '--features', 'adversarial')
+    ok = ok and cargo('build', '-p', 'neard', '--features', 'adversarial')
+    ok = ok and cargo('build', '-p', 'genesis-populate', '-p', 'restaked',
+                      '-p', 'near-test-contracts', add_features=False)
     if spec.is_expensive:
         # It reads better when the command arguments are aligned so allow long
         # lines.  pylint: disable=line-too-long
-        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace',                                                                              '--features=expensive_tests')
-        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-client', '-p', 'near-chunks', '-p', 'neard', '-p', 'near-chain', '--features=expensive_tests')
-        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace', '-p', 'nearcore',                                                            '--features=expensive_tests')
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace',                                                         '--features=expensive_tests')
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-client', '-p', 'neard', '-p', 'near-chain', '--features=expensive_tests')
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-chunks',                                    '--features=expensive_tests', add_features=False)
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace', '-p', 'nearcore',                                       '--features=expensive_tests')
 
     return ok
 
