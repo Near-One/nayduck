@@ -50,6 +50,38 @@ def run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
             command, ex.returncode, stderr)) from ex
 
 
+def update_repo() -> pathlib.Path:
+    """Fetches the latest code from nearcore repository and returns path to it.
+
+    The command clones the nearcore repository to ~/nearcore.git directory and
+    returns path to it (i.e. Path representing ~/nearcore.git).  If the
+    directory already exists, rather than cloning the repository anew, updates
+    the existing local repository.  The end result is the same.  If there's an
+    error updating the existing repository, it is deleted and created anew as if
+    it was never there.
+
+    Returns:
+        Path to the local clone of the nearcore repository.  The path is to
+        a bare repository, i.e. the repository does not have a work tree.
+    Raises:
+        Failure: if cloning of the remote repository fails.
+    """
+    home_dir = pathlib.Path.home()
+    repo_dir = home_dir / 'nearcore.git'
+
+    if repo_dir.is_dir():
+        try:
+            run('git', 'remote', 'update', '--prune', cwd=repo_dir)
+            return repo_dir
+        except Failure as ex:
+            print(ex.args[0])
+        shutil.rmtree(repo_dir)
+
+    run('git', 'clone', '--mirror', 'https://github.com/near/nearcore',
+        cwd=home_dir)
+    return repo_dir
+
+
 def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     """Starts a test run based on the JSON request.
 
@@ -79,10 +111,7 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
         raise Failure('Branch and/or git sha were not provided.')
 
     requester = request_json.get('requester', 'unknown')
-
-    repo_dir = pathlib.Path('nearcore.git').resolve()
-    shutil.rmtree(repo_dir, ignore_errors=True)
-    run('git', 'clone', '--mirror', 'https://github.com/near/nearcore')
+    repo_dir = update_repo()
     sha, user, title = run(
         'git', 'log', '--format=%H\n%ae\n%s', '-n1', request_json['sha'],
         cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
