@@ -11,7 +11,6 @@ from db_worker import WorkerDB
 from multiprocessing import Process
 import json
 from azure.storage.blob import BlobServiceClient, ContentSettings
-from os.path import expanduser
 
 import utils
 
@@ -82,8 +81,8 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
 
         print("[RUNNING] %s %s" % (' '.join(test), ' '.join(cmd)))
 
-        stdout = open(os.path.join(dir_name, 'stdout'), 'w')
-        stderr = open(os.path.join(dir_name, 'stderr'), 'w')
+        stdout = open(dir_name / 'stdout', 'w')
+        stderr = open(dir_name / 'stderr', 'w')
 
         env = os.environ.copy()
         env["RUST_BACKTRACE"] = "1"
@@ -95,7 +94,7 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
             if ret == 0:
                 ignored = False
                 if test[0] == 'expensive' or test[0] == 'lib':
-                    with open(os.path.join(dir_name, 'stdout')) as f:
+                    with open(dir_name / 'stdout') as f:
                         lines = f.readlines()
                         while len(lines) and lines[-1].strip() == '':
                             lines.pop()
@@ -106,7 +105,7 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
                                 ignored = True
                 outcome = 'PASSED' if not ignored else 'IGNORED'
                 if test[0] == 'expensive' or test[0] == 'lib':
-                    with open(os.path.join(dir_name, 'stderr')) as f:
+                    with open(dir_name / 'stderr') as f:
                         lines = f.readlines()
                         for line in lines:
                             if line.strip() in FAIL_PATTERNS:
@@ -116,7 +115,7 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
                 return 'POSTPONE'
             else:
                 outcome = 'FAILED'
-                with open(os.path.join(dir_name, 'stdout')) as f:
+                with open(dir_name / 'stdout') as f:
                     lines = f.readlines()
                     while len(lines) and lines[-1].strip() == '':
                         lines.pop()
@@ -139,7 +138,7 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
 
         if test[0] == 'pytest':
             for node_dir in utils.list_test_node_dirs():
-                shutil.copytree(node_dir, os.path.join(dir_name, os.path.basename(node_dir)))
+                shutil.copytree(node_dir, dir_name / PurePath(node_dir).name)
 
         print("[%7s] %s" % (outcome, ' '.join(test)))
         sys.stdout.flush()
@@ -148,7 +147,7 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
     return outcome
 
 
-def find_patterns(filename: str,
+def find_patterns(filename: Path,
                   patterns: typing.Sequence[str]) -> typing.List[str]:
     """Searches for patterns in given file; returns list of found patterns.
 
@@ -174,43 +173,47 @@ def find_patterns(filename: str,
     return [pattern for ok, pattern in zip(found, patterns) if ok]
 
 
-def save_logs(server, test_id, dir_name):
+def save_logs(server, test_id, directory: Path):
     blob_size = 1024
     blob_service_client = BlobServiceClient.from_connection_string(AZURE)
     cnt_settings = ContentSettings(content_type="text/plain")
-    files = []
-    for filename in os.listdir(dir_name):
-        if os.path.isdir(os.path.join(dir_name, filename)):
-            fl_name = filename.split('_')[0]
-            if os.path.exists(os.path.join(dir_name, filename, "remote.log")):
-                files.append((fl_name + "_remote", os.path.join(dir_name, filename, "remote.log")))
-            if os.path.exists(os.path.join(dir_name, filename, "companion.log")):
-                files.append((fl_name + "_companion", os.path.join(dir_name, filename, "companion.log")))
-            if os.path.exists(os.path.join(dir_name, filename, "stderr")):
-                files.append((fl_name, os.path.join(dir_name, filename, "stderr")))
-        elif filename in ["stderr", "stdout", "build_err", "build_out"]:
-            files.append((filename, os.path.join(dir_name, filename)))
-    home = expanduser("~")
-    if os.path.isdir(os.path.join(home, ".rainbow", "logs")):
-        for folder in os.listdir(os.path.join(home, ".rainbow", "logs")):
-            for filename in os.listdir(os.path.join(home, ".rainbow", "logs", folder)):
-                if "err" in filename:
-                    files.append((f"{folder}_err", os.path.join(home, ".rainbow", "logs", folder, filename)))
-                if "out" in filename:
-                    files.append((f"{folder}_out", os.path.join(home, ".rainbow", "logs", folder, filename)))
 
-    for fl_name, fl in files:
-        file_size = os.path.getsize(fl)
-        found_patterns = find_patterns(fl, INTERESTING_PATTERNS)
+    files = []
+    for entry in os.listdir(directory):
+        entry_path = directory / entry
+        if entry_path.is_dir():
+            filename = entry.split('_')[0]
+            for filename, suffix in (
+                    ('remote.log', '_remote'),
+                    ('companion.log', '_companion'),
+                    ('stderr', ''),
+            ):
+                if (entry_path / filename).exists():
+                    files.append((filename + suffix, entry_path / filename))
+        elif entry in ('stderr', 'stdout', 'build_err', 'build_out'):
+            files.append((entry, directory / entry))
+
+    rainbow_logs = Path.home() / '.rainbow' / 'logs'
+    if rainbow_logs.is_dir():
+        for folder in os.listdir(rainbow_logs):
+            for entry in os.listdir(rainbow_logs / folder):
+                for suffix in ('err', 'out'):
+                    if suffix in entry:
+                        path = rainbow_logs / folder / entry
+                        files.append((f'{folder}_{suffix}', path))
+
+    for filename, path in files:
+        file_size = path.stat().st_size
+        found_patterns = find_patterns(path, INTERESTING_PATTERNS)
         try:
             found_patterns.remove(BACKTRACE_PATTERN)
             stack_trace = True
         except ValueError:
             stack_trace = False
         # REMOVE V2!
-        blob_name = str(test_id) + "_v2_" + fl_name
+        blob_name = str(test_id) + "_v2_" + filename
         s3 = ""
-        with open(fl, 'rb') as f:
+        with open(path, 'rb') as f:
             f.seek(0)
             beginning = f.read(blob_size * 5 * 2).decode()
             if len(beginning) < blob_size * 5 * 2:
@@ -221,12 +224,12 @@ def save_logs(server, test_id, dir_name):
                 f.seek(-blob_size * 5, 2)
                 data += f.read().decode()
         blob_client = blob_service_client.get_blob_client(container="logs", blob=blob_name)    
-        with open(fl, 'rb') as f:
+        with open(path, 'rb') as f:
             blob_client.upload_blob(f, content_settings=cnt_settings)
             s3 = blob_client.url
         print(s3) 
 
-        server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
+        server.save_short_logs(test_id, filename, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
 
 def scp_build(build_id, ip, test, build_type="debug"):
@@ -293,7 +296,6 @@ def keep_pulling():
     hostname = socket.gethostname()
     server = WorkerDB()
     server.handle_restart(hostname)
-    home = expanduser("~")
     while True:
         time.sleep(5)
         try:
@@ -308,11 +310,11 @@ def keep_pulling():
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
             outdir = WORKDIR / 'output'
-            shutil.rmtree(outdir, ignore_errors=True)
-            shutil.rmtree(os.path.join(home, ".rainbow"), ignore_errors=True)
-            shutil.rmtree(os.path.join(home, ".rainbow-bridge"), ignore_errors=True)
+            utils.rmdirs(outdir,
+                         Path.home() / '.rainbow',
+                         Path.home() / '.rainbow-bridge')
             outdir = outdir / str(test['test_id'])
-            outdir.mkdir(parents=True, exist_ok=True)
+            utils.mkdirs(outdir)
             
             remote = False
             config_override = {}
