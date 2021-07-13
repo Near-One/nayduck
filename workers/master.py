@@ -9,7 +9,6 @@ import stat
 import time
 import traceback
 import typing
-import requests
 from db_master import MasterDB
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
@@ -148,9 +147,35 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
         return False
 
 
+def get_ip() -> str:
+    """Returns private IPv4 address of the current host.
+
+    Returns:
+        A string with the hosts private IP address.
+    Raises:
+        SystemExit: if no private IP address could be found for the host.
+    """
+    for iface in psutil.net_if_addrs().values():
+        for addr in iface:
+            if addr.family != socket.AF_INET:
+                continue
+            ip_addr = addr.address
+            octets = [int(octet) for octet in ip_addr.split('.')]
+            if len(octets) != 4:  # Sanity check
+                continue
+            # Check if it's a private address.  We don't want to return any kind
+            # of public addresses or localhost.
+            if (octets[0] == 10 or
+                (octets[0] == 172 and 16 <= octets[1] <= 31) or
+                (octets[0] == 192 and octets[1] == 168)):
+                return ip_addr
+    sys.exit('Unable to determine private IP address')
+
+
 def keep_pulling():
-    ip_address = requests.get('https://checkip.amazonaws.com').text.strip()
-    print(ip_address)
+    ip_address = get_ip()
+    print('Starting master at {}'.format(ip_address))
+
     server = MasterDB()
     server.handle_restart(ip_address)
   
