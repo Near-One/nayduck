@@ -121,15 +121,15 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
         return runner(cmd, cwd=Path('nearcore'))
 
     ok = True
-    ok = ok and cargo('build', '-j8', '-p', 'neard', '-p', 'genesis-populate',
+    ok = ok and cargo('build', '-p', 'neard', '-p', 'genesis-populate',
                       '-p', 'restaked', '-p', 'near-test-contracts',
                       '--features', 'adversarial')
     if spec.is_expensive:
         # It reads better when the command arguments are aligned so allow long
         # lines.  pylint: disable=line-too-long
-        ok = ok and cargo('test', '-j8', '--no-run', '--target-dir', 'target_expensive', '--workspace',                                                                              '--features=expensive_tests')
-        ok = ok and cargo('test', '-j8'  '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-client', '-p', 'near-chunks', '-p', 'neard', '-p', 'near-chain', '--features=expensive_tests')
-        ok = ok and cargo('test', '-j8', '--no-run', '--target-dir', 'target_expensive', '--workspace', '-p', 'nearcore',                                                            '--features=expensive_tests')
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace',                                                                              '--features=expensive_tests')
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-client', '-p', 'near-chunks', '-p', 'neard', '-p', 'near-chain', '--features=expensive_tests')
+        ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace', '-p', 'nearcore',                                                            '--features=expensive_tests')
 
     return ok
 
