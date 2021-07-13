@@ -73,7 +73,7 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
     def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool=False):
         if create_dir:
             utils.mkdirs(dst)
-        return runner(('cp', '-r', '--', *srcs, dst))
+        return runner(('cp', '-rl', '--', *srcs, dst))
 
     ok = True
     ok = ok and cp(dst=spec.build_dir / 'target' / spec.build_type,
