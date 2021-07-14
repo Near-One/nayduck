@@ -1,13 +1,17 @@
 from flask import Flask, session, flash, render_template, redirect, json, url_for, request, abort, make_response, jsonify, send_file
 import os
+import traceback
 from flask_cors import CORS
 
 from ui_db import UIDB
+import scheduler
+
+
+NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
+              'http://nayduck.eastus.cloudapp.azure.com:3000')
 
 app = Flask(__name__)
-CORS(app)
-
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+CORS(app, origins=NAYDUCK_UI)
 
 
 @app.route('/', methods=['GET'])
@@ -77,6 +81,22 @@ def get_auth_code():
     server = UIDB()
     code = server.get_auth_code(login)
     return jsonify({"code": code})
+
+
+@app.route('/request_a_run', methods=['POST'])
+@flask_cors.cross_origin(origins=[])
+def request_a_run():
+    request_json = request.get_json(force=True)
+    try:
+        run_id = scheduler.request_a_run_impl(request_json)
+        url = f'Success. {NAYDUCK_UI}/#/run/{run_id}'
+        response = {'code': 0, 'response': f'Success. {url}'}
+    except scheduler.Failure as ex:
+        response = ex.to_response()
+    except Exception as ex:
+        traceback.print_exc()
+        response = scheduler.Failure(ex).to_response()
+    return jsonify(response)
 
 
 if __name__ == '__main__':

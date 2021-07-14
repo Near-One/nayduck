@@ -1,19 +1,12 @@
-import os
 import pathlib
 import shlex
 import shutil
 import subprocess
 import typing
-import traceback
 
 import requests
-import flask
 
-from db import SchedulerDB
-
-app = flask.Flask(__name__)
-
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+from ui_db import UIDB
 
 
 class Failure(Exception):
@@ -27,7 +20,7 @@ class Failure(Exception):
         return {'code': 1, 'response': self.args[0]}
 
 
-def run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
+def _run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
     """Executes a command; returns its output as "bytes"; raises on failure.
 
     Args:
@@ -50,7 +43,7 @@ def run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
             command, ex.returncode, stderr)) from ex
 
 
-def update_repo() -> pathlib.Path:
+def _update_repo() -> pathlib.Path:
     """Fetches the latest code from nearcore repository and returns path to it.
 
     The command clones the nearcore repository to ~/nearcore.git directory and
@@ -71,14 +64,14 @@ def update_repo() -> pathlib.Path:
 
     if repo_dir.is_dir():
         try:
-            run('git', 'remote', 'update', '--prune', cwd=repo_dir)
+            _run('git', 'remote', 'update', '--prune', cwd=repo_dir)
             return repo_dir
         except Failure as ex:
             print(ex.args[0])
         shutil.rmtree(repo_dir)
 
-    run('git', 'clone', '--mirror', 'https://github.com/near/nearcore',
-        cwd=home_dir)
+    _run('git', 'clone', '--mirror', 'https://github.com/near/nearcore',
+         cwd=home_dir)
     return repo_dir
 
 
@@ -95,7 +88,7 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     # if not request_json['token']:
     #     raise Failure('Your client is too old. NayDuck requires Github auth. '
     #                   'Sync your client to head.')
-    server = SchedulerDB()
+    server = UIDB()
     if 'token' in request_json:
         github_login = server.get_github_login(request_json['token'])
         if not github_login:
@@ -111,8 +104,8 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
         raise Failure('Branch and/or git sha were not provided.')
 
     requester = request_json.get('requester', 'unknown')
-    repo_dir = update_repo()
-    sha, user, title = run(
+    repo_dir = _update_repo()
+    sha, user, title = _run(
         'git', 'log', '--format=%H\n%ae\n%s', '-n1', request_json['sha'],
         cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
     tests = []
@@ -123,26 +116,6 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
                 tests.extend(spl[1:] * int(spl[0]))
             else:
                 tests.append(test.strip())
-    return server.scheduling_a_run(branch=request_json['branch'], sha=sha,
-                                   user=user.split('@')[0], title=title,
-                                   tests=tests, requester=requester)
-
-
-@app.route('/request_a_run', methods=['POST', 'GET'])
-def request_a_run():
-    request_json = flask.request.get_json(force=True)
-    try:
-        run_id = request_a_run_impl(request_json)
-        url = '{}/#/run/{}'.format(os.getenv('NAYDUCK_UI'), run_id)
-        response = {'code': 0, 'response': 'Success. ' + url}
-    except Failure as ex:
-        response = ex.to_response()
-    except Exception as ex:
-        traceback.print_exc()
-        response = Failure(ex).to_response()
-    return flask.jsonify(response)
-
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
-    
+    return server.schedule_a_run(branch=request_json['branch'], sha=sha,
+                                 user=user.split('@')[0], title=title,
+                                 tests=tests, requester=requester)

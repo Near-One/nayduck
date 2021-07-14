@@ -94,11 +94,3 @@ class DB ():
                 self.mydb.commit()
             else:
                 self.mydb.rollback()
- 
-    def get_github_login(self, token):
-        sql = "SELECT name FROM users WHERE code=%s"
-        result = self._execute_sql(sql, (token,))
-        login = result.fetchone()
-        if login:
-            return login['name']  
-        return None
