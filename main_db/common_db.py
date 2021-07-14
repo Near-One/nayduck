@@ -13,38 +13,24 @@ class DB ():
         self.user = os.environ['DB_USER']
         self.passwd = os.environ['DB_PASSWD']
         self.database = os.environ['DB']
-        self.commit = commit
-        self.mydb, self.mycursor = self.connect()
 
-    def connect(self):
-        mydb = mysql.connector.connect(
+        self.mydb = mysql.connector.connect(
             host=self.host,
             user=self.user, 
             passwd=self.passwd, 
             database=self.database,
-            autocommit=self.commit,
+            autocommit=commit,
         )
-        mycursor = mydb.cursor(buffered=True, dictionary=True)
-        return mydb, mycursor
+        self.mycursor = self.mydb.cursor(buffered=True, dictionary=True)
 
     def execute_sql(self, sql, val=()):
-        try:
-            self.mycursor.execute(sql, val)
-            if self.commit:
-                self.mydb.commit()
-        except Exception as e:
-            try:
-                print(sql, val)
-                print(e)
-                self.mycursor.close()
-                self.mydb.close()
-            except Exception as ee:
-                print(ee)
-                raise ee
-            self.mydb, self.mycursor = self.connect()
-            self.mycursor.execute(sql, val)
-            if self.commit:
-                self.mydb.commit()
+        # If we're not inside of a transaction check if connection is active and
+        # reconnect if necessary.  If we are in a transaction, don't try to
+        # reconnect since that would rollback what has been executed so far
+        # without the caller knowing.
+        if not self.mydb.in_transaction:
+            self.mydb.ping(True)
+        self.mycursor.execute(sql, val)
         return self.mycursor
  
     def get_github_login(self, token):
