@@ -50,25 +50,10 @@ def get_sequential_test_cmd(cwd: Path,
 
 
 def install_new_packages():
-    print('Install new packages')
-    try:
-        with open(WORKDIR / 'nearcore/pytest/requirements.txt') as rd:
-            required = {line.strip().lower() for line in rd}
-        output = subprocess.check_output(('pip3', 'freeze'), text=True,
-                                         stderr=subprocess.PIPE)
-        installed = {line.split('==')[0].lower()
-                     for line in output.splitlines()}
-        missing = required - installed
-        if missing:
-            print(missing)
-            subprocess.check_call(('pip3', 'install', *missing),
-                                  stdout=subprocess.DEVNULL,
-                                  stderr=subprocess.PIPE)
-    except subprocess.CalledProcessError as ex:
-        print('<{}> exited with: {}\n{}'.format(
-            ' '.join(ex.cmd), ex.returncode, ex.stderr))
-    except Exception as e:
-        print(e)
+    """Makes sure all Python requirements for the pytests are satisfied."""
+    requirements = WORKDIR / 'nearcore/pytest/requirements.txt'
+    subprocess.check_call(
+        ('python', '-m', 'pip', 'install' ,'--user', '-q', '-r', requirements))
 
 
 def run_test(dir_name: Path, test, remote=False, build_type="debug"):
@@ -361,9 +346,11 @@ def keep_pulling():
                     server.update_test_status("SCP FAILED", test['test_id'])
                     continue
             
-            install_new_packages()
+            tokens = test_name.split()
+            if tokens and tokens[0] in ('pytest', 'mocknet'):
+                install_new_packages()
             server.test_started(test['test_id'])
-            code = run_test(outdir, test_name.strip().split(' '), remote, "release" if release else "debug")
+            code = run_test(outdir, tokens, remote, "release" if release else "debug")
             server = WorkerDB()
             if code == 'POSTPONE':
                 server.remark_test_pending(test['test_id'])
