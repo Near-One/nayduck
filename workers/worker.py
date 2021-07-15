@@ -6,17 +6,20 @@ import psutil
 import shutil
 from pathlib import Path, PurePath
 import time
+import typing
 from db_worker import WorkerDB
-from rc import bash, run
 from multiprocessing import Process
 import json
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from os.path import expanduser
 
+import utils
+
 
 DEFAULT_TIMEOUT = 180
-FAIL_PATTERNS = ['stack backtrace:']
-INTERESTING_PATTERNS = ["LONG DELAY"]
+BACKTRACE_PATTERN = 'stack backtrace:'
+FAIL_PATTERNS = [BACKTRACE_PATTERN]
+INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 WORKDIR = Path('/datadrive')
@@ -47,18 +50,23 @@ def get_sequential_test_cmd(cwd: Path,
 
 
 def install_new_packages():
+    print('Install new packages')
     try:
-        print("Install new packages")
-        f = open(WORKDIR / 'nearcore/pytest/requirements.txt', 'r')
-        required = {l.strip().lower() for l in f.readlines()}
-        p = bash(f'''pip3 freeze''')
-        rr = p.stdout.split('\n')
-        installed = {k.split('==')[0].lower() for k in rr if k}
+        with open(WORKDIR / 'nearcore/pytest/requirements.txt') as rd:
+            required = {line.strip().lower() for line in rd}
+        output = subprocess.check_output(('pip3', 'freeze'), text=True,
+                                         stderr=subprocess.PIPE)
+        installed = {line.split('==')[0].lower()
+                     for line in output.splitlines()}
         missing = required - installed
-        print(missing)
         if missing:
-            python = sys.executable
-            subprocess.check_call([python, '-m', 'pip', 'install', *missing], stdout=subprocess.DEVNULL)
+            print(missing)
+            subprocess.check_call(('pip3', 'install', *missing),
+                                  stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as ex:
+        print('<{}> exited with: {}\n{}'.format(
+            ' '.join(ex.cmd), ex.returncode, ex.stderr))
     except Exception as e:
         print(e)
 
@@ -84,11 +92,8 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
         print(cmd)
 
         if test[0] == 'pytest':
-            node_dirs = subprocess.check_output("find ~/.near/test* -maxdepth 0 || true", shell=True).decode('utf-8').strip().split('\n')
-            for node_dir in node_dirs:
-                if node_dir:
-                    shutil.rmtree(node_dir)
-            subprocess.check_output('mkdir -p ~/.near', shell=True)
+            utils.rmdirs(*utils.list_test_node_dirs())
+            utils.mkdirs(Path.home() / '.near')
 
         print("[RUNNING] %s %s" % (' '.join(test), ' '.join(cmd)))
 
@@ -148,16 +153,41 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
             handle.communicate()
 
         if test[0] == 'pytest':
-            node_dirs = subprocess.check_output("find ~/.near/test* -maxdepth 0 || true", shell=True).decode('utf-8').strip().split('\n')
-            for node_dir in node_dirs:
-                if node_dir: # if empty, node_dirs will be always ['']
-                    shutil.copytree(node_dir, os.path.join(dir_name, os.path.basename(node_dir)))
+            for node_dir in utils.list_test_node_dirs():
+                shutil.copytree(node_dir, os.path.join(dir_name, os.path.basename(node_dir)))
 
         print("[%7s] %s" % (outcome, ' '.join(test)))
         sys.stdout.flush()
     except Exception as ee:
         print(ee)
     return outcome
+
+
+def find_patterns(filename: str,
+                  patterns: typing.Sequence[str]) -> typing.List[str]:
+    """Searches for patterns in given file; returns list of found patterns.
+
+    Args:
+        filename: Path to the file to read.
+        patterns: List of patterns to look for.  Patterns are matched as fixed
+            strings (no regex or globing) and must not span multiple lines since
+            search is done line-by-line.
+
+    Returns:
+        A list of patterns which were found in the file.
+    """
+    found = [False] * len(patterns)
+    count = len(found)
+    with open(filename) as rd:
+        for line in rd:
+            for idx, pattern in enumerate(patterns):
+                if not found[idx] and pattern in line:
+                    found[idx] = True
+                    count -= 1
+                    if not count:
+                        break
+    return [pattern for ok, pattern in zip(found, patterns) if ok]
+
 
 def save_logs(server, test_id, dir_name):
     blob_size = 1024
@@ -185,17 +215,13 @@ def save_logs(server, test_id, dir_name):
                     files.append((f"{folder}_out", os.path.join(home, ".rainbow", "logs", folder, filename)))
 
     for fl_name, fl in files:
-        stack_trace = False
-        data = ""
         file_size = os.path.getsize(fl)
-        res = bash(f'''grep "stack backtrace:" {fl}''')
-        if res.returncode == 0:
+        found_patterns = find_patterns(fl, INTERESTING_PATTERNS)
+        try:
+            found_patterns.remove(BACKTRACE_PATTERN)
             stack_trace = True
-        found_patterns = []
-        for pattern in INTERESTING_PATTERNS:
-            res = bash(f'''grep "{pattern}" {fl}''')
-            if res.returncode == 0:
-                found_patterns.append(pattern)
+        except ValueError:
+            stack_trace = False
         # REMOVE V2!
         blob_name = str(test_id) + "_v2_" + fl_name
         s3 = ""
@@ -217,50 +243,66 @@ def save_logs(server, test_id, dir_name):
 
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
-def scp_build(build_id, ip, test, build_type="debug"):
-    (WORKDIR / 'nearcore' / 'target' / build_type).mkdir(parents=True, exist_ok=True)
-    (WORKDIR / 'nearcore' / 'target_expensive' / build_type / 'deps').mkdir(parents=True, exist_ok=True)
-    bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/* {WORKDIR}/nearcore/target/{build_type}/''')
-    bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/near-test-contracts/* {WORKDIR}/nearcore/runtime/near-test-contracts/res/''')
-    
-    if test[0] == "expensive":
-        if test[1].startswith('--'):
-            test_name = test[3].replace('-', '_')
-        else:
-            test_name = test[2].replace('-', '_')
-        bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* {WORKDIR}/nearcore/target_expensive/{build_type}/deps''')
-    elif test[0] == "lib":
-        if test[1].startswith('--'):
-            test_name = test[2].replace('-', '_')
-        else:
-            test_name = test[1].replace('-', '_')
-        bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* {WORKDIR}/nearcore/target_expensive/{build_type}/deps''')
-    return bld
 
-def checkout(sha):
-    print("Checkout")
-    bld = bash(f'''
-        cd {WORKDIR / 'nearcore'}
-        rm -rf target
-        rm -rf target_expensive
-        rm -rf normal_target
-        git checkout {sha}
-    ''')
-    if bld.returncode != 0:
-        print("Clone")
-        bld = bash(f'''
-            cd {WORKDIR}
-            rm -rf nearcore
-            git clone https://github.com/nearprotocol/nearcore 
-            cd nearcore
-            git checkout {sha}
-        ''')
-        return bld
-    return bld
+def scp_build(build_id, ip, test, build_type="debug"):
+    def scp(src: str, dst: str) -> None:
+        src = f'azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/{src}'
+        dst = WORKDIR / 'nearcore' / dst
+        utils.mkdirs(dst)
+        cmd = ('scp', '-o', 'StrictHostKeyChecking=no', src, dst)
+        subprocess.check_call(cmd)
+
+    scp(f'target/{build_type}/*', f'target/{build_type}')
+    scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
+
+    if test[0] in ('expensive', 'lib'):
+        idx = 1 + (test[0] == 'expensive') + test[1].startswith('--')
+        test_name = test[idx].replace('-', '_')
+        scp(f'target_expensive/{build_type}/deps/{test_name}-*',
+            f'target_expensive/{build_type}/deps')
+
+
+def checkout(sha: str) -> bool:
+    """Checks out given SHA in the nearcore repository.
+
+    If the repository directory exists updates the origin remote and then checks
+    out the SHA.  If that fails, deletes the directory, clones the upstream and
+    tries to check out the commit again.
+
+    If the repository directory does not exist, clones the origin and then tries
+    to check out the commit.
+
+    The repository directory will be located in (WORKDIR / 'nearcore').
+
+    Args:
+        sha: Commit SHA to check out.
+    Returns:
+        Whether operation succeeded.
+    """
+    repo_dir = (WORKDIR / 'nearcore')
+    if repo_dir.is_dir():
+        print('Checkout', sha)
+        for directory in ('target', 'target_expensive', 'normal_target'):
+            utils.rmdirs(repo_dir / directory)
+        try:
+            subprocess.check_call(('git', 'remote', 'update', '--prune'),
+                                  cwd=repo_dir)
+            subprocess.check_call(('git', 'checkout', sha), cwd=repo_dir)
+            return True
+        except subprocess.CalledProcessError:
+            pass
+
+    print('Clone', sha)
+    utils.rmdirs(repo_dir)
+    try:
+        subprocess.check_call(
+            ('git', 'clone', 'https://github.com/nearprotocol/nearcore'),
+            cwd=WORKDIR)
+        subprocess.check_call(('git', 'checkout', sha), cwd=repo_dir)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
 
 def keep_pulling():
     hostname = socket.gethostname()
@@ -277,10 +319,7 @@ def keep_pulling():
             
             test_name = test['name']
             print(test)
-            chck = checkout(test['sha'])
-            if chck.returncode != 0:
-                print(chck)
-                # More logs!
+            if not checkout(test['sha']):
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
             outdir = WORKDIR / 'output'
@@ -315,9 +354,10 @@ def keep_pulling():
                 test_name = test_name[:test_name.find('--features')]
 
             if not ('mocknet' in test_name):
-                scp = scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
-                if scp.returncode != 0:
-                    print(scp)
+                try:
+                    scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
+                except (OSError, subprocess.SubprocessError) as ex:
+                    print(ex)
                     server.update_test_status("SCP FAILED", test['test_id'])
                     continue
             
