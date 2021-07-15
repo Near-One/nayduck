@@ -1,4 +1,5 @@
 import os
+import signal
 import socket
 import subprocess
 import psutil
@@ -52,6 +53,33 @@ def install_new_packages():
         ('python', '-m', 'pip', 'install' ,'--user', '-q', '-r', requirements))
 
 
+def kill_process_tree(pid: int) -> None:
+    """Kills a process tree (including grandchildren).
+
+    Sends SIGTERM to the process and all its descendant and waits for them to
+    terminate.  If a process doesn't terminate within five seconds, sends
+    SIGKILL to remaining stragglers.
+
+    Args:
+        pid: Process ID of the parent whose process tree to kill.
+    """
+    def send_to_all(procs: typing.List[psutil.Process], sig: int) -> None:
+        for proc in procs:
+            try:
+                proc.send_signal(sig)
+            except psutil.NoSuchProcess:
+                pass
+
+    proc = psutil.Process(pid)
+    procs = proc.children(recursive=True) + [proc]
+    print('Sending SIGTERM to {} process tree'.format(pid))
+    send_to_all(procs, signal.SIGTERM)
+    _, procs = psutil.wait_procs(procs, timeout=5)
+    if procs:
+        print('Sending SIGKILL to {} remaining processes'.format(len(procs)))
+        send_to_all(procs, signal.SIGKILL)
+
+
 def run_command_with_tmpdir(cmd: typing.Sequence[str],
                             stdout: typing.IO[typing.AnyStr],
                             stderr: typing.IO[typing.AnyStr],
@@ -85,11 +113,7 @@ def run_command_with_tmpdir(cmd: typing.Sequence[str],
         try:
             return handle.wait(timeout)
         except subprocess.TimeoutExpired:
-            print('Sending SIGINT to %s' % handle.pid)
-            for child in psutil.Process(handle.pid).children(recursive=True):
-                child.terminate()
-            handle.terminate()
-            handle.wait()
+            kill_process_tree(handle.pid)
             raise
 
 
