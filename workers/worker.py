@@ -1,9 +1,9 @@
 import os
 import socket
-import sys
 import subprocess
 import psutil
 import shutil
+import shlex
 from pathlib import Path, PurePath
 import time
 import typing
@@ -55,7 +55,96 @@ def install_new_packages():
         ('python', '-m', 'pip', 'install' ,'--user', '-q', '-r', requirements))
 
 
-def run_test(dir_name: Path, test, remote=False, build_type="debug"):
+def analyse_test_outcome(test: typing.Sequence[str],
+                         ret: int,
+                         stdout: typing.BinaryIO,
+                         stderr: typing.BinaryIO) -> str:
+    """Returns test's outcome based on exit code and test's output.
+
+    Args:
+        test: The test whose result is being analysed.
+        ret: Test process exit code.
+        stdout: Test's standard output opened as binary file.  The file
+            descriptor must be seekable since it will be seeked to the beginning
+            of the file if necessary.
+        stderr: Test's standard error output opened as binary file.  The file
+            descriptor must be seekable since it will be seeked to the beginning
+            of the file if necessary.
+    Returns:
+        Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE' or 'IGNORED'.
+    """
+    if ret == 13:
+        return 'POSTPONE'
+
+    def get_last_line(rd: typing.BinaryIO) -> str:
+        """Returns last non-empty line of a file or empty string if"""
+        rd.seek(0)
+        last_line = b''
+        for line in rd:
+            line = line.strip()
+            if line:
+                last_line = line
+        return last_line
+
+    if ret != 0:
+        if b'1 passed; 0 failed;' in get_last_line(stdout):
+            return 'PASSED'
+        return 'FAILED'
+
+    if test[0] == 'expensive' or test[0] == 'lib':
+        stderr.seek(0)
+        for line in stderr:
+            if line.strip().decode('utf-8', 'replace') in FAIL_PATTERNS:
+                return 'FAILED'
+        if b'0 passed' in get_last_line(stdout):
+            return 'IGNORED'
+
+    return 'PASSED'
+
+
+def execute_test_command(dir_name: Path,
+                         test: typing.Sequence[str],
+                         build_type: str,
+                         cwd: Path,
+                         timeout: int) -> str:
+    """Executes a test command and returns test's outcome.
+
+    Args:
+        dir_name: Directory where to save 'stdout' and 'stderr' files.
+        test: The test to execute.  Test command is constructed based on that
+            list by calling get_sequential_test_cmd()
+        build_type: A build type ('debug' or 'release') used in some
+            circumstances to locate a built test binary inside of the taregt
+            directory.
+        cwd: Working directory to execute the test in.
+        timeout: Time in seconds to allow the test to run.  After that time
+            passes, the test process will be killed and function will return
+            'TIMEOUT' outcome.
+    Returns:
+        Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE', 'IGNORED' or
+        'TIMEOUT'.
+    """
+    env = dict(os.environ, RUST_BACKTRACE='1')
+    cmd = get_sequential_test_cmd(cwd, test, build_type)
+    print('[RUNNING] {}\n+ {}'.format(
+        ' '.join(test), ' '.join(shlex.quote(str(arg)) for arg in cmd)))
+    with open(dir_name / 'stdout', 'wb+') as stdout, \
+         open(dir_name / 'stderr', 'wb+') as stderr, \
+         subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
+                          env=env, cwd=cwd) as handle:
+        try:
+            ret = handle.wait(timeout)
+        except subprocess.TimeoutExpired:
+            print('Sending SIGINT to %s' % handle.pid)
+            for child in psutil.Process(handle.pid).children(recursive=True):
+                child.terminate()
+            handle.terminate()
+            handle.wait()
+            return 'TIMEOUT'
+        return analyse_test_outcome(test, ret, stdout, stderr)
+
+
+def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
     cwd = WORKDIR / 'nearcore'
     if test[0] in ('pytest', 'mocknet'):
         cwd = cwd / 'pytest'
@@ -63,85 +152,23 @@ def run_test(dir_name: Path, test, remote=False, build_type="debug"):
     outcome = "FAILED"
     try:
         timeout = DEFAULT_TIMEOUT
-
         if len(test) > 1 and test[1].startswith('--timeout='):
             timeout = int(test[1][10:])
             test = [test[0]] + test[2:]
-
         if remote:
             timeout += 60 * 15
-
-        
-        cmd = get_sequential_test_cmd(cwd, test, build_type)
-        print(cmd)
 
         if test[0] == 'pytest':
             utils.rmdirs(*utils.list_test_node_dirs())
             utils.mkdirs(Path.home() / '.near')
 
-        print("[RUNNING] %s %s" % (' '.join(test), ' '.join(cmd)))
-
-        stdout = open(dir_name / 'stdout', 'w')
-        stderr = open(dir_name / 'stderr', 'w')
-
-        env = os.environ.copy()
-        env["RUST_BACKTRACE"] = "1"
-
-        handle = subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
-                                  env=env, cwd=cwd)
-        try:
-            ret = handle.wait(timeout)
-            if ret == 0:
-                ignored = False
-                if test[0] == 'expensive' or test[0] == 'lib':
-                    with open(dir_name / 'stdout') as f:
-                        lines = f.readlines()
-                        while len(lines) and lines[-1].strip() == '':
-                            lines.pop()
-                        if len(lines) == 0:
-                            ignored = True
-                        else:
-                            if '0 passed' in lines[-1]:
-                                ignored = True
-                outcome = 'PASSED' if not ignored else 'IGNORED'
-                if test[0] == 'expensive' or test[0] == 'lib':
-                    with open(dir_name / 'stderr') as f:
-                        lines = f.readlines()
-                        for line in lines:
-                            if line.strip() in FAIL_PATTERNS:
-                                outcome = 'FAILED'
-                                break
-            elif ret == 13:
-                return 'POSTPONE'
-            else:
-                outcome = 'FAILED'
-                with open(dir_name / 'stdout') as f:
-                    lines = f.readlines()
-                    while len(lines) and lines[-1].strip() == '':
-                        lines.pop()
-                    if len(lines) == 0:
-                        outcome = 'FAILED'
-                    else:
-                        if '1 passed; 0 failed;' in lines[-1]:
-                            outcome = 'PASSED'
-        except subprocess.TimeoutExpired as e:
-            stdout.flush()
-            stderr.flush()
-            sys.stdout.flush()
-            sys.stderr.flush()
-            outcome = 'TIMEOUT'
-            print("Sending SIGINT to %s" % handle.pid)
-            for child in psutil.Process(handle.pid).children(recursive=True):
-                child.terminate()
-            handle.terminate()
-            handle.communicate()
-
-        if test[0] == 'pytest':
-            for node_dir in utils.list_test_node_dirs():
-                shutil.copytree(node_dir, dir_name / PurePath(node_dir).name)
-
+        outcome = execute_test_command(dir_name, test, build_type, cwd, timeout)
         print("[%7s] %s" % (outcome, ' '.join(test)))
-        sys.stdout.flush()
+
+        if outcome != 'POSTPONE' and test[0] == 'pytest':
+            for node_dir in utils.list_test_node_dirs():
+                shutil.copytree(node_dir,
+                                dir_name / PurePath(node_dir).name)
     except Exception as ee:
         print(ee)
     return outcome
