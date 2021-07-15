@@ -19,6 +19,7 @@ FAIL_PATTERNS = ['stack backtrace:']
 INTERESTING_PATTERNS = ["LONG DELAY"]
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
+WORKDIR = Path('/datadrive')
 
 def get_sequential_test_cmd(cwd: Path,
                             test: typing.Sequence[str],
@@ -48,7 +49,7 @@ def get_sequential_test_cmd(cwd: Path,
 def install_new_packages():
     try:
         print("Install new packages")
-        f = open(f'''nearcore/pytest/requirements.txt''', 'r')
+        f = open(WORKDIR / 'nearcore/pytest/requirements.txt', 'r')
         required = {l.strip().lower() for l in f.readlines()}
         p = bash(f'''pip3 freeze''')
         rr = p.stdout.split('\n')
@@ -62,8 +63,8 @@ def install_new_packages():
         print(e)
 
 
-def run_test(dir_name, test, remote=False, build_type="debug"):
-    cwd = Path.cwd() / 'nearcore'
+def run_test(dir_name: Path, test, remote=False, build_type="debug"):
+    cwd = WORKDIR / 'nearcore'
     if test[0] in ('pytest', 'mocknet'):
         cwd = cwd / 'pytest'
 
@@ -217,12 +218,12 @@ def save_logs(server, test_id, dir_name):
         server.save_short_logs(test_id, fl_name, file_size, data, s3, stack_trace, ",".join(found_patterns))
             
 def scp_build(build_id, ip, test, build_type="debug"):
-    Path(f'nearcore/target/{build_type}/').mkdir(parents=True, exist_ok=True)
-    Path(f'nearcore/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
+    (WORKDIR / 'nearcore' / 'target' / build_type).mkdir(parents=True, exist_ok=True)
+    (WORKDIR / 'nearcore' / 'target_expensive' / build_type / 'deps').mkdir(parents=True, exist_ok=True)
     bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/* nearcore/target/{build_type}/''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target/{build_type}/* {WORKDIR}/nearcore/target/{build_type}/''')
     bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/near-test-contracts/* nearcore/runtime/near-test-contracts/res/''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/near-test-contracts/* {WORKDIR}/nearcore/runtime/near-test-contracts/res/''')
     
     if test[0] == "expensive":
         if test[1].startswith('--'):
@@ -230,20 +231,20 @@ def scp_build(build_id, ip, test, build_type="debug"):
         else:
             test_name = test[2].replace('-', '_')
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* nearcore/target_expensive/{build_type}/deps''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* {WORKDIR}/nearcore/target_expensive/{build_type}/deps''')
     elif test[0] == "lib":
         if test[1].startswith('--'):
             test_name = test[2].replace('-', '_')
         else:
             test_name = test[1].replace('-', '_')
         bld = bash(f'''
-            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* nearcore/target_expensive/{build_type}/deps''')
+            scp -o StrictHostKeyChecking=no azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/target_expensive/{build_type}/deps/{test_name}-* {WORKDIR}/nearcore/target_expensive/{build_type}/deps''')
     return bld
 
 def checkout(sha):
     print("Checkout")
     bld = bash(f'''
-        cd nearcore
+        cd {WORKDIR / 'nearcore'}
         rm -rf target
         rm -rf target_expensive
         rm -rf normal_target
@@ -252,6 +253,7 @@ def checkout(sha):
     if bld.returncode != 0:
         print("Clone")
         bld = bash(f'''
+            cd {WORKDIR}
             rm -rf nearcore
             git clone https://github.com/nearprotocol/nearcore 
             cd nearcore
@@ -281,11 +283,12 @@ def keep_pulling():
                 # More logs!
                 server.update_test_status("CHECKOUT FAILED", test['test_id'])
                 continue
-            shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
+            outdir = WORKDIR / 'output'
+            shutil.rmtree(outdir, ignore_errors=True)
             shutil.rmtree(os.path.join(home, ".rainbow"), ignore_errors=True)
             shutil.rmtree(os.path.join(home, ".rainbow-bridge"), ignore_errors=True)
-            outdir = os.path.abspath('output/' + str(test['test_id']))
-            Path(outdir).mkdir(parents=True, exist_ok=True)
+            outdir = outdir / str(test['test_id'])
+            outdir.mkdir(parents=True, exist_ok=True)
             
             remote = False
             config_override = {}
