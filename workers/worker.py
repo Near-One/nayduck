@@ -5,6 +5,7 @@ import psutil
 import shutil
 import shlex
 from pathlib import Path, PurePath
+import tempfile
 import time
 import typing
 from db_worker import WorkerDB
@@ -49,6 +50,47 @@ def install_new_packages():
     requirements = WORKDIR / 'nearcore/pytest/requirements.txt'
     subprocess.check_call(
         ('python', '-m', 'pip', 'install' ,'--user', '-q', '-r', requirements))
+
+
+def run_command_with_tmpdir(cmd: typing.Sequence[str],
+                            stdout: typing.IO[typing.AnyStr],
+                            stderr: typing.IO[typing.AnyStr],
+                            cwd: Path,
+                            timeout: int) -> str:
+    """Executes a command and cleans up its temporary files once it’s done.
+
+    Executes a command with TMPDIR, TEMP and TMP environment variables set to
+    a temporary directory which is cleared after the command terminates.  This
+    should clean up all temporary file that the command might have created.
+
+    Args:
+        cmd: The command to execute.
+        stdout: File to direct command’s standard output to.
+        stderr: File to direct command’s standard error output to.
+        cwd: Work directory to run the command in.
+        timeout: Time in seconds to allow the test to run.  After that time
+            passes, the test process will be killed and function will raise
+            subprocess.Timeout exception.
+    Raises:
+        subprocess.Timeout: if process takes longer that timeout seconds to
+        complete.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir, \
+         subprocess.Popen(cmd, stdout=stdout, stderr=stderr, cwd=cwd,
+                          env=dict(os.environ,
+                                   RUST_BACKTRACE='1',
+                                   TMPDIR=tmpdir,
+                                   TEMP=tmpdir,
+                                   TMP=tmpdir)) as handle:
+        try:
+            return handle.wait(timeout)
+        except subprocess.TimeoutExpired:
+            print('Sending SIGINT to %s' % handle.pid)
+            for child in psutil.Process(handle.pid).children(recursive=True):
+                child.terminate()
+            handle.terminate()
+            handle.wait()
+            raise
 
 
 def analyse_test_outcome(test: typing.Sequence[str],
@@ -120,22 +162,14 @@ def execute_test_command(dir_name: Path,
         Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE', 'IGNORED' or
         'TIMEOUT'.
     """
-    env = dict(os.environ, RUST_BACKTRACE='1')
     cmd = get_sequential_test_cmd(cwd, test, build_type)
     print('[RUNNING] {}\n+ {}'.format(
         ' '.join(test), ' '.join(shlex.quote(str(arg)) for arg in cmd)))
     with open(dir_name / 'stdout', 'wb+') as stdout, \
-         open(dir_name / 'stderr', 'wb+') as stderr, \
-         subprocess.Popen(cmd, stdout=stdout, stderr=stderr,
-                          env=env, cwd=cwd) as handle:
+         open(dir_name / 'stderr', 'wb+') as stderr:
         try:
-            ret = handle.wait(timeout)
+            ret = run_command_with_tmpdir(cmd, stdout, stderr, cwd, timeout)
         except subprocess.TimeoutExpired:
-            print('Sending SIGINT to %s' % handle.pid)
-            for child in psutil.Process(handle.pid).children(recursive=True):
-                child.terminate()
-            handle.terminate()
-            handle.wait()
             return 'TIMEOUT'
         return analyse_test_outcome(test, ret, stdout, stderr)
 
