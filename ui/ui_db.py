@@ -1,4 +1,5 @@
 import mysql.connector
+import collections
 import random
 import string
 import time
@@ -48,33 +49,71 @@ class UIDB (common_db.DB):
             return login['name']  
         return None
 
+    _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
+                          'build_failed', 'canceled', 'timeout')
+    _NO_STATUSES = dict.fromkeys(_STATUS_CATEGORIES + ('failed',), 0)
+    _NO_BUILDS = (
+        {
+            'build_id': 0,
+            'status': 'TEST SPECIFIC',
+            'is_release': False,
+            'features': '',
+            'tests': _NO_STATUSES,
+        },
+    )
+
     def get_all_runs(self):
-        sql = "SELECT * FROM runs ORDER BY id desc LIMIT 100"
-        res = self._execute_sql(sql, ())
-        all = res.fetchall()
-        all_runs = []
-        for run in all:
-            sql = "SELECT build_id, status, is_release, features FROM builds WHERE run_id=%s"
-            res = self._execute_sql(sql, (run['id'],))
-            builds = res.fetchall()
-            # For older runs, to be able to get older data.
-            if not builds:
-                builds = [{'build_id': 0, 'status': 'TEST SPECIFIC', 'is_release': False, 'features': ''}] 
-            for build in builds:
-                sql = '''select count(IF(status='PENDING',1,NULL)) AS pending,  count(IF(status='RUNNING',1,NULL)) AS running,  
-                                 count(IF(status='PASSED',1,NULL)) AS passed,  count(IF(status='IGNORED',1,NULL)) AS ignored,  
-                                 count(IF(status LIKE '%FAILED%',1,NULL)) AS failed,  count(IF(status='BUILD FAILED',1,NULL)) AS build_failed,  
-                                 count(IF(status='CANCELED',1,NULL)) AS canceled,  count(IF(status='TIMEOUT',1,NULL)) AS timeout 
-                                 from tests where {} = %s'''
-                if build['build_id'] == 0:
-                    res = self._execute_sql(sql.format('run_id'), (run['id'],))
-                else:
-                    res = self._execute_sql(sql.format('build_id'), (build['build_id'],))
-                tests = res.fetchone()
-                build['tests'] = tests
-            run['builds'] = builds
-            all_runs.append(run)
-        return all_runs
+        # Get the last 100 runs
+        sql = 'SELECT * FROM runs ORDER BY id DESC LIMIT 100'
+        all_runs = dict((int(run['id']), run)
+                        for run in self._execute_sql(sql).fetchall())
+        run_id_range = min(all_runs), max(all_runs)
+
+        statuses = self.__get_statuses_for_runs(*run_id_range)
+
+        # Get builds for the last 100 runs.
+        sql = '''SELECT run_id, build_id, status, is_release, features
+                   FROM builds
+                  WHERE run_id BETWEEN %s AND %s'''
+        for build in self._execute_sql(sql, run_id_range).fetchall():
+            run_id = int(build.pop('run_id'))
+            build_id = int(build['build_id'])
+            build['tests'] = statuses.get((run_id, build_id), self._NO_STATUSES)
+            all_runs[run_id].setdefault('builds', []).append(build)
+
+        # Fill out fake builds for any old runs which don't have corresponding
+        # builds.  In practice this is never executed since those runs no longer
+        # show up on the dashboard in the top 100.
+        for run in all_runs.values():
+            run.setdefault('builds', self._NO_BUILDS)
+
+        return sorted(all_runs.values(), key=lambda run: -run['id'])
+
+    def __get_statuses_for_runs(self, min_run_id: int, max_run_id: int):
+        """Return test statuses for runs with ids in given range.
+
+        Args:
+            min_run_id: The lowest run id to return statuses for.
+            max_run_id: The highest run id to return statuses for.
+        Returns:
+            A {(run_id, build_id): {status: count}} dictionary.
+        """
+        statuses = collections.defaultdict(collections.Counter)
+        sql = '''SELECT run_id, build_id, status, COUNT(status) AS cnt
+                   FROM tests
+                  WHERE run_id BETWEEN %s AND %s
+                  GROUP BY 1, 2, 3'''
+        result = self._execute_sql(sql, (min_run_id, max_run_id))
+        for test in result.fetchall():
+            counter = statuses[
+                (int(test['run_id']), int(test['build_id'] or 0))
+            ]
+            status = test['status'].lower().replace(' ', '_')
+            if status in self._STATUS_CATEGORIES:
+                counter[status.lower().replace(' ', '_')] += int(test['cnt'])
+            if 'failed' in status:
+                counter['failed'] += int(test['cnt'])
+        return statuses
 
     def get_test_history_by_id(self, test_id):
         sql = "SELECT t.name, r.branch FROM tests as t, runs as r WHERE t.test_id=%s and r.id = t.run_id"
