@@ -141,8 +141,8 @@ function AllRuns () {
                       <NavLink className="build_link" to={"/build/" + build.build_id} >
                       <b>{build.is_release == 0 ? 'Debug' : 'Release'}  
                         {build.features == "" ? " ": "/"}
-                        {build.features == "--features nightly_protocol --features nightly_protocol_features" 
-                          ? 'Nightly ' : build.features + " "}
+                        {build.features == "--features nightly_protocol --features nightly_protocol_features" || build.features == "--features nightly_protocol,nightly_protocol_features"
+                          ? 'Nightly ' : build.features == "--features sandbbox" ? 'Sandbox ' : build.features.substr(11) + " "}
                       </b>
                       {build.status} 
                       </NavLink>

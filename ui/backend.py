@@ -1,6 +1,7 @@
 from flask import Flask, session, flash, render_template, redirect, json, url_for, request, abort, make_response, jsonify, send_file
 import os
 import traceback
+import typing
 from flask_cors import CORS
 
 from ui_db import UIDB
@@ -14,6 +15,46 @@ app = Flask(__name__)
 CORS(app, origins=NAYDUCK_UI)
 
 
+def get_int(req: typing.Any, key: str) -> int:
+    """Gets an integer field from the JSON request.
+
+    The value may be of any type which can be converted into an int by calling
+    `int(value)`.
+
+    Args:
+        req: The JSON request object.
+        key: The key to get from the request object.
+    Raises:
+        HTTPException: if req is not a dictionary, is missing the key or the
+           value of the key is not convertible into an integer.
+    """
+    try:
+        return int(req[key])
+    except Exception:
+        flask.abort(400)
+        raise  # just to silence pylint
+
+
+def get_str(req: typing.Any, key: str) -> str:
+    """Gets a string field from the JSON request.
+
+    Args:
+        req: The JSON request object.
+        key: The key to get from the request object.
+    Raises:
+        HTTPException: if req is not a dictionary, is missing the key or the
+           value is not a string.
+    """
+    try:
+        value = req[key]
+        if not isinstance(value, str):
+            flask.abort(400)
+    except Exception:
+        flask.abort(400)
+        raise  # just to silence pylint
+    return value
+
+
 @app.route('/', methods=['GET'])
 def get_runs():
     server = UIDB()
@@ -24,7 +65,7 @@ def get_runs():
 @app.route('/run', methods=['POST', 'GET'])
 def get_a_run():
     request_json = request.get_json(force=True)
-    run_id = request_json['run_id']
+    run_id = get_int(request_json, 'run_id')
     server = UIDB()
     a_run = server.get_one_run(run_id)
     return jsonify(a_run)
@@ -33,7 +74,7 @@ def get_a_run():
 @app.route('/test', methods=['POST', 'GET'])
 def get_a_test():
     request_json = request.get_json(force=True) 
-    test_id = request_json['test_id']
+    test_id = get_int(request_json, 'test_id')
     server = UIDB()
     a_test = server.get_one_test(test_id)
     return jsonify(a_test)
@@ -42,7 +83,7 @@ def get_a_test():
 @app.route('/build', methods=['POST', 'GET'])
 def get_build_info():
     request_json = request.get_json(force=True) 
-    build_id = request_json['build_id']
+    build_id = get_int(request_json, 'build_id')
     server = UIDB()
     a_test = server.get_build_info(build_id)
     return jsonify(a_test)
@@ -51,7 +92,7 @@ def get_build_info():
 @app.route('/test_history', methods=['POST', 'GET'])
 def test_history():
     request_json = request.get_json(force=True) 
-    test_id = request_json['test_id']
+    test_id = get_int(request_json, 'test_id')
     server = UIDB()
     history = server.get_test_history_by_id(test_id)
     return jsonify(history)
@@ -60,8 +101,8 @@ def test_history():
 @app.route('/branch_history', methods=['POST', 'GET'])
 def branch_history():
     request_json = request.get_json(force=True) 
-    test_id = request_json['test_id']
-    branch = request_json['branch']
+    test_id = get_int(request_json, 'test_id')
+    branch = get_str(request_json, 'branch')
     server = UIDB()
     history = [server.get_histoty_for_base_branch(test_id, branch)]
     return jsonify(history)
@@ -69,7 +110,7 @@ def branch_history():
 @app.route('/cancel_the_run', methods=['POST', 'GET'])
 def cancel_the_run():
     request_json = request.get_json(force=True) 
-    run_id = request_json['run_id']
+    run_id = get_int(request_json, 'run_id')
     server = UIDB()
     server.cancel_the_run(run_id)
     return jsonify({})
@@ -77,7 +118,7 @@ def cancel_the_run():
 @app.route('/get_auth_code', methods=['POST', 'GET'])
 def get_auth_code():
     request_json = request.get_json(force=True) 
-    login = request_json['github_login']
+    login = get_str(request_json, 'github_login')
     server = UIDB()
     code = server.get_auth_code(login)
     return jsonify({"code": code})

@@ -1,4 +1,5 @@
 import pathlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -75,6 +76,190 @@ def _update_repo() -> pathlib.Path:
     return repo_dir
 
 
+_VALID_FEATURE = re.compile(r'^[a-zA-Z0-9_][-a-zA-Z0-9_]*$')
+_TEST_COUNT_LIMIT = 1024
+_SENTINEL = object()
+
+class Request(typing.NamedTuple):
+    """Contents of a "Requests a Run" request."""
+    branch: str
+    sha: str
+    requester: str
+    tests: typing.List[str]
+
+    @classmethod
+    def from_json_request(cls, request_json: typing.Any) -> 'Request':
+        """Validates JSON request and returns a new Request object.
+
+        Checks if all required keys are present and if all of them are of
+        correct types.
+
+        Furthermore, validates that --features in test names are correct.  The
+        latter is important because anything following --features string in test
+        name is included in cargo commands and we don't want to allow arbitrary
+        switches to be passed.  The tests are somewhat modified after the
+        verification to be in a more of a canonical form.
+
+        Args:
+            request_json: The JSON request that user made.
+        Returns:
+            A new Request object describing the request.
+        Raises:
+            Failure: if validation fails.
+        """
+        requester = request_json.get('requester', 'unknown')
+        branch = request_json.get('branch', _SENTINEL)
+        sha = request_json.get('sha', _SENTINEL)
+        tests = request_json.get('tests')
+
+        if branch is _SENTINEL or sha is _SENTINEL:
+            raise Failure('Invalid request object: missing branch or sha field')
+        if not tests:
+            raise Failure('No tests specified')
+
+        if not (isinstance(requester, str) and isinstance(branch, str) and
+                isinstance(sha, str) and isinstance(tests, (list, tuple))):
+            raise Failure('Invalid request object: '
+                          'one of the fields has wrong type')
+
+        return cls(branch=branch, sha=sha, requester=requester,
+                   tests=cls._verify_tests(tests))
+
+    @classmethod
+    def _verify_tests(cls, tests: typing.List[typing.Any]) -> typing.List[str]:
+        """Verifies that requested tests are valid.
+
+        See Request._verify_single_test for description of what it means for
+        a single test to be valid.  Apart from checks on individual tests, this
+        method also verifies that there was at least one test and no more than
+        _TEST_COUNT_LIMIT in the request.  This takes into account that tests
+        can be multiplied by having count in front of them.
+
+        Args:
+            tests: Tests as given in the JSON request.
+        Returns:
+            List of tests to schedule.
+        Raises:
+            Failure: if any of the test is not valid, there are no tests given
+                or there are too many tests given.
+        """
+        result = []
+        for test in tests:
+            count, test = cls._verify_single_test(test)
+            if count + len(result) > _TEST_COUNT_LIMIT:
+                raise Failure('Invalid request object: too many tests; '
+                              f'max {_TEST_COUNT_LIMIT} allowed')
+            result.extend([test] * count)
+        if not result:
+            raise Failure('Invalid request object: no tests specified')
+        return result
+
+    @classmethod
+    def _verify_single_test(cls, test: typing.Any) -> typing.Tuple[int, str]:
+        """Verifies a single test line.
+
+        Checks that the test is a string and verifies that the --features (if
+        any) arguments are correct.  That is, if there's a --features switch in
+        the test, everything that follows it must be features and more
+        --features switches.  Furthermore, all features must have valid names.
+
+        Note that many things about the test are not checked.  Features are
+        checked because they are passed somewhat verbatim to cargo commands and
+        we want to control what goes there.  We are less concerned about
+        arguments to tests.
+
+        Args:
+            test: The test to verify.
+        Returns:
+            A (count, test) tuple.  The count specifies how many time given test
+            should be scheduled and test is the test after some normalisation.
+        Raises:
+            Failure: if the test is not valid.
+        """
+        if not isinstance(test, str):
+            raise Failure(f'Invalid test: {test}; expected string')
+        test = test.strip()
+        if not test or test[0] == '#':
+            return (0, '')
+
+        words, features = cls._extract_features(test)
+        count = int(words.pop(0)) if words and words[0].isnumeric() else 1
+        cls._check_test_name(test, words)
+        if features:
+            words.extend(('--features', ','.join(sorted(features))))
+        return count, ' '.join(words)
+
+    @classmethod
+    def _extract_features(
+            cls, test: str
+    ) -> typing.Tuple[typing.Sequence[str], typing.Optional[typing.Set[str]]]:
+        """Extracts feature names from test.
+
+        A test can specify features it requires the binaries to be built with.
+        For example:
+
+            pytest sanity/proxy_simple.py --features nightly_protocol
+
+        This method extracts those features from test name and the test name
+        without the features.
+
+        Args:
+            test: The test being parsed.
+        Returns:
+            A (words, features) tuple where words is the test name sans features
+            split into words and features is a set of features present in the
+            test (or None if there were no features).  For the aforementioned
+            example, the method returns:
+
+                (['pytest', 'sanity/proxy_simple.py'],
+                 set(['nightly_protocol']))
+        Raises:
+            Failure: if the --features have invalid format or any of the
+                features have invalid names.
+        """
+        pos = test.find('--features')
+        if pos == -1:
+            return test.split(), None
+
+        features = set()
+        want_features = False
+        for arg in test[pos:].split():
+            if want_features:
+                features.update(arg.split(','))
+                want_features = False
+            elif arg == '--features':
+                want_features = True
+            elif arg.startswith('--features='):
+                features.update(arg[11:].split(','))
+            else:
+                want_features = True
+                break
+        if want_features:
+            raise Failure(f'Invalid features arguments in: {test}')
+        for feature in features:
+            if not _VALID_FEATURE.search(feature):
+                raise Failure(f'Invalid feature "{feature}" in: {test}')
+        return test[:pos].split(), features
+
+    @classmethod
+    def _check_test_name(cls, test: str, words: typing.Sequence[str]) -> None:
+        """Checks whether the test name is valid; raises Failure if not."""
+        try:
+            idx = 1 + words[1].startswith('--timeout')
+            if words[0] in ('pytest', 'mocknet'):
+                pattern = r'^[-_a-zA-Z0-9/]+\.py$'
+            elif words[0] in ('expensive', 'lib'):
+                idx += words[0] == 'expensive'
+                pattern = '^[-_a-zA-Z0-9]+$'
+            else:
+                raise Failure(f'Invalid test category "{words[0]}" in: {test}')
+            name = words[idx]
+        except ValueError as ex:
+            raise Failure(f'Missing test name in: {test}') from ex
+        if not re.search(pattern, name):
+            raise Failure(f'Invalid test name "{name}" in: {test}')
+
+
 def _verify_token(server: UIDB,
                   request_json: typing.Dict[str, typing.Any]) -> None:
     """Verifies if request has correct token; raises Failure if not."""
@@ -83,7 +268,7 @@ def _verify_token(server: UIDB,
     #     raise Failure('Your client is too old. NayDuck requires Github auth. '
     #                   'Sync your client to head.')
         return
-    github_login = server.get_github_login(token)
+    github_login = isinstance(token, str) and server.get_github_login(token)
     if not github_login:
         raise Failure('Invalid NayDuck token.')
     if github_login == 'NayDuck':
@@ -106,24 +291,22 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     Raises:
         Failure: on any kind of error.
     """
+    req = Request.from_json_request(request_json)
     server = UIDB()
     _verify_token(server, request_json)
-    if not request_json['branch'] or not request_json['sha']:
-        raise Failure('Branch and/or git sha were not provided.')
 
-    requester = request_json.get('requester', 'unknown')
     repo_dir = _update_repo()
     sha, user, title = _run(
-        'git', 'log', '--format=%H\n%ae\n%s', '-n1', request_json['sha'],
+        'git', 'log', '--format=%H\n%ae\n%s', '-n1', req.sha,
         cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
     tests = []
-    for test in request_json['tests']:
+    for test in req.tests:
         spl = test.split(maxsplit=1)
         if spl and spl[0][0] != '#':
             if len(spl) > 1 and spl[0].isnumeric():
                 tests.extend(spl[1:] * int(spl[0]))
             else:
                 tests.append(test.strip())
-    return server.schedule_a_run(branch=request_json['branch'], sha=sha,
+    return server.schedule_a_run(branch=req.branch, sha=sha,
                                  user=user.split('@')[0], title=title,
-                                 tests=tests, requester=requester)
+                                 tests=tests, requester=req.requester)
