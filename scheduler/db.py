@@ -5,19 +5,20 @@ import datetime
 import os
 import sys
 import time
+import typing
 
 sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class SchedulerDB (common_db.DB):
-    def __init__(self):
-        super().__init__(commit=False)
+    def scheduling_a_run(self, branch: str, sha: str, user: str, title: str,
+                         tests: typing.Sequence[str], requester: str):
+        return self._with_transaction(lambda: self.__do_schedule(
+            branch, sha, user, title, tests, requester))
 
-    def scheduling_a_run(self, branch, sha, user, title, tests, requester):
+    def __do_schedule(self, branch: str, sha: str, user: str, title: str,
+                      tests: typing.Sequence[str], requester: str):
         # Into Runs
-        sql = "START TRANSACTION"
-        self._execute_sql(sql)
-        
         run_id = self._insert('runs',
                               branch=branch,
                               sha=sha,
@@ -76,7 +77,5 @@ class SchedulerDB (common_db.DB):
                          priority=priority,
                          release=int(release),
                          remote=int(remote))
-        sql = "COMMIT"
-        self._execute_sql(sql)
         return run_id
         

@@ -9,7 +9,7 @@ import os
 
 
 class DB ():
-    def __init__(self, *, commit=True):
+    def __init__(self):
         self.host = os.environ['DB_HOST']
         self.user = os.environ['DB_USER']
         self.passwd = os.environ['DB_PASSWD']
@@ -20,7 +20,7 @@ class DB ():
             user=self.user, 
             passwd=self.passwd, 
             database=self.database,
-            autocommit=commit,
+            autocommit=True,
         )
         self.mycursor = self.mydb.cursor(buffered=True, dictionary=True)
 
@@ -64,6 +64,36 @@ class DB ():
             placeholders=', '.join(['%s'] * len(columns)))
         cursor = self._execute_sql(sql, values)
         return cursor.lastrowid
+
+    def _with_transaction(
+            self,
+            callback: typing.Callable[[], typing.TypeVar('T')]
+    ) -> typing.TypeVar('T'):
+        """Executes callback inside of a SQL transaction.
+
+        Starts a transaction before calling the callback and ends it once the
+        callback finishes.  If the callback raises an exception, the method
+        rolls back the transaction.  Otherwise, it commits the transaction and
+        returns whatever value the callback returned.
+
+        Raises an exception if transaction is already active.
+
+        Args:
+            callback: Code to execute within the transaction.
+        Returns:
+            Whatever callback returns.
+        """
+        self.mydb.start_transaction()
+        commit = False
+        try:
+            result = callback()
+            commit = True
+            return result
+        finally:
+            if commit:
+                self.mydb.commit()
+            else:
+                self.mydb.rollback()
  
     def get_github_login(self, token):
         sql = "SELECT name FROM users WHERE code=%s"
