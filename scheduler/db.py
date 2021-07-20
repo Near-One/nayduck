@@ -26,50 +26,27 @@ class SchedulerDB (common_db.DB):
                               title=title,
                               requester=requester)
 
-        debug_builds = {}
-        release_builds = {}
-
         # Into Tests
+        builds = {}
         after = int(time.time())
+        priority = int(requester == 'NayDuck')
         for test in tests:
-            if requester == 'NayDuck':
-                priority = 1
-            else:
-                priority = 0
-            if "--features" in test:
-                features = test[test.find('--features'):]
-            else:
-                features = ""
-            release = False
-            remote = False
+            pos = test.find('--features')
+            features = '' if pos < 0 else test[pos:]
+            release = '--release' in test
+            remote = '--remote' in test
             build_status = 'PENDING'
-            if '--remote' in test: 
-                remote = True
             if 'mocknet' in test:
                 remote = True
                 build_status = 'SKIPPED'
-            if '--release' in test:
-                release = True
-                if features not in release_builds:
-                    build_id = self._insert('builds',
-                                            run_id=run_id,
-                                            status=build_status,
-                                            features=features,
-                                            is_release=1)
-                    release_builds[features] = build_id
-                else:
-                    build_id = release_builds[features]
-            else:
-                if features not in debug_builds:
-                    build_id = self._insert('builds',
-                                            run_id=run_id,
-                                            status=build_status,
-                                            features=features,
-                                            is_release=0)
-                    build_id = result.lastrowid
-                    debug_builds[features] = build_id
-                else:
-                    build_id = debug_builds[features]
+            build_id = builds.get((release, features))
+            if build_id is None:
+                build_id = self._insert('builds',
+                                        run_id=run_id,
+                                        status=build_status,
+                                        features=features,
+                                        is_release=int(release))
+                builds[(release, features)] = build_id
             self._insert('tests',
                          run_id=run_id,
                          build_id=build_id,
