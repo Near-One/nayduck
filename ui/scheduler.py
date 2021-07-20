@@ -75,6 +75,27 @@ def _update_repo() -> pathlib.Path:
     return repo_dir
 
 
+def _verify_token(server: UIDB,
+                  request_json: typing.Dict[str, typing.Any]) -> None:
+    """Verifies if request has correct token; raises Failure if not."""
+    token = request_json.get('token')
+    if token is None:
+    #     raise Failure('Your client is too old. NayDuck requires Github auth. '
+    #                   'Sync your client to head.')
+        return
+    github_login = server.get_github_login(token)
+    if not github_login:
+        raise Failure('Invalid NayDuck token.')
+    if github_login == 'NayDuck':
+        return
+    github_req = f'https://api.github.com/users/{github_login}/orgs'
+    response = requests.get(github_req)
+    if not any(org.get('login') in ('nearprotocol', 'near')
+               for org in response.json()):
+        raise Failure(f'{github_login} is not part of '
+                      'NearProtocol or Near organisations.')
+
+
 def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     """Starts a test run based on the JSON request.
 
@@ -85,21 +106,8 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     Raises:
         Failure: on any kind of error.
     """
-    # if not request_json['token']:
-    #     raise Failure('Your client is too old. NayDuck requires Github auth. '
-    #                   'Sync your client to head.')
     server = UIDB()
-    if 'token' in request_json:
-        github_login = server.get_github_login(request_json['token'])
-        if not github_login:
-            raise Failure('NayDuck token is not found. Do not try to fake it.')
-        if github_login != 'NayDuck':
-            github_req = f'''https://api.github.com/users/{github_login}/orgs'''
-            response = requests.get(github_req)
-            if not any(org.get('login') in ('nearprotocol', 'near')
-                       for org in response.json()):
-                raise Failure(f'{github_login} is not part of '
-                              'NearProtocol or Near orgs.')
+    _verify_token(server, request_json)
     if not request_json['branch'] or not request_json['sha']:
         raise Failure('Branch and/or git sha were not provided.')
 
