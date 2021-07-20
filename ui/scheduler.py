@@ -299,14 +299,23 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     sha, user, title = _run(
         'git', 'log', '--format=%H\n%ae\n%s', '-n1', req.sha,
         cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
+
+    builds = {}
     tests = []
     for test in req.tests:
-        spl = test.split(maxsplit=1)
-        if spl and spl[0][0] != '#':
-            if len(spl) > 1 and spl[0].isnumeric():
-                tests.extend(spl[1:] * int(spl[0]))
-            else:
-                tests.append(test.strip())
-    return server.schedule_a_run(branch=req.branch, sha=sha,
-                                 user=user.split('@')[0], title=title,
-                                 tests=tests, requester=req.requester)
+        is_release = '--release' in test
+        pos = test.find('--features')
+        features = '' if pos < 0 else test[pos:]
+        build = builds.setdefault((is_release, features), UIDB.BuildSpec(
+            is_release=is_release, features=features))
+        build.add_test(has_non_mocknet=not test.startswith('mocknet '))
+        test = UIDB.TestSpec(name=test, build=build,
+                             is_remote='--remote' in test)
+        tests.append(test)
+
+    # Sort builds by number of dependent tests so that when masters choose what
+    # to do they start with builds which unlock the largest number of tests.
+    return server.schedule_a_run(
+        branch=req.branch, sha=sha, user=user.split('@')[0], title=title,
+        builds=sorted(builds.values(), key=lambda build: -build.test_count),
+        tests=tests, requester=req.requester)

@@ -47,7 +47,6 @@ CREATE TABLE `tests` (
   `build_id` int(11) NOT NULL AUTO_INCREMENT,
   `status` varchar(50) DEFAULT NULL,
   `name` varchar(200) DEFAULT NULL,
-  `features` varchar(250) DEFAULT NULL,
   `started` timestamp NULL DEFAULT NULL,
   `finished` timestamp NULL DEFAULT NULL,
   `hostname` varchar(50) DEFAULT NULL,

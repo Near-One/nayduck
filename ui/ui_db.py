@@ -146,12 +146,8 @@ class UIDB (common_db.DB):
         
         sql = "SELECT build_id, is_release, features FROM builds WHERE run_id=%s"
         res = self._execute_sql(sql, (run_id,))
-        builds = res.fetchall()
-        if not builds:
-            builds = [{'build_id': 0, 'status': 'TEST SPECIFIC', 'is_release': False, 'features': ''}] 
-        builds_dict = {}
-        for build in builds:
-            builds_dict[build['build_id']] = build
+        builds_dict = dict((build['build_id'], build)
+                           for build in (res.fetchall() or self._NO_BUILDS))
 
         sql = "SELECT * FROM tests WHERE run_id=%s ORDER BY FIELD(status, 'FAILED', 'TIMEOUT', 'IGNORED' , 'PASSED', 'CANCELED', 'RUNNING', 'PENDING'), started"
         res = self._execute_sql(sql, (run_id,))
@@ -246,8 +242,53 @@ class UIDB (common_db.DB):
             test.update(run_data)       
         return tests
 
-    def schedule_a_run(self, branch: str, sha: str, user: str, title: str,
-                         tests: typing.Sequence[str], requester: str) -> int:
+    class BuildSpec:
+        """Specification for a build.
+
+        Attributes:
+            is_release: Whether the build should use release build profile.
+            features: Features command line arguments to use when building.
+            has_non_mocknet: Whether any non-mocknet test depends on this build.
+                At the moment, mocknet tests don't need a build so a build with
+                no non-mocknet tests becomes a no-op.
+            build_id: A build_id filled in by UIDB.schedule_a_run when the build
+                is inserted into the database.
+            test_count: Number of tests depending on this build.
+        """
+
+        def __init__(self, *, is_release: bool, features: str) -> None:
+            self.is_release = is_release
+            self.features = features
+            self.has_non_mocknet = False
+            self.build_id = 0
+            self.test_count = 0
+
+        def add_test(self, *, has_non_mocknet: bool) -> None:
+            self.has_non_mocknet = self.has_non_mocknet or has_non_mocknet
+            self.test_count += 1
+
+    class TestSpec:
+        """Specification for a test.
+
+        Attributes:
+            name: Name of the tests which also describes the command to be
+                executed.
+            is_remote: Whether the test is remote.
+            build: A BuildSpec this test depends on.  This is used to get the
+                build_id.
+        """
+
+        def __init__(self, *, name: str, is_remote: bool,
+                     build: 'UIDB.BuildSpec') -> None:
+            self.name = name
+            self.is_release = build.is_release
+            self.is_remote = is_remote
+            self.build = build
+
+    def schedule_a_run(self, *, branch: str, sha: str, user: str, title: str,
+                      builds: typing.Sequence['UIDB.BuildSpec'],
+                      tests: typing.Sequence['UIDB.TestSpec'],
+                      requester: str) -> int:
         """Schedules a run with given set of pending tests to the database.
 
         Adds a run comprising of all specified tests as well as all builds the
@@ -261,7 +302,9 @@ class UIDB (common_db.DB):
             sha: Commit sha to run the tests on.
             user: Author of the commit.
             title: Subject of the commit.
-            tests: A sequence of tests to add.
+            builds: A sequence of builds necessary for the tests to run.  The
+                builds are modified in place by having their build_id set.
+            tests: A sequence of tests to add as a sequence of TestSpec objects.
             requester: User who requested the tests.  If the requester is
                 NayDuck, the tests will be run with lower priority.  In other
                 words, user-requested tests are run before any NayDuck requested
@@ -270,11 +313,16 @@ class UIDB (common_db.DB):
             Id of the scheduled run.
         """
         return self._with_transaction(lambda: self.__do_schedule(
-            branch, sha, user, title, tests, requester))
+            branch=branch, sha=sha, user=user, title=title, builds=builds,
+            tests=tests, requester=requester))
 
-    def __do_schedule(self, branch: str, sha: str, user: str, title: str,
-                      tests: typing.Sequence[str], requester: str) -> int:
+    def __do_schedule(self, *, branch: str, sha: str, user: str, title: str,
+                      builds: typing.Sequence['UIDB.BuildSpec'],
+                      tests: typing.Sequence['UIDB.TestSpec'],
+                      requester: str) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
+        priority = int(requester == 'NayDuck')
+
         # Into Runs
         run_id = self._insert('runs',
                               branch=branch,
@@ -283,32 +331,29 @@ class UIDB (common_db.DB):
                               title=title,
                               requester=requester)
 
+        # Into Builds
+        for build in builds:
+            build_status = 'PENDING' if build.has_non_mocknet else 'SKIPPED'
+            build.build_id = self._insert('builds',
+                                          run_id=run_id,
+                                          status=build_status,
+                                          features=build.features,
+                                          is_release=build.is_release)
+
         # Into Tests
-        builds = {}
-        after = int(time.time())
-        priority = int(requester == 'NayDuck')
+        sql = '''INSERT
+                   INTO tests (run_id, build_id, name, priority,
+                               is_release, remote)
+                 VALUES {}'''.format(
+                     ', '.join(['(%s, %s, %s, %s, %s, %s)'] * len(tests)))
+        vals = []
         for test in tests:
-            pos = test.find('--features')
-            features = '' if pos < 0 else test[pos:]
-            release = '--release' in test
-            remote = '--remote' in test
-            build_status = 'PENDING'
-            if 'mocknet' in test:
-                remote = True
-                build_status = 'SKIPPED'
-            build_id = builds.get((release, features))
-            if build_id is None:
-                build_id = self._insert('builds',
-                                        run_id=run_id,
-                                        status=build_status,
-                                        features=features,
-                                        is_release=int(release))
-                builds[(release, features)] = build_id
-            self._insert('tests',
-                         run_id=run_id,
-                         build_id=build_id,
-                         name=test.strip(),
-                         priority=priority,
-                         release=int(release),
-                         remote=int(remote))
+            vals.extend((run_id,
+                         test.build.build_id,
+                         test.name,
+                         priority,
+                         test.is_release,
+                         test.is_remote))
+        self._execute_sql(sql, vals)
+
         return run_id
