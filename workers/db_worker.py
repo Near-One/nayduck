@@ -25,32 +25,38 @@ class WorkerDB (common_db.DB):
                 SET t.started = now(), t.status = 'RUNNING', t.hostname=%s WHERE t.test_id=id.test_id and 
                 @tmp_id := id.test_id'''
             vals = (after, hostname)
-        res = self.execute_sql(sql, vals)
+        res = self._execute_sql(sql, vals)
         if res.rowcount == 0:
             return None
         sql = f'''SELECT t.test_id, t.run_id, t.build_id, r.sha, t.name, b.ip, b.is_release FROM tests t, runs r, builds b 
                   WHERE t.test_id = @tmp_id and t.run_id = r.id and  t.build_id = b.build_id'''
-        result = self.execute_sql(sql, ())
+        result = self._execute_sql(sql, ())
         pending_test = result.fetchone()
         return pending_test
 
     def test_started(self, id):
         sql = "UPDATE tests SET started = now() WHERE test_id= %s"
-        self.execute_sql(sql, (id,))
+        self._execute_sql(sql, (id,))
 
     def update_test_status(self, status, id):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
-        self.execute_sql(sql, (status, id))
+        self._execute_sql(sql, (status, id))
 
     def save_short_logs(self, test_id, filename, file_size, data, storage, stack_trace, found_patterns):
-        sql = "INSERT INTO logs (test_id, type, full_size, log, storage, stack_trace, patterns) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-        self.execute_sql(sql, (test_id, filename, file_size, data, storage, stack_trace, found_patterns))
+        self._insert('logs',
+                     test_id=test_id,
+                     type=filename,
+                     full_size=file_size,
+                     log=data,
+                     storage=storage,
+                     stack_trace=stack_trace,
+                     patterns=found_patterns)
 
     def remark_test_pending(self, id):
         after = int(time.time()) + 3*60
         sql = "UPDATE tests SET started = null, hostname=null, status='PENDING', select_after=%s WHERE test_id= %s"
-        self.execute_sql(sql, (after, id))
+        self._execute_sql(sql, (after, id))
 
     def handle_restart(self, hostname):
         sql = "UPDATE tests SET started = null, status = 'PENDING', hostname=null  WHERE status = 'RUNNING' and hostname=%s"
-        self.execute_sql(sql, (hostname,))
+        self._execute_sql(sql, (hostname,))
