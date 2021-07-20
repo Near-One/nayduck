@@ -34,25 +34,35 @@ class WorkerDB (common_db.DB):
         This method must be run inside of a transaction because it uses
         variables and so we cannot tolerate disconnects between the two queries.
         """
-        after = int(time.time())
-        if "mocknet" in hostname:
-            sql = '''UPDATE tests t SET t.started = now(), t.status = 'RUNNING', t.hostname=%s  WHERE t.status = 'PENDING' and 
-                     build_id in (select build_id from builds where status = 'SKIPPED') and
-                     t.name LIKE '%mocknet%' and @tmp_id := t.test_id ORDER BY t.test_id LIMIT 1;'''
-            vals =  (hostname,)
-        else:
-            sql = '''UPDATE tests AS t, 
-            (SELECT test_id FROM tests WHERE status = 'PENDING' and   
-                    build_id in (select build_id from builds where status = 'BUILD DONE' or status = 'SKIPPED') and
-                name NOT LIKE '%mocknet%' and select_after < %s ORDER BY priority, test_id LIMIT 1) AS id 
-                SET t.started = now(), t.status = 'RUNNING', t.hostname=%s WHERE t.test_id=id.test_id and 
-                @tmp_id := id.test_id'''
-            vals = (after, hostname)
-        res = self._execute_sql(sql, vals)
+        # If mocknet tests are allowed, prefer them to other tests (i.e. sort
+        # them before others).  Otherwise, filter out mocknet tests.
+        mocknet = 'mocknet' in hostname
+        sql = '''UPDATE tests
+                    SET started = NOW(),
+                        status = 'RUNNING',
+                        hostname = %s,
+                        test_id = (@test_id := test_id)
+                  WHERE status = 'PENDING'
+                    AND build_id IN (SELECT build_id
+                                       FROM builds
+                                      WHERE status IN ('BUILD DONE', 'SKIPPED'))
+                    {where}
+                    AND select_after < %s
+                  ORDER BY {order_by} priority, test_id
+                  LIMIT 1'''.format(
+                      where='' if mocknet else 'AND name NOT LIKE "%mocknet %"',
+                      order_by='name NOT LIKE "mocknet %", ' if mocknet else '')
+        res = self._execute_sql(sql, (hostname, int(time.time())))
         if res.rowcount == 0:
             return None
-        sql = f'''SELECT t.test_id, t.run_id, t.build_id, r.sha, t.name, b.ip, b.is_release FROM tests t, runs r, builds b 
-                  WHERE t.test_id = @tmp_id and t.run_id = r.id and  t.build_id = b.build_id'''
+        sql = '''SELECT t.test_id, t.run_id, t.build_id, t.name,
+                        b.ip, b.is_release,
+                        r.sha
+                   FROM tests t, runs r, builds b
+                  WHERE t.test_id = @test_id
+                    AND t.run_id = r.id
+                    AND t.build_id = b.build_id
+                  LIMIT 1'''
         result = self._execute_sql(sql, ())
         pending_test = result.fetchone()
         return pending_test
