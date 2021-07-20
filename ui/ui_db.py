@@ -10,6 +10,20 @@ import sys
 sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
+
+def _prettify_size(size: int) -> str:
+    """Returns file size in human-readable format, e.g. 10k i/o 10000."""
+    if size < 1000:
+        return str(size)
+    for suffix in 'kMGTPEZ':
+        if size < 10000:
+            return '%.1f%s' % (size / 1000, suffix)
+        size //= 1000
+        if size < 1000:
+            return str(size) + suffix
+    return str(size) + 'Y'
+
+
 class UIDB (common_db.DB):
     def cancel_the_run(self, run_id, status="CANCELED"):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE run_id= %s and status='PENDING'"
@@ -76,12 +90,14 @@ class UIDB (common_db.DB):
             if test["finished"] != None and test["started"] != None:
                 test["run_time"] = str(test["finished"] - test["started"])
             if interested_in_logs:
-                sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
+                sql = '''SELECT type, size, storage, stack_trace, patterns
+                           FROM logs
+                          WHERE test_id = %s
+                          ORDER BY type'''
                 res = self._execute_sql(sql, (test["test_id"],))
-                logs = res.fetchall()
-                test["logs"] = logs
-                # for l in logs:
-                #     test["logs"].append(l)
+                logs = test['logs'] = res.fetchall()
+                for log in logs:
+                    log['full_size'] = _prettify_size(log.pop('size'))
         return tests
             
     def get_one_run(self, run_id):
@@ -108,17 +124,16 @@ class UIDB (common_db.DB):
         return a_run
 
     def get_data_about_test(self, test, branch, blob=False):
+        columns = 'type, size, storage, stack_trace, patterns'
         if blob:
-            sql = "SELECT * from logs WHERE test_id = %s ORDER BY type"
-        else:
-            sql = "SELECT type, full_size, storage, stack_trace, patterns from logs WHERE test_id = %s ORDER BY type"
-        res = self._execute_sql(sql, (test["test_id"],))
-        logs = res.fetchall()
+            columns += ', log'
+        sql = f'SELECT {columns} FROM logs WHERE test_id = %s ORDER BY type'
         test["logs"] = {}
-        for l in logs:
-            if "log" in l:
-                l["log"] = l["log"].decode()
-            test["logs"][l["type"]] = l
+        for log in self._execute_sql(sql, (test['test_id'],)).fetchall():
+            log['full_size'] = _prettify_size(log.pop('size'))
+            if blob:
+                log['log'] = log['log'].decode('utf-8', 'replace')
+            test['logs'][log['type']] = log
         test['cmd'] = test["name"]
         if '--features' in test["name"]:
             test["name"] =  test["name"][ : test["name"].find('--features')]

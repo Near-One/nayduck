@@ -10,6 +10,7 @@ import typing
 sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
+
 class WorkerDB (common_db.DB):
     def get_pending_test(
             self, hostname: str
@@ -64,11 +65,13 @@ class WorkerDB (common_db.DB):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
         self._execute_sql(sql, (status, id))
 
-    def save_short_logs(self, test_id, filename, file_size, data, storage, stack_trace, found_patterns):
+    def save_short_logs(self, test_id: int, filename: str, file_size: int,
+                        data: bytes, storage: str, stack_trace: bool,
+                        found_patterns: str) -> None:
         self._insert('logs',
                      test_id=test_id,
                      type=filename,
-                     full_size=file_size,
+                     size=file_size,
                      log=data,
                      storage=storage,
                      stack_trace=stack_trace,

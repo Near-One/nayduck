@@ -20,16 +20,6 @@ INTERESTING_PATTERNS = ["LONG DELAY"]
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
-def prettify_size(size):
-    if size < 1024: return size
-    size //= 1024
-    if size < 1024: return "%sK" % size
-    size //= 1024
-    if size < 1024: return "%sM" % size
-    size //= 1024
-    return "%sG" % size
-
-
 def get_sequential_test_cmd(test, build_type):
     try:
         if test[0] == 'pytest' or test[0] == 'mocknet':
@@ -196,7 +186,7 @@ def save_logs(server, test_id, dir_name):
     for fl_name, fl in files:
         stack_trace = False
         data = ""
-        file_size = prettify_size(os.path.getsize(fl))
+        file_size = os.path.getsize(fl)
         res = bash(f'''grep "stack backtrace:" {fl}''')
         if res.returncode == 0:
             stack_trace = True

@@ -3,7 +3,7 @@ CREATE TABLE `logs` (
   `test_id` int(11) DEFAULT NULL,
   `type` varchar(50) DEFAULT NULL,
   `log` blob,
-  `full_size` varchar(50) DEFAULT NULL,
+  `size` bigint(20) unsigned NOT NULL,
   `storage` varchar(200) DEFAULT NULL,
   `stack_trace` tinyint(1) DEFAULT '0',
   `patterns` varchar(200) DEFAULT NULL,
