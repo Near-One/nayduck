@@ -1,16 +1,12 @@
-import mysql.connector
 import collections
+import os
 import random
 import string
-import time
-
-import datetime
-import os
 import sys
 import typing
 
 sys.path.append(os.path.abspath('../main_db'))
-import common_db
+import common_db  # pylint: disable=wrong-import-position
 
 
 def _prettify_size(size: int) -> str:

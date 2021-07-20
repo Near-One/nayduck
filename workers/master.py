@@ -1,17 +1,14 @@
 import os
-import socket
-import sys
-import subprocess
-import psutil
-import shutil
 from pathlib import Path
+import socket
 import stat
 import time
 import traceback
 import typing
-from db_master import MasterDB
-from azure.storage.blob import BlobServiceClient, ContentSettings
 
+import psutil
+
+from db_master import MasterDB
 import utils
 
 

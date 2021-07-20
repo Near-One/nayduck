@@ -1,13 +1,10 @@
-import mysql.connector
-import random
-
-import datetime
 import os
 import sys
 import typing
 
 sys.path.append(os.path.abspath('../main_db'))
-import common_db
+import common_db  # pylint: disable=wrong-import-position
+
 
 class MasterDB (common_db.DB):
     def get_new_build(

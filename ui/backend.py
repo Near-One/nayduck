@@ -1,8 +1,9 @@
-from flask import Flask, session, flash, render_template, redirect, json, url_for, request, abort, make_response, jsonify, send_file
 import os
 import traceback
 import typing
-from flask_cors import CORS
+
+import flask
+import flask_cors
 
 from ui_db import UIDB
 import scheduler
@@ -11,8 +12,8 @@ import scheduler
 NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
 
-app = Flask(__name__)
-CORS(app, origins=NAYDUCK_UI)
+app = flask.Flask(__name__)
+flask_cors.CORS(app, origins=NAYDUCK_UI)
 
 
 def get_int(req: typing.Any, key: str) -> int:
@@ -59,75 +60,75 @@ def get_str(req: typing.Any, key: str) -> str:
 def get_runs():
     server = UIDB()
     all_runs = server.get_all_runs()
-    return jsonify(all_runs)
+    return flask.jsonify(all_runs)
 
 
 @app.route('/run', methods=['POST', 'GET'])
 def get_a_run():
-    request_json = request.get_json(force=True)
+    request_json = flask.request.get_json(force=True)
     run_id = get_int(request_json, 'run_id')
     server = UIDB()
     a_run = server.get_one_run(run_id)
-    return jsonify(a_run)
+    return flask.jsonify(a_run)
 
 
 @app.route('/test', methods=['POST', 'GET'])
 def get_a_test():
-    request_json = request.get_json(force=True) 
+    request_json = flask.request.get_json(force=True)
     test_id = get_int(request_json, 'test_id')
     server = UIDB()
     a_test = server.get_one_test(test_id)
-    return jsonify(a_test)
+    return flask.jsonify(a_test)
 
 
 @app.route('/build', methods=['POST', 'GET'])
 def get_build_info():
-    request_json = request.get_json(force=True) 
+    request_json = flask.request.get_json(force=True)
     build_id = get_int(request_json, 'build_id')
     server = UIDB()
     a_test = server.get_build_info(build_id)
-    return jsonify(a_test)
+    return flask.jsonify(a_test)
 
 
 @app.route('/test_history', methods=['POST', 'GET'])
 def test_history():
-    request_json = request.get_json(force=True) 
+    request_json = flask.request.get_json(force=True)
     test_id = get_int(request_json, 'test_id')
     server = UIDB()
     history = server.get_test_history_by_id(test_id)
-    return jsonify(history)
+    return flask.jsonify(history)
 
 
 @app.route('/branch_history', methods=['POST', 'GET'])
 def branch_history():
-    request_json = request.get_json(force=True) 
+    request_json = flask.request.get_json(force=True)
     test_id = get_int(request_json, 'test_id')
     branch = get_str(request_json, 'branch')
     server = UIDB()
     history = [server.get_histoty_for_base_branch(test_id, branch)]
-    return jsonify(history)
+    return flask.jsonify(history)
 
 @app.route('/cancel_the_run', methods=['POST', 'GET'])
 def cancel_the_run():
-    request_json = request.get_json(force=True) 
+    request_json = flask.request.get_json(force=True)
     run_id = get_int(request_json, 'run_id')
     server = UIDB()
     server.cancel_the_run(run_id)
-    return jsonify({})
+    return flask.jsonify({})
 
 @app.route('/get_auth_code', methods=['POST', 'GET'])
 def get_auth_code():
-    request_json = request.get_json(force=True) 
+    request_json = flask.request.get_json(force=True)
     login = get_str(request_json, 'github_login')
     server = UIDB()
     code = server.get_auth_code(login)
-    return jsonify({"code": code})
+    return flask.jsonify({'code': code})
 
 
 @app.route('/request_a_run', methods=['POST'])
 @flask_cors.cross_origin(origins=[])
 def request_a_run():
-    request_json = request.get_json(force=True)
+    request_json = flask.request.get_json(force=True)
     try:
         run_id = scheduler.request_a_run_impl(request_json)
         url = f'Success. {NAYDUCK_UI}/#/run/{run_id}'
@@ -137,7 +138,7 @@ def request_a_run():
     except Exception as ex:
         traceback.print_exc()
         response = scheduler.Failure(ex).to_response()
-    return jsonify(response)
+    return flask.jsonify(response)
 
 
 if __name__ == '__main__':

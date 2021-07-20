@@ -1,12 +1,8 @@
-import mysql.connector
 import gzip
-import random
-import string
-import time
+import os
 import typing
 
-import datetime
-import os
+import mysql.connector
 
 
 class DB ():
