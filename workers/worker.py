@@ -27,25 +27,21 @@ def get_sequential_test_cmd(cwd: Path,
                             test: typing.Sequence[str],
                             build_type: str) -> typing.Sequence[str]:
     try:
-        if test[0] == 'pytest' or test[0] == 'mocknet':
-            return ["python", "tests/" + test[1]] + test[2:]
-        deps_path = cwd / 'target_expensive' / build_type / 'deps'
-        if test[0] == 'expensive':
-            fls = os.listdir(deps_path)
-            print(fls)
-            for f in fls:
-                if test[2].replace('-', '_') + '-' in f:
-                    return [deps_path / f, test[3], '--exact', '--nocapture']
-        elif test[0] == 'lib':
-            fls = os.listdir(deps_path)
-            print(fls)
-            for f in fls:
-                if test[1].replace('-', '_')  + '-' in f:
-                    return [deps_path / f, test[2], '--exact', '--nocapture']
-        assert False, test
-    except:
+        if test[0] in ('pytest', 'mocknet'):
+            return ['python', 'tests/' + test[1]] + test[2:]
+        if test[0] in ('expensive', 'lib'):
+            path = cwd / 'target_expensive' / build_type / 'deps'
+            idx = 1 + (test[0] == 'expensive')
+            name_prefix = test[idx].replace('-', '_') + '-'
+            files = os.listdir(path)
+            for filename in files:
+                if filename.startswith(name_prefix):
+                    return [path / filename, test[idx],
+                            '--exact', '--nocapture']
+    except Exception:
         print(test)
         raise
+    raise ValueError('Invalid test command: ' + ' '.join(test))
 
 
 def install_new_packages():
