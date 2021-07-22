@@ -61,10 +61,12 @@ class MasterDB (common_db.DB):
         row['expensive'] = bool(row['expensive'])
         return row
 
-    def update_run_status(self, build_id, status, err, out):
+    def update_run_status(self, build_id: int, success: bool, *,
+                          out: bytes, err: bytes) -> None:
+        status = 'BUILD DONE' if success else 'BUILD FAILED'
         sql = "UPDATE builds SET finished = now(), status = %s, stderr=%s, stdout = %s WHERE build_id=%s"
         self._execute_sql(sql, (status, err, out, build_id))
-        if status == "BUILD FAILED":
+        if not success:
             sql = "UPDATE tests SET status = 'CANCELED' WHERE build_id=%s and status='PENDING'"
             self._execute_sql(sql, (build_id,))
 

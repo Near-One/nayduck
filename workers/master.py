@@ -4,14 +4,17 @@ import sys
 import subprocess
 import psutil
 import shutil
-from pathlib import Path, PurePath
+from pathlib import Path
+import stat
 import time
+import traceback
+import typing
 import requests
 from db_master import MasterDB
-from rc import bash, run
-from multiprocessing import Process, Queue, Pool
 from azure.storage.blob import BlobServiceClient, ContentSettings
-                                       
+
+import utils
+
 
 def enough_space(filename="/datadrive"):
     try:
@@ -25,126 +28,122 @@ def enough_space(filename="/datadrive"):
     except:
         return False
 
-def cp_exe(cmd):
-    b = bash(cmd)
-    print(b)
 
-def cp(build_id, build_type, expensive):
-        bash(f'''rm -rf {build_id}''')
-        Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
-        Path(f'{build_id}/near-test-contracts').mkdir(parents=True, exist_ok=True)
-        bld_cp = bash(f'''
-            cp -r nearcore/target/{build_type}/neard {build_id}/target/{build_type}/neard
-            cp -r nearcore/target/{build_type}/near {build_id}/target/{build_type}/near
-            cp -r nearcore/target/{build_type}/genesis-populate {build_id}/target/{build_type}/genesis-populate
-            cp -r nearcore/target/{build_type}/restaked {build_id}/target/{build_type}/restaked
-            cp -r nearcore/runtime/near-test-contracts/res/* {build_id}/near-test-contracts/
-        ''')
-        if expensive > 0:
-            Path(f'{build_id}/target_expensive/{build_type}/deps').mkdir(parents=True, exist_ok=True)
-            bld_cp = bash(f'''find nearcore/target_expensive/{build_type}/deps/* -perm /a+x''')
-            exe_files = bld_cp.stdout.split('\n')
-            fls = {}
-            for f in exe_files:
-                if not f:
-                    continue
-                base = os.path.basename(f)
-                if "." in base:
-                    continue
-                test_name = base.split('-')[0]
-                if test_name in fls:
-                    if os.path.getctime(fls[test_name]) < os.path.getctime(f):
-                        fls[test_name] = f
-                else:
-                    fls[test_name] = f
-            
-            cmds = []
-            for f in fls.values():
-                cmds.append(f'cp {f} {build_id}/target_expensive/{build_type}/deps/')
-            p = Pool(10)
-            p.map(cp_exe, cmds)
-            p.close()
-            
-def build_target(queue, features, release):
-    print("Build target")
-    bld = bash(f'''
-            cd nearcore
-            cargo build -j8 -p neard -p genesis-populate -p restaked -p near-test-contracts --features adversarial {features} {release}
-    ''', login=True)
-    queue.put(bld)
-            
+class BuildSpec(typing.NamedTuple):
+    """Build specification as read from the database."""
+    build_id: int
+    build_dir: Path
+    sha: str
+    features: typing.Sequence[str]
+    is_release: bool
+    is_expensive: bool
 
-def build_target_expensive(queue, features, release):
-    print("Build expensive")
-    bld = bash(f'''
-            cd nearcore
-            cargo test -j8 --workspace --no-run --target-dir target_expensive --features=expensive_tests {features} {release} 
-            cargo test -j8 --no-run --target-dir target_expensive --package near-client --package near-chunks --package neard --package near-chain --features=expensive_tests {features} {release}
-            cargo test -j8 --no-run  --workspace --target-dir target_expensive --package nearcore --features=expensive_tests {features} {release}
-    ''' , login=True)
-    queue.put(bld)
-            
-def build(build_id, sha, outdir, features, is_release, expensive):
-    if is_release:
-        release = "--release"
-    else:
-        release = ""
-    
-    with open(str(outdir) + '/build_out', 'w') as fl_o:
-        with open(str(outdir) + '/build_err', 'w') as fl_e:
-            kwargs = {"stdout": fl_o, "stderr": fl_e}
-            print("Checkout")
-            bld = bash(f'''
-                cd nearcore
-                git checkout {sha}
-            ''' , **kwargs, login=True)
-            print(bld)
-            if bld.returncode != 0:
-                print("Clone")
-                bld = bash(f'''
-                    rm -rf nearcore
-                    git clone https://github.com/nearprotocol/nearcore 
-                    cd nearcore
-                    git checkout {sha}
-                ''' , **kwargs, login=True)
-                print(bld)
-                if bld.returncode != 0:
-                    return bld.returncode
-            print("Build")
-            queue = Queue()
-            
-            p1 = Process(target=build_target, args=(queue, features, release))
-            p1.start()
-            if expensive > 0:
-                p2 = Process(target=build_target_expensive, args=(queue, features, release))
-                p2.start()
-            p1.join()
-            bld1 = queue.get()
-            fl_e.write(bld1.stderr)
-            fl_o.write(bld1.stdout)
-            if expensive > 0:
-                p2.join()
-                bld2 = queue.get()
-                fl_e.write(bld2.stderr)
-                fl_o.write(bld2.stdout)
-            if bld1.returncode != 0:
-                bash(f'''rm -rf nearcore''')
-                return bld1.returncode
-            if expensive > 0 and bld2.returncode != 0:
-                bash(f'''rm -rf nearcore''')
-                return bld2.returncode
-            if is_release:
-                cp(build_id, "release", expensive)
-            else:
-                cp(build_id, "debug", expensive)
+    @classmethod
+    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> 'BuildSpec':
+        build_id = int(data['build_id'])
+        return cls(
+            build_id=build_id,
+            build_dir=Path(str(build_id)),
+            sha=str(data['sha']),
+            features=tuple(str(data['features']).strip().split()),
+            is_release=bool(data['is_release']),
+            is_expensive=bool(data['expensive']))
 
-            return 0
+    @property
+    def build_type(self) -> str:
+        return ('debug', 'release')[self.is_release]
 
-def cleanup_finished_runs(runs):
-    for run in runs:
-        bash(f'''
-            rm -rf {run}
-        ''')
+
+def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
+    """Copies artefacts to the build output directory.
+
+    Args:
+        spec: The build specification as read from the database.  Based on it,
+            the function determines which files were built (most notably whether
+            expensive targets were compiled) and where they are located
+            (e.g. whether they are in debug or release subdirectories).
+        runner: A utils.Runner class used to execute `cp` commands.
+    Returns:
+        Whether copying of all files have succeeded.
+    """
+    print('Copying data')
+
+    utils.rmdirs(spec.build_dir)
+
+    def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool=False):
+        if create_dir:
+            utils.mkdirs(dst)
+        return runner(('cp', '-r', '--', *srcs, dst))
+
+    ok = True
+    ok = ok and cp(dst=spec.build_dir / 'target' / spec.build_type,
+                   srcs=[Path('nearcore') / 'target' / spec.build_type / exe
+                         for exe in ('neard', 'near', 'genesis-populate',
+                                     'restaked')],
+                   create_dir=True)
+    ok = ok and cp(dst=spec.build_dir / 'near-test-contracts',
+                   srcs=[Path('nearcore') / 'runtime' / 'near-test-contracts' /
+                         'res'])
+
+    if not ok or not spec.is_expensive:
+        return ok
+
+    files = {}
+    deps_dir = Path('nearcore/target_expensive') / spec.build_type / 'deps'
+    for filename in os.listdir(deps_dir):
+        if '.' in filename:
+            continue
+        path = deps_dir / filename
+        try:
+            attrs = path.stat()
+        except OSError:
+            continue
+        if not stat.S_ISREG(attrs.st_mode) or attrs.st_mode & 0o100 == 0:
+            continue
+        ctime = attrs.st_ctime
+        test_name = filename.split('-')[0]
+        (prev_path, prev_ctime) = files.setdefault(test_name, (path, ctime))
+        if prev_path != path and prev_ctime < ctime:
+            files[test_name] = (path, ctime)
+
+    return not files or cp(
+        dst=spec.build_dir / 'target_expensive' / spec.build_type / 'deps',
+        srcs=[path for path, _ in files.values()], create_dir=True)
+
+
+def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
+    print('Building {}target'.format('expensive ' if spec.is_expensive else ''))
+
+    def cargo(*cmd):
+        cmd = ['cargo', *cmd, *spec.features]
+        if spec.is_release:
+            cmd.append('--release')
+        return runner(cmd, cwd=Path('nearcore'))
+
+    ok = True
+    ok = ok and cargo('build', '-j8', '-p', 'neard', '-p', 'genesis-populate',
+                      '-p', 'restaked', '-p', 'near-test-contracts',
+                      '--features', 'adversarial')
+    if spec.is_expensive:
+        # It reads better when the command arguments are aligned so allow long
+        # lines.  pylint: disable=line-too-long
+        ok = ok and cargo('test', '-j8', '--no-run', '--target-dir', 'target_expensive', '--workspace',                                                                              '--features=expensive_tests')
+        ok = ok and cargo('test', '-j8'  '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-client', '-p', 'near-chunks', '-p', 'neard', '-p', 'near-chain', '--features=expensive_tests')
+        ok = ok and cargo('test', '-j8', '--no-run', '--target-dir', 'target_expensive', '--workspace', '-p', 'nearcore',                                                            '--features=expensive_tests')
+
+    return ok
+
+
+def build(spec: BuildSpec, runner: utils.Runner) -> bool:
+    try:
+        return (utils.checkout(spec.sha, runner=runner) and
+                build_target(spec, runner=runner) and
+                copy(spec, runner=runner))
+    except Exception:
+        traceback.print_exc()
+        runner.write_err(traceback.format_exc())
+        return False
+
 
 def keep_pulling():
     ip_address = requests.get('https://checkip.amazonaws.com').text.strip()
@@ -155,34 +154,28 @@ def keep_pulling():
     while True:
         time.sleep(5)
         try:
-            server = MasterDB()
             finished_runs = server.get_builds_with_finished_tests(ip_address)
-            cleanup_finished_runs(finished_runs)
+            utils.rmdirs(*[Path(run) for run in finished_runs])
+
             if not enough_space():
                 print("Not enough space. Waiting for clean up.")
-                bash(f''' rm -rf nearcore/target''')
-                bash(f''' rm -rf nearcore/target_expensive''')
+                utils.rmdirs(Path('nearcore/target'),
+                             Path('nearcore/target_expensive'))
                 continue
+
             new_build = server.get_new_build(ip_address)
             if not new_build:
                 continue
+
             print(new_build)
-            shutil.rmtree(os.path.abspath('output/'), ignore_errors=True)
-            outdir = os.path.abspath('output/')
-            Path(outdir).mkdir(parents=True, exist_ok=True)
-            code = build(new_build['build_id'], new_build['sha'], outdir, new_build['features'], new_build['is_release'],
-                         new_build['expensive'])
-            server = MasterDB()
-            if code == 0:
-                status = 'BUILD DONE'
-            else:
-                status = 'BUILD FAILED'
-            
-            fl_err = os.path.join(outdir, "build_err")
-            fl_out = os.path.join(outdir, "build_out")
-            err = open(fl_err, 'r').read()
-            out = open(fl_out, 'r').read()           
-            server.update_run_status(new_build['build_id'], status, err, out)
+            spec = BuildSpec.from_dict(new_build)
+            runner = utils.Runner(capture=True)
+            success = build(spec, runner)
+            print('Build {}; updating database'.format(
+                'succeeded' if success else 'failed'))
+            server.update_run_status(spec.build_id, success,
+                                     out=runner.stdout, err=runner.stderr)
+            print('Done; starting another pool iteration')
         except Exception as e:
             print(e)
 

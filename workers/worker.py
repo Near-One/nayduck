@@ -335,51 +335,9 @@ def scp_build(build_id, ip, test, build_type="debug"):
             f'target_expensive/{build_type}/deps')
 
 
-def checkout(sha: str) -> bool:
-    """Checks out given SHA in the nearcore repository.
-
-    If the repository directory exists updates the origin remote and then checks
-    out the SHA.  If that fails, deletes the directory, clones the upstream and
-    tries to check out the commit again.
-
-    If the repository directory does not exist, clones the origin and then tries
-    to check out the commit.
-
-    The repository directory will be located in (WORKDIR / 'nearcore').
-
-    Args:
-        sha: Commit SHA to check out.
-    Returns:
-        Whether operation succeeded.
-    """
-    repo_dir = (WORKDIR / 'nearcore')
-    if repo_dir.is_dir():
-        print('Checkout', sha)
-        for directory in ('target', 'target_expensive', 'normal_target'):
-            utils.rmdirs(repo_dir / directory)
-        try:
-            subprocess.check_call(('git', 'remote', 'update', '--prune'),
-                                  cwd=repo_dir)
-            subprocess.check_call(('git', 'checkout', sha), cwd=repo_dir)
-            return True
-        except subprocess.CalledProcessError:
-            pass
-
-    print('Clone', sha)
-    utils.rmdirs(repo_dir)
-    try:
-        subprocess.check_call(
-            ('git', 'clone', 'https://github.com/nearprotocol/nearcore'),
-            cwd=WORKDIR)
-        subprocess.check_call(('git', 'checkout', sha), cwd=repo_dir)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-
 def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
     print(test)
-    if not checkout(test['sha']):
+    if not utils.checkout(test['sha'], cwd=WORKDIR):
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
         return
     outdir = WORKDIR / 'output'
