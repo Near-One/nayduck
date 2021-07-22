@@ -4,12 +4,34 @@ import random
 import datetime
 import os
 import sys
+import typing
 
 sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class MasterDB (common_db.DB):
-    def get_new_build(self, ip_address):
+    def get_new_build(
+            self, ip_address: str
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
+        """Returns a pending build to process or None if none found.
+
+        Args:
+            ip_address: IP address of the master making the request.  This will
+                be stored in the database so workers will know where to find
+                build artefacts.
+        Returns:
+            A build to process or None if none are present.
+        """
+        return self._with_transaction(lambda: self.__get_new_build(ip_address))
+
+    def __get_new_build(
+            self, ip_address: str
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
+        """Implementation of get_new_build method (which see).
+
+        This method must be run inside of a transaction because it uses
+        variables and so we cannot tolerate disconnects between the two queries.
+        """
         sql = "UPDATE builds SET started = now(), status = 'BUILDING', ip=%s  WHERE status = 'PENDING' and @tmp_id := build_id ORDER BY build_id LIMIT 1 "
         res = self._execute_sql(sql, (ip_address,))
         if res.rowcount == 0:

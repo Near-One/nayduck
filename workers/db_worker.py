@@ -5,12 +5,34 @@ import datetime
 import os
 import time
 import sys
+import typing
 
 sys.path.append(os.path.abspath('../main_db'))
 import common_db
 
 class WorkerDB (common_db.DB):
-    def get_pending_test(self, hostname):
+    def get_pending_test(
+            self, hostname: str
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
+        """Returns a pending test to process or None if none found.
+
+        Args:
+            hostname: hostname of the worker.  This is used to decide whether to
+                return mocknet tests and also is stored in the database to be
+                able to cleanup the database on restarts.
+        Returns:
+            A build to process or None if none are present.
+        """
+        return self._with_transaction(lambda: self.__get_pending_test(hostname))
+
+    def __get_pending_test(
+            self, hostname: str
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
+        """Implementation of get_pending_test method (which see).
+
+        This method must be run inside of a transaction because it uses
+        variables and so we cannot tolerate disconnects between the two queries.
+        """
         after = int(time.time())
         if "mocknet" in hostname:
             sql = '''UPDATE tests t SET t.started = now(), t.status = 'RUNNING', t.hostname=%s  WHERE t.status = 'PENDING' and 
