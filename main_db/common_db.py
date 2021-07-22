@@ -65,6 +65,34 @@ class DB ():
         cursor = self._execute_sql(sql, values)
         return cursor.lastrowid
 
+    def _multi_insert(self, table: str,
+                      columns: typing.Collection[str],
+                      rows: typing.Iterable[typing.Collection[typing.Any]],
+                      *,
+                      replace: bool = False) -> None:
+        """Executes an INSERT statement adding multiple rows at once.
+
+        Args:
+            table: Table to insert rows into.
+            columns: Names of columns to insert.
+            rows: An iterable of rows to insert.  Each element must be
+                a collection of the same length as columns count.  Values of
+                each element correspond to columns at the same index.
+            replace: Whether to uses REPLACE statement rather than INSERT.
+        """
+        vals = []
+        for row in rows:
+            assert len(row) == len(columns), row
+            vals.extend(row)
+        placeholders = '({})'.format(', '.join(['%s'] * len(columns)))
+        count = len(vals) // len(columns)
+        sql = '{verb} INTO {table} (`{columns}`) VALUES {placeholders}'.format(
+            verb='REPLACE' if replace else 'INSERT',
+            table=table,
+            columns='`, `'.join(columns),
+            placeholders=', '.join([placeholders] * count))
+        self._execute_sql(sql, vals)
+
     def _with_transaction(
             self,
             callback: typing.Callable[[], typing.TypeVar('T')]

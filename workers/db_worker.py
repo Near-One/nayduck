@@ -75,17 +75,19 @@ class WorkerDB (common_db.DB):
         sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
         self._execute_sql(sql, (status, id))
 
-    def save_short_logs(self, test_id: int, filename: str, file_size: int,
-                        data: bytes, storage: str, stack_trace: bool,
-                        found_patterns: str) -> None:
-        self._insert('logs',
-                     test_id=test_id,
-                     type=filename,
-                     size=file_size,
-                     log=data,
-                     storage=storage,
-                     stack_trace=stack_trace,
-                     patterns=found_patterns)
+    def save_short_logs(self, test_id: int,
+                        logs: typing.Collection['worker.LogFile']) -> None:
+        columns = ('test_id', 'type', 'size', 'log', 'storage', 'stack_trace',
+                   'patterns')
+        self._multi_insert('logs', columns, ((
+            test_id,
+            log.name,
+            log.size,
+            log.data or b'',
+            log.url or '',
+            log.stack_trace,
+            log.patterns
+        ) for log in logs), replace=True)
 
     def remark_test_pending(self, id):
         after = int(time.time()) + 3*60

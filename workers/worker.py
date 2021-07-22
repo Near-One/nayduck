@@ -13,7 +13,8 @@ import typing
 from db_worker import WorkerDB
 from multiprocessing import Process
 import json
-from azure.storage.blob import BlobServiceClient, ContentSettings
+
+import azure.storage.blob
 
 import utils
 
@@ -229,12 +230,12 @@ def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
     return outcome
 
 
-def find_patterns(filename: Path,
-                  patterns: typing.Sequence[str]) -> typing.List[str]:
+def find_patterns(rd: typing.BinaryIO,
+                  patterns: typing.Collection[str]) -> typing.List[str]:
     """Searches for patterns in given file; returns list of found patterns.
 
     Args:
-        filename: Path to the file to read.
+        rd: The file opened for reading.
         patterns: List of patterns to look for.  Patterns are matched as fixed
             strings (no regex or globing) and must not span multiple lines since
             search is done line-by-line.
@@ -244,22 +245,30 @@ def find_patterns(filename: Path,
     """
     found = [False] * len(patterns)
     count = len(found)
-    with open(filename) as rd:
-        for line in rd:
-            for idx, pattern in enumerate(patterns):
-                if not found[idx] and pattern in line:
-                    found[idx] = True
-                    count -= 1
-                    if not count:
-                        break
+    for line in rd:
+        line = line.decode('utf-8', 'replace')
+        for idx, pattern in enumerate(patterns):
+            if not found[idx] and pattern in line:
+                found[idx] = True
+                count -= 1
+                if not count:
+                    break
     return [pattern for ok, pattern in zip(found, patterns) if ok]
 
 
-def save_logs(server, test_id, directory: Path):
-    blob_size = 1024
-    blob_service_client = BlobServiceClient.from_connection_string(AZURE)
-    cnt_settings = ContentSettings(content_type="text/plain")
+class LogFile:
+    def __init__(self, name: str, path: Path) -> None:
+        self.name = name
+        self.path = path
+        self.patterns = ''
+        self.stack_trace = False
+        self.size = path.stat().st_size
+        self.data: typing.Optional[bytes] = None
+        self.url: typing.Optional[str] = None
 
+
+def list_logs(directory: Path) -> typing.Sequence[LogFile]:
+    """Lists all log files to be saved."""
     files = []
     for entry in os.listdir(directory):
         entry_path = directory / entry
@@ -271,9 +280,10 @@ def save_logs(server, test_id, directory: Path):
                     ('stderr', ''),
             ):
                 if (entry_path / filename).exists():
-                    files.append((filename + suffix, entry_path / filename))
+                    files.append(
+                        LogFile(filename + suffix, entry_path / filename))
         elif entry in ('stderr', 'stdout', 'build_err', 'build_out'):
-            files.append((entry, directory / entry))
+            files.append(LogFile(entry, directory / entry))
 
     rainbow_logs = Path.home() / '.rainbow' / 'logs'
     if rainbow_logs.is_dir():
@@ -282,37 +292,111 @@ def save_logs(server, test_id, directory: Path):
                 for suffix in ('err', 'out'):
                     if suffix in entry:
                         path = rainbow_logs / folder / entry
-                        files.append((f'{folder}_{suffix}', path))
+                        files.append(LogFile(f'{folder}_{suffix}', path))
 
-    for filename, path in files:
-        file_size = path.stat().st_size
-        found_patterns = find_patterns(path, INTERESTING_PATTERNS)
-        try:
-            found_patterns.remove(BACKTRACE_PATTERN)
-            stack_trace = True
-        except ValueError:
-            stack_trace = False
-        # REMOVE V2!
-        blob_name = str(test_id) + "_v2_" + filename
-        s3 = ""
-        with open(path, 'rb') as f:
-            f.seek(0)
-            beginning = f.read(blob_size * 5 * 2).decode()
-            if len(beginning) < blob_size * 5 * 2:
-                data = beginning
-            else:
-                data = beginning[0:blob_size * 5]
-                data += '\n...\n'
-                f.seek(-blob_size * 5, 2)
-                data += f.read().decode()
-        blob_client = blob_service_client.get_blob_client(container="logs", blob=blob_name)    
-        with open(path, 'rb') as f:
-            blob_client.upload_blob(f, content_settings=cnt_settings)
-            s3 = blob_client.url
-        print(s3) 
+    return files
 
-        server.save_short_logs(test_id, filename, file_size, data, s3, stack_trace, ",".join(found_patterns))
-            
+
+_MAX_SHORT_LOG_SIZE = 10 * 1024
+
+def read_short_log(size: int, rd: typing.BinaryIO) -> None:
+    """Reads a short log from given file.
+
+    A short log it at most _MAX_SHORT_LOG_SIZE bytes long.  If the file is
+    longer than that, the function reads half of the maximum length from the
+    beginning and half from the of the file and returns those two fragments
+    concatenated with an three dots in between.
+
+    Args:
+        size: Actual size of the file.
+        rd: The file opened for reading.
+    Returns:
+        A short contents of the file.
+    """
+    if size < _MAX_SHORT_LOG_SIZE:
+        data = rd.read()
+        if len(data) < _MAX_SHORT_LOG_SIZE:  # Sanity check
+            return data
+        rd.seek(0)
+
+    data = rd.read(_MAX_SHORT_LOG_SIZE // 2 - 3)
+    if data:
+        pos = len(data)
+        limit = max(pos - 6, 1)
+        while pos > limit and (data[pos - 1] & 0xC0) == 0x80:
+            pos -= 1
+        # If we can't find a start byte near the end than it's probably not
+        # UTF-8 at all.
+        if ((data[pos - 1] & 0xC0) == 0xC0 and
+            data[pos-1:].decode('utf-8', 'ignore') == ''):
+            data = data[:pos-1]
+
+    rd.seek(-_MAX_SHORT_LOG_SIZE // 2 + 2, 2)
+    ending = rd.read()
+    if ending:
+        limit = min(len(ending), 8)
+        pos = 0
+        while pos < limit and (ending[pos] & 0xC0) == 0x80:
+            pos += 1
+        if pos < limit:  # If we went too far it doesn't look like UTF-8.
+            ending = ending[pos:]
+
+    return data + b'\n...\n' + ending
+
+
+_BLOB_CONTENT_SETTINGS = azure.storage.blob.ContentSettings(
+    content_type='text/plain')
+
+def upload_log(service_client: azure.storage.blob.BlobServiceClient,
+               blob_name: str,
+               rd: typing.BinaryIO) -> typing.Optional[str]:
+    """Uploads file to Azure BLOB store.
+
+    Args:
+        service_client: The BlobServiceClient to send the file to.
+        blob_name: Blob name to save the file under.  The function uses `logs`
+            container.
+        rd: The file opened for reading.
+    Returns:
+        URL of blob or None if error occurred.
+    """
+    try:
+        blob_client = service_client.get_blob_client(container='logs',
+                                                     blob=blob_name)
+        blob_client.upload_blob(
+            rd, content_settings=_BLOB_CONTENT_SETTINGS, overwrite=True)
+        return blob_client.url
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
+def save_logs(server: WorkerDB, test_id: int, directory: Path) -> None:
+    logs = list_logs(directory)
+    if not logs:
+        return
+
+    service_client = \
+        azure.storage.blob.BlobServiceClient.from_connection_string(AZURE)
+
+    for log in logs:
+        with open(log.path, 'rb') as rd:
+            patterns = find_patterns(rd, INTERESTING_PATTERNS)
+            try:
+                patterns.remove(BACKTRACE_PATTERN)
+                log.stack_trace = True
+            except ValueError:
+                pass
+            log.patterns = ','.join(sorted(patterns))
+
+            rd.seek(0)
+            log.data = read_short_log(log.size, rd)
+
+            rd.seek(0)
+            log.url = upload_log(service_client, f'{test_id}_{log.name}', rd)
+
+    server.save_short_logs(test_id, logs)
+
 
 def scp_build(build_id, ip, test, build_type="debug"):
     if test[0] == 'mocknet':

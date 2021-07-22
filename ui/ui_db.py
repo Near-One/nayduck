@@ -342,19 +342,15 @@ class UIDB (common_db.DB):
                                           priority=priority)
 
         # Into Tests
-        sql = '''INSERT
-                   INTO tests (run_id, build_id, name, priority,
-                               is_release, remote)
-                 VALUES {}'''.format(
-                     ', '.join(['(%s, %s, %s, %s, %s, %s)'] * len(tests)))
-        vals = []
-        for test in tests:
-            vals.extend((run_id,
-                         test.build.build_id,
-                         test.name,
-                         priority,
-                         test.is_release,
-                         test.is_remote))
-        self._execute_sql(sql, vals)
+        columns = ('run_id', 'build_id', 'name', 'priority', 'is_release',
+                   'remote')
+        self._multi_insert('tests', columns, ((
+            run_id,
+            test.build.build_id,
+            test.name,
+            priority,
+            test.is_release,
+            test.is_remote
+        ) for test in tests))
 
         return run_id
