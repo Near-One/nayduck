@@ -195,6 +195,6 @@ def keep_pulling():
         except Exception as ex:
             print(ex)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     keep_pulling()
         

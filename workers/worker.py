@@ -204,7 +204,7 @@ def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
     if test[0] in ('pytest', 'mocknet'):
         cwd = cwd / 'pytest'
 
-    outcome = "FAILED"
+    outcome = 'FAILED'
     try:
         timeout = DEFAULT_TIMEOUT
         if len(test) > 1 and test[1].startswith('--timeout='):
@@ -218,7 +218,7 @@ def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
             utils.mkdirs(Path.home() / '.near')
 
         outcome = execute_test_command(dir_name, test, build_type, cwd, timeout)
-        print("[%7s] %s" % (outcome, ' '.join(test)))
+        print('[{:<7}] {}'.format(outcome, ' '.join(test)))
 
         if outcome != 'POSTPONE' and test[0] == 'pytest':
             for node_dir in utils.list_test_node_dirs():
@@ -397,7 +397,7 @@ def save_logs(server: WorkerDB, test_id: int, directory: Path) -> None:
     server.save_short_logs(test_id, logs)
 
 
-def scp_build(build_id, master_ip, test, build_type="debug"):
+def scp_build(build_id, master_ip, test, build_type='debug'):
     if test[0] == 'mocknet':
         return
 
@@ -492,5 +492,5 @@ def main():
             time.sleep(10)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -23,7 +23,7 @@ def _prettify_size(size: int) -> str:
 
 
 class UIDB (common_db.DB):
-    def cancel_the_run(self, run_id, status="CANCELED"):
+    def cancel_the_run(self, run_id, status='CANCELED'):
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
                   WHERE status = 'PENDING' AND run_id = %s'''
@@ -121,7 +121,7 @@ class UIDB (common_db.DB):
                   LIMIT 1'''
         result = self._execute_sql(sql, (test_id,))
         res = result.fetchone()
-        return self.get_test_history(res["name"], res["branch"], interested_in_logs=True)
+        return self.get_test_history(res['name'], res['branch'], interested_in_logs=True)
         
     def get_test_history(self, test_name, branch, interested_in_logs=False):
         sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
@@ -133,14 +133,14 @@ class UIDB (common_db.DB):
         result = self._execute_sql(sql, (test_name, branch))
         tests = result.fetchall()
         for test in tests:
-            if test["finished"] is not None and test["started"] is not None:
-                test["run_time"] = str(test["finished"] - test["started"])
+            if test['finished'] is not None and test['started'] is not None:
+                test['run_time'] = str(test['finished'] - test['started'])
             if interested_in_logs:
                 sql = '''SELECT type, size, storage, stack_trace, patterns
                            FROM logs
                           WHERE test_id = %s
                           ORDER BY type'''
-                res = self._execute_sql(sql, (test["test_id"],))
+                res = self._execute_sql(sql, (test['test_id'],))
                 logs = test['logs'] = res.fetchall()
                 for log in logs:
                     log['full_size'] = _prettify_size(log.pop('size'))
@@ -148,7 +148,7 @@ class UIDB (common_db.DB):
             
     def get_one_run(self, run_id):
         run_data = self.get_data_about_run(run_id)
-        branch = run_data["branch"] 
+        branch = run_data['branch']
         
         sql = '''SELECT build_id, is_release, features
                    FROM builds
@@ -175,22 +175,22 @@ class UIDB (common_db.DB):
         if blob:
             columns += ', log'
         sql = f'SELECT {columns} FROM logs WHERE test_id = %s ORDER BY type'
-        test["logs"] = {}
+        test['logs'] = {}
         for log in self._execute_sql(sql, (test['test_id'],)).fetchall():
             log['full_size'] = _prettify_size(log.pop('size'))
             if blob:
                 log['log'] = self._str_from_blob(log['log'])
             test['logs'][log['type']] = log
-        test['cmd'] = test["name"]
-        if '--features' in test["name"]:
-            test["name"] =  test["name"][ : test["name"].find('--features')]
-        test["name"] = ' '.join(word
-                                for word in test["name"].split()
-                                if not word.startswith("--"))
-        if test["finished"] is not None and test["started"] is not None:
-            test["test_time"] = str(test["finished"] - test["started"])
-        history = self.get_test_history(test["cmd"], branch)
-        test["history"] = self.history_stats(history)
+        test['cmd'] = test['name']
+        if '--features' in test['name']:
+            test['name'] =  test['name'][ : test['name'].find('--features')]
+        test['name'] = ' '.join(word
+                                for word in test['name'].split()
+                                if not word.startswith('--'))
+        if test['finished'] is not None and test['started'] is not None:
+            test['test_time'] = str(test['finished'] - test['started'])
+        history = self.get_test_history(test['cmd'], branch)
+        test['history'] = self.history_stats(history)
         return test
 
     def get_data_about_run(self, run_id):
@@ -202,8 +202,8 @@ class UIDB (common_db.DB):
         sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
         res = self._execute_sql(sql, (build_id,))
         build = res.fetchone()
-        if build["finished"] is not None and build["started"] is not None:
-            build["build_time"] = str(build["finished"] - build["started"])
+        if build['finished'] is not None and build['started'] is not None:
+            build['build_time'] = str(build['finished'] - build['started'])
         build['stdout'] = self._str_from_blob(build['stdout'])
         build['stderr'] = self._str_from_blob(build['stderr'])
         run = self.get_data_about_run(build['run_id'])
@@ -214,22 +214,22 @@ class UIDB (common_db.DB):
         sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
         res = self._execute_sql(sql, (test_id,))
         test = res.fetchone()
-        history = self.get_test_history(test["name"], branch)
+        history = self.get_test_history(test['name'], branch)
         if len(history):
-            test_id_base_branch = history[0]["test_id"]
+            test_id_base_branch = history[0]['test_id']
         else:
             test_id_base_branch = -1
-        return {"history": self.history_stats(history), "test_id": test_id_base_branch}
+        return {'history': self.history_stats(history), 'test_id': test_id_base_branch}
         
     def history_stats(self, history):
-        res = {"PASSED": 0, "FAILED": 0, "OTHER": 0}
+        res = {'PASSED': 0, 'FAILED': 0, 'OTHER': 0}
         for hist in history:
-            if hist["status"] == "PASSED":
-                res["PASSED"] += 1
-            elif hist["status"] in ("FAILED", "BUILD FAILED", "TIMEOUT"):
-                res["FAILED"] += 1
+            if hist['status'] == 'PASSED':
+                res['PASSED'] += 1
+            elif hist['status'] in ('FAILED', 'BUILD FAILED', 'TIMEOUT'):
+                res['FAILED'] += 1
             else:
-                res["OTHER"] += 1
+                res['OTHER'] += 1
         return res
         
     def get_one_test(self, test_id):
@@ -237,8 +237,8 @@ class UIDB (common_db.DB):
         res = self._execute_sql(sql, (test_id,))
         tests = res.fetchall()
         for test in tests:
-            run_data = self.get_data_about_run(test["run_id"])
-            new_data = self.get_data_about_test(test, run_data["branch"], blob=True) 
+            run_data = self.get_data_about_run(test['run_id'])
+            new_data = self.get_data_about_test(test, run_data['branch'], blob=True)
             test.update(new_data)
             test.update(run_data)       
         return tests
