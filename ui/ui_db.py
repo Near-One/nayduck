@@ -184,12 +184,9 @@ class UIDB (common_db.DB):
         test['cmd'] = test["name"]
         if '--features' in test["name"]:
             test["name"] =  test["name"][ : test["name"].find('--features')]
-        spl = test["name"].split(' ')
-        test_l = []
-        for s in spl:
-            if not s.startswith("--"):
-                test_l.append(s)
-        test["name"] = ' '.join(test_l)
+        test["name"] = ' '.join(word
+                                for word in test["name"].split()
+                                if not word.startswith("--"))
         if test["finished"] is not None and test["started"] is not None:
             test["test_time"] = str(test["finished"] - test["started"])
         history = self.get_test_history(test["cmd"], branch)
@@ -199,8 +196,7 @@ class UIDB (common_db.DB):
     def get_data_about_run(self, run_id):
         sql = 'SELECT * FROM runs WHERE id = %s LIMIT 1'
         res = self._execute_sql(sql, (run_id,))
-        r = res.fetchone()
-        return r
+        return res.fetchone()
                     
     def get_build_info(self, build_id):
         sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
@@ -227,10 +223,10 @@ class UIDB (common_db.DB):
         
     def history_stats(self, history):
         res = {"PASSED": 0, "FAILED": 0, "OTHER": 0}
-        for h in history:
-            if h["status"] == "PASSED":
+        for hist in history:
+            if hist["status"] == "PASSED":
                 res["PASSED"] += 1
-            elif h["status"] == "FAILED" or h["status"] == "BUILD FAILED" or h["status"] == "TIMEOUT":
+            elif hist["status"] in ("FAILED", "BUILD FAILED", "TIMEOUT"):
                 res["FAILED"] += 1
             else:
                 res["OTHER"] += 1

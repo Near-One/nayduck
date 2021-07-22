@@ -53,7 +53,7 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
 
     utils.rmdirs(spec.build_dir)
 
-    def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool=False):
+    def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool=False):    # pylint: disable=invalid-name
         if create_dir:
             utils.mkdirs(dst)
         return runner(('cp', '-rl', '--', *srcs, dst))
@@ -192,8 +192,8 @@ def keep_pulling():
             server.update_build_status(spec.build_id, success,
                                        out=runner.stdout, err=runner.stderr)
             print('Done; starting another pool iteration')
-        except Exception as e:
-            print(e)
+        except Exception as ex:
+            print(ex)
 
 if __name__ == "__main__":
     keep_pulling()

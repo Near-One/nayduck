@@ -62,15 +62,15 @@ class WorkerDB (common_db.DB):
         pending_test = result.fetchone()
         return pending_test
 
-    def test_started(self, id):
+    def test_started(self, test_id):
         sql = 'UPDATE tests SET started = NOW() WHERE test_id = %s'
-        self._execute_sql(sql, (id,))
+        self._execute_sql(sql, (test_id,))
 
-    def update_test_status(self, status, id):
+    def update_test_status(self, status, test_id):
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
                   WHERE test_id = %s'''
-        self._execute_sql(sql, (status, id))
+        self._execute_sql(sql, (status, test_id))
 
     def save_short_logs(self, test_id: int,
                         logs: typing.Collection['worker.LogFile']) -> None:

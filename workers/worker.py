@@ -224,8 +224,8 @@ def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
             for node_dir in utils.list_test_node_dirs():
                 shutil.copytree(node_dir,
                                 dir_name / PurePath(node_dir).name)
-    except Exception as ee:
-        print(ee)
+    except Exception as ex:
+        print(ex)
     return outcome
 
 
@@ -448,8 +448,8 @@ def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
     os.environ.pop('NEAR_PYTEST_CONFIG', None)
     if config_override:
         os.environ['NEAR_PYTEST_CONFIG'] = '/datadrive/nayduck/.remote'
-        with open('/datadrive/nayduck/.remote', 'w') as f:
-            json.dump(config_override, f)
+        with open('/datadrive/nayduck/.remote', 'w') as wr:
+            json.dump(config_override, wr)
 
     try:
         scp_build(test['build_id'], test['master_ip'], tokens,
