@@ -15,19 +15,6 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 import utils
 
 
-def enough_space(filename="/datadrive"):
-    try:
-        df = subprocess.Popen(["df", filename], stdout=subprocess.PIPE, universal_newlines=True)
-        output = df.communicate()[0]
-        pr = output.split()[11]
-        n_pr = int(str(pr)[:-1])
-        if n_pr >= 80:
-            return False
-        return True
-    except:
-        return False
-
-
 class BuildSpec(typing.NamedTuple):
     """Build specification as read from the database."""
     build_id: int
@@ -147,6 +134,43 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
         return False
 
 
+def wait_for_free_space(server: MasterDB, ip_address: str) -> None:
+    """Wait until there's at least 20% free space on /datadrive.
+
+    If there's less than 20% of free space on /datadrive file system, delete
+    finished builds and wait until enough tests finish that enough free space
+    becomes available.
+
+    Args:
+        server: Database to query for finished tests.
+        ip_address: This builder's IP address used to retrieve list of builds
+            we've performed from the database.
+    """
+    def enough_space() -> bool:
+        return psutil.disk_usage('/datadrive').percent < 80.0
+
+    def clean_finished() -> bool:
+        server.with_builds_without_pending_tests(
+            ip_address, lambda ids: utils.rmdirs(
+                *[Path(str(bid)) for bid in ids]))
+        return enough_space()
+
+    if enough_space() or clean_finished():
+        return
+
+    utils.rmdirs(Path('nearcore/target'), Path('nearcore/target_expensive'))
+    if enough_space():
+        return
+
+    print('Not enough free space; '
+          'waiting for tests to finish to clean up more builds')
+    while True:
+        time.sleep(5)
+        if clean_finished():
+            break
+    print('Got enough free space; continuing')
+
+
 def get_ip() -> str:
     """Returns private IPv4 address of the current host.
 
@@ -181,16 +205,8 @@ def keep_pulling():
   
     while True:
         time.sleep(5)
+        wait_for_free_space(server, ip_address)
         try:
-            finished_runs = server.get_builds_with_finished_tests(ip_address)
-            utils.rmdirs(*[Path(run) for run in finished_runs])
-
-            if not enough_space():
-                print("Not enough space. Waiting for clean up.")
-                utils.rmdirs(Path('nearcore/target'),
-                             Path('nearcore/target_expensive'))
-                continue
-
             new_build = server.get_new_build(ip_address)
             if not new_build:
                 continue

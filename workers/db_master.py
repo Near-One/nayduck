@@ -74,17 +74,31 @@ class MasterDB (common_db.DB):
         sql = "UPDATE builds SET started = null, status = 'PENDING', ip=null  WHERE status = 'BUILDING' and ip=%s"
         self._execute_sql(sql, (ip_address,))
 
-    def get_builds_with_finished_tests(self, ip_address):
-        sql = "SELECT build_id FROM builds WHERE ip=%s ORDER BY build_id desc LIMIT 20"
-        result = self._execute_sql(sql, (ip_address,))
-        builds = result.fetchall()
-        finished_runs = []
-        for build in builds:
-            sql = "SELECT count(IF(status='PENDING' or status='RUNNING',1,NULL)) AS still_going FROM tests WHERE build_id = %s"
-            result = self._execute_sql(sql, (build['build_id'],))
-            going = result.fetchone()
-            if going['still_going'] == 0:
-                finished_runs.append(build['build_id'])
-        return finished_runs
 
-       
+    def with_builds_without_pending_tests(
+            self,
+            ip_address: str,
+            callback: typing.Callable[[typing.Iterable[int]], typing.Any]
+    ) -> None:
+        """Runs cleanup callback on IDs of builds with no unfinished tests.
+
+        Retrieves IDs of all builds assigned to this master which no pending
+        test depends on, calls callback on that list and then marks those builds
+        as no longer available.
+
+        Args:
+            ip_address: IP of the master.
+            callback: Callback to call with sequence of build IDs to cleanup.
+        """
+        sql = '''SELECT build_id
+                   FROM builds JOIN tests USING (build_id)
+                  WHERE ip = %s
+                    AND tests.status NOT IN ('PENDING', 'RUNNING')
+                  GROUP BY 1'''
+        result = self._execute_sql(sql, (ip_address,))
+        builds = tuple(int(build['build_id']) for build in result.fetchall())
+        if builds:
+            CALLBACK(builds)
+            sql = 'UPDATE builds SET ip = NULL WHERE build_id IN ({})'
+            sql = sql.format(', '.join(str(build_id) for build_id in builds))
+            self._execute_sql(sql)
