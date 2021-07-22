@@ -28,11 +28,13 @@ def _prettify_size(size: int) -> str:
 
 class UIDB (common_db.DB):
     def cancel_the_run(self, run_id, status="CANCELED"):
-        sql = "UPDATE tests SET finished = now(), status = %s WHERE run_id= %s and status='PENDING'"
+        sql = '''UPDATE tests
+                    SET finished = NOW(), status = %s
+                  WHERE status = 'PENDING' AND run_id = %s'''
         self._execute_sql(sql, (status, run_id))
 
     def get_auth_code(self, login):
-        sql = "SELECT id, code FROM users WHERE name=%s"
+        sql = 'SELECT code FROM users WHERE name = %s LIMIT 1'
         result = self._execute_sql(sql, (login,))
         user = result.fetchone()
         if user:
@@ -43,7 +45,7 @@ class UIDB (common_db.DB):
         return code
  
     def get_github_login(self, token):
-        sql = "SELECT name FROM users WHERE code=%s"
+        sql = 'SELECT name FROM users WHERE code = %s LIMIT 1'
         result = self._execute_sql(sql, (token,))
         login = result.fetchone()
         if login:
@@ -117,13 +119,21 @@ class UIDB (common_db.DB):
         return statuses
 
     def get_test_history_by_id(self, test_id):
-        sql = "SELECT t.name, r.branch FROM tests as t, runs as r WHERE t.test_id=%s and r.id = t.run_id"
+        sql = '''SELECT t.name, r.branch
+                   FROM tests AS t, runs AS r
+                  WHERE t.test_id = %s AND r.id = t.run_id
+                  LIMIT 1'''
         result = self._execute_sql(sql, (test_id,))
         res = result.fetchone()
         return self.get_test_history(res["name"], res["branch"], interested_in_logs=True)
         
     def get_test_history(self, test_name, branch, interested_in_logs=False):
-        sql = "SELECT t.test_id, r.requester, r.title, t.status, t.started, t.finished, r.branch, r.sha FROM tests as t, runs as r WHERE name=%s and t.run_id = r.id and r.branch=%s ORDER BY t.test_id desc LIMIT 30"
+        sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
+                        t.finished, r.branch, r.sha
+                   FROM tests AS t, runs AS r
+                  WHERE name = %s AND t.run_id = r.id AND r.branch = %s
+                  ORDER BY t.test_id DESC
+                  LIMIT 30'''
         result = self._execute_sql(sql, (test_name, branch))
         tests = result.fetchall()
         for test in tests:
@@ -144,12 +154,19 @@ class UIDB (common_db.DB):
         run_data = self.get_data_about_run(run_id)
         branch = run_data["branch"] 
         
-        sql = "SELECT build_id, is_release, features FROM builds WHERE run_id=%s"
+        sql = '''SELECT build_id, is_release, features
+                   FROM builds
+                  WHERE run_id = %s'''
         res = self._execute_sql(sql, (run_id,))
         builds_dict = dict((build['build_id'], build)
                            for build in (res.fetchall() or self._NO_BUILDS))
 
-        sql = "SELECT * FROM tests WHERE run_id=%s ORDER BY FIELD(status, 'FAILED', 'TIMEOUT', 'IGNORED' , 'PASSED', 'CANCELED', 'RUNNING', 'PENDING'), started"
+        sql = '''SELECT *
+                   FROM tests
+                  WHERE run_id = %s
+                  ORDER BY FIELD(status, 'FAILED', 'TIMEOUT', 'IGNORED',
+                                 'PASSED', 'CANCELED', 'RUNNING', 'PENDING'),
+                           started'''
         res = self._execute_sql(sql, (run_id,))
         a_run = res.fetchall()
         for test in a_run:
@@ -186,13 +203,13 @@ class UIDB (common_db.DB):
         return test
 
     def get_data_about_run(self, run_id):
-        sql = "SELECT * from runs WHERE id = %s"
+        sql = 'SELECT * FROM runs WHERE id = %s LIMIT 1'
         res = self._execute_sql(sql, (run_id,))
         r = res.fetchone()
         return r
                     
     def get_build_info(self, build_id):
-        sql = "SELECT * from builds WHERE build_id = %s"
+        sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
         res = self._execute_sql(sql, (build_id,))
         build = res.fetchone()
         if build["finished"] is not None and build["started"] is not None:
@@ -204,7 +221,7 @@ class UIDB (common_db.DB):
         return build
                     
     def get_histoty_for_base_branch(self, test_id, branch):
-        sql = "SELECT name FROM tests WHERE test_id=%s"
+        sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
         res = self._execute_sql(sql, (test_id,))
         test = res.fetchone()
         history = self.get_test_history(test["name"], branch)
@@ -226,7 +243,7 @@ class UIDB (common_db.DB):
         return res
         
     def get_one_test(self, test_id):
-        sql = "SELECT * FROM tests WHERE test_id=%s"
+        sql = 'SELECT * FROM tests WHERE test_id = %s'
         res = self._execute_sql(sql, (test_id,))
         tests = res.fetchall()
         for test in tests:

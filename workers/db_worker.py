@@ -67,11 +67,13 @@ class WorkerDB (common_db.DB):
         return pending_test
 
     def test_started(self, id):
-        sql = "UPDATE tests SET started = now() WHERE test_id= %s"
+        sql = 'UPDATE tests SET started = NOW() WHERE test_id = %s'
         self._execute_sql(sql, (id,))
 
     def update_test_status(self, status, id):
-        sql = "UPDATE tests SET finished = now(), status = %s WHERE test_id= %s"
+        sql = '''UPDATE tests
+                    SET finished = NOW(), status = %s
+                  WHERE test_id = %s'''
         self._execute_sql(sql, (status, id))
 
     def save_short_logs(self, test_id: int,
