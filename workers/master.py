@@ -29,7 +29,7 @@ def cp_exe(cmd):
     b = bash(cmd)
     print(b)
 
-def cp(build_id, build_type, pytest, expensive):
+def cp(build_id, build_type, expensive):
         bash(f'''rm -rf {build_id}''')
         Path(f'{build_id}/target/{build_type}/').mkdir(parents=True, exist_ok=True)
         Path(f'{build_id}/near-test-contracts').mkdir(parents=True, exist_ok=True)
@@ -84,7 +84,7 @@ def build_target_expensive(queue, features, release):
     ''' , login=True)
     queue.put(bld)
             
-def build(build_id, sha, outdir, features, is_release, pytest, expensive):
+def build(build_id, sha, outdir, features, is_release, expensive):
     if is_release:
         release = "--release"
     else:
@@ -134,9 +134,9 @@ def build(build_id, sha, outdir, features, is_release, pytest, expensive):
                 bash(f'''rm -rf nearcore''')
                 return bld2.returncode
             if is_release:
-                cp(build_id, "release", pytest, expensive)
+                cp(build_id, "release", expensive)
             else:
-                cp(build_id, "debug", pytest, expensive)
+                cp(build_id, "debug", expensive)
 
             return 0
 
@@ -171,7 +171,7 @@ def keep_pulling():
             outdir = os.path.abspath('output/')
             Path(outdir).mkdir(parents=True, exist_ok=True)
             code = build(new_build['build_id'], new_build['sha'], outdir, new_build['features'], new_build['is_release'],
-                         new_build['pytest'], new_build['expensive'])
+                         new_build['expensive'])
             server = MasterDB()
             if code == 0:
                 status = 'BUILD DONE'

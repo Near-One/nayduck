@@ -32,16 +32,34 @@ class MasterDB (common_db.DB):
         This method must be run inside of a transaction because it uses
         variables and so we cannot tolerate disconnects between the two queries.
         """
-        sql = "UPDATE builds SET started = now(), status = 'BUILDING', ip=%s  WHERE status = 'PENDING' and @tmp_id := build_id ORDER BY build_id LIMIT 1 "
-        res = self._execute_sql(sql, (ip_address,))
-        if res.rowcount == 0:
+        sql = '''UPDATE builds
+                    SET started = NOW(),
+                        status = 'BUILDING',
+                        ip = %s,
+                        build_id = (@build_id := build_id)
+                    WHERE status = 'PENDING'
+                    ORDER BY priority, build_id
+                    LIMIT 1'''
+        result = self._execute_sql(sql, (ip_address,))
+        if result.rowcount == 0:
             return None
-        sql = '''SELECT b.build_id, r.sha, b.features, b.is_release, count(IF(t.name LIKE "%pytest %",1,NULL)) as pytest,   
-                 count(IF(t.name LIKE "%expensive %",1,NULL)) as expensive
-                 FROM builds as b, runs as r, tests as t WHERE b.build_id = @tmp_id and b.run_id = r.id and t.build_id = b.build_id'''
-        result = self._execute_sql(sql, ())
-        new_run = result.fetchone()
-        return new_run
+        # We're executing this query once in a blue moon so it doesn't need to
+        # be super optimised.  If we cared about the performance we could
+        # duplicate `sha` column in a build and add `has_expensive` column, but
+        # in this instance we care more about database normalisation.
+        sql = '''SELECT b.build_id,
+                        r.sha,
+                        b.features,
+                        b.is_release,
+                        SUM(t.name LIKE "%expensive %") AS expensive
+                   FROM builds b
+                   JOIN runs r ON (r.id = b.run_id)
+                   JOIN tests t USING (build_id)
+                  WHERE b.build_id = @build_id
+                  LIMIT 1'''
+        row = self._execute_sql(sql).fetchone()
+        row['expensive'] = bool(row['expensive'])
+        return row
 
     def update_run_status(self, build_id, status, err, out):
         sql = "UPDATE builds SET finished = now(), status = %s, stderr=%s, stdout = %s WHERE build_id=%s"

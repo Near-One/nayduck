@@ -36,6 +36,7 @@ CREATE TABLE `builds` (
   `ip` varchar(50) DEFAULT NULL,
   `features` varchar(250) DEFAULT NULL,
   `is_release` tinyint(1) DEFAULT '0',
+  `priority` tinyint(4) NOT NULL DEFAULT '0',
   PRIMARY KEY (`build_id`),
   CONSTRAINT `builds_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=latin1;

@@ -338,7 +338,8 @@ class UIDB (common_db.DB):
                                           run_id=run_id,
                                           status=build_status,
                                           features=build.features,
-                                          is_release=build.is_release)
+                                          is_release=build.is_release,
+                                          priority=priority)
 
         # Into Tests
         sql = '''INSERT
