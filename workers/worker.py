@@ -8,6 +8,7 @@ import shlex
 from pathlib import Path, PurePath
 import tempfile
 import time
+import traceback
 import typing
 from db_worker import WorkerDB
 from multiprocessing import Process
@@ -373,75 +374,82 @@ def checkout(sha: str) -> bool:
         return False
 
 
-def keep_pulling():
+def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
+    test_name = test['name']
+    print(test)
+    if not checkout(test['sha']):
+        server.update_test_status('CHECKOUT FAILED', test['test_id'])
+        return
+    outdir = WORKDIR / 'output'
+    utils.rmdirs(outdir,
+                 Path.home() / '.rainbow',
+                 Path.home() / '.rainbow-bridge')
+    outdir = outdir / str(test['test_id'])
+    utils.mkdirs(outdir)
+
+    remote = False
+    config_override = {}
+    if 'NEAR_PYTEST_CONFIG' in os.environ:
+         del os.environ['NEAR_PYTEST_CONFIG']
+    if '--remote' in test_name:
+        remote = True
+        config_override['local'] = False
+        config_override['preexist'] = True
+        os.environ['NEAR_PYTEST_CONFIG'] = '/datadrive/nayduck/.remote'
+        test_name = test_name.replace(' --remote', '')
+    release = False
+    if '--release' in test_name:
+        release = True
+        config_override['release'] = True
+        config_override['near_root'] = '../target/release/'
+        os.environ['NEAR_PYTEST_CONFIG'] = '/datadrive/nayduck/.remote'
+        test_name = test_name.replace(' --release', '')
+    if 'NEAR_PYTEST_CONFIG' in os.environ:
+        with open('/datadrive/nayduck/.remote', 'w') as f:
+            json.dump(config_override, f)
+
+    if '--features' in test_name:
+        test_name = test_name[:test_name.find('--features')]
+
+    if not ('mocknet' in test_name):
+        try:
+            scp_build(test['build_id'], test['ip'], test_name.split(),
+                      'release' if release else 'debug')
+        except (OSError, subprocess.SubprocessError) as ex:
+            server.update_test_status('SCP FAILED', test['test_id'])
+            raise
+
+    tokens = test_name.split()
+    if tokens and tokens[0] in ('pytest', 'mocknet'):
+        install_new_packages()
+    server.test_started(test['test_id'])
+    code = run_test(outdir, tokens, remote, 'release' if release else 'debug')
+    if code == 'POSTPONE':
+        server.remark_test_pending(test['test_id'])
+    else:
+        server.update_test_status(code, test['test_id'])
+        save_logs(server, test['test_id'], outdir)
+
+
+def main():
     hostname = socket.gethostname()
+    print('Starting worker at {}'.format(hostname))
     server = WorkerDB()
     server.handle_restart(hostname)
     while True:
-        time.sleep(5)
         try:
-            server = WorkerDB()
             test = server.get_pending_test(hostname)
-            if not test:
-                continue
-            
-            test_name = test['name']
-            print(test)
-            if not checkout(test['sha']):
-                server.update_test_status("CHECKOUT FAILED", test['test_id'])
-                continue
-            outdir = WORKDIR / 'output'
-            utils.rmdirs(outdir,
-                         Path.home() / '.rainbow',
-                         Path.home() / '.rainbow-bridge')
-            outdir = outdir / str(test['test_id'])
-            utils.mkdirs(outdir)
-            
-            remote = False
-            config_override = {}
-            if "NEAR_PYTEST_CONFIG" in os.environ:
-                 del os.environ["NEAR_PYTEST_CONFIG"]
-            if '--remote' in test_name: 
-                remote = True
-                config_override['local'] = False
-                config_override['preexist'] = True
-                os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
-                test_name = test_name.replace(' --remote', '')
-            release = False
-            if '--release' in test_name:
-                release = True
-                config_override['release'] = True
-                config_override['near_root'] = '../target/release/'
-                os.environ["NEAR_PYTEST_CONFIG"] = "/datadrive/nayduck/.remote"
-                test_name = test_name.replace(' --release', '')
-            if "NEAR_PYTEST_CONFIG" in os.environ:
-                with open("/datadrive/nayduck/.remote", "w") as f:
-                    json.dump(config_override, f)
-            
-            if '--features' in test_name:
-                test_name = test_name[:test_name.find('--features')]
+            if test:
+                handle_test(server, test)
+            else:
+                time.sleep(10)
+        except KeyboardInterrupt:
+            print('Got SIGINT; terminating')
+            break
+        except Exception:
+            traceback.print_exc()
+            time.sleep(10)
 
-            if not ('mocknet' in test_name):
-                try:
-                    scp_build(test['build_id'], test['ip'], test_name.strip().split(' '), "release" if release else "debug")
-                except (OSError, subprocess.SubprocessError) as ex:
-                    print(ex)
-                    server.update_test_status("SCP FAILED", test['test_id'])
-                    continue
-            
-            tokens = test_name.split()
-            if tokens and tokens[0] in ('pytest', 'mocknet'):
-                install_new_packages()
-            server.test_started(test['test_id'])
-            code = run_test(outdir, tokens, remote, "release" if release else "debug")
-            server = WorkerDB()
-            if code == 'POSTPONE':
-                server.remark_test_pending(test['test_id'])
-                continue
-            server.update_test_status(code, test['test_id'])
-            save_logs(server, test['test_id'], outdir)
-        except Exception as e:
-            print(e)
 
 if __name__ == "__main__":
-    keep_pulling()        
+    main()
