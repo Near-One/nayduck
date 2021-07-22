@@ -82,7 +82,7 @@ class WorkerDB (common_db.DB):
             test_id,
             log.name,
             log.size,
-            log.data or b'',
+            self._blob_from_data(log.data or b''),
             log.url or '',
             log.stack_trace,
             log.patterns

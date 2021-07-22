@@ -89,6 +89,8 @@ class MasterDB (common_db.DB):
                             tests.status = "CANCELED"
                       WHERE builds.build_id = %s
                         AND tests.status = "PENDING"'''
+        out = self._blob_from_data(out)
+        err = self._blob_from_data(err)
         self._execute_sql(sql, (err, out, build_id))
 
     def handle_restart(self, ipv4: int) -> None:

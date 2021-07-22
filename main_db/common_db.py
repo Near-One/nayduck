@@ -1,4 +1,5 @@
 import mysql.connector
+import gzip
 import random
 import string
 import time
@@ -122,3 +123,43 @@ class DB ():
                 self.mydb.commit()
             else:
                 self.mydb.rollback()
+
+    @classmethod
+    def _blob_from_data(cls, data: typing.AnyStr) -> bytes:
+        """Converts string or bytes to BLOB form for storage in database.
+
+        If an argument is a string, encodes it into bytes using UTF-8 encoding.
+        Any non-empty buffer is then compressed to save space though compressed
+        data is returned only if it's shorter than uncompressed bytes.
+
+        Args:
+            data: Data, either str or bytes, to store in the database BLOB
+                field.
+        Returns:
+            BLOB data to save in the database.
+        """
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        must_compress = data.startswith(b'\x1f\x8b')
+        if must_compress or len(data) > 18:
+            compressed = gzip.compress(data)
+            if must_compress or len(compressed) < len(data):
+                return compressed
+        return data
+
+    @classmethod
+    def _str_from_blob(cls, blob: bytes) -> bytes:
+        """Converts BLOB read from database into a string.
+
+        This conversion is necessary because the data may be compressed in which
+        case this method will decompress it.  The bytes are then decoded
+        assuming UTF-8 encoding using a replacement character to handle errors.
+
+        Args:
+            blob: BLOB data read from the database.
+        Returns:
+            String stored in the database.
+        """
+        if blob.startswith(b'\x1f\x8b'):
+            blob = gzip.decompress(blob)
+        return blob.decode('utf-8', 'replace')

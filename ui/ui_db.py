@@ -168,7 +168,7 @@ class UIDB (common_db.DB):
         for log in self._execute_sql(sql, (test['test_id'],)).fetchall():
             log['full_size'] = _prettify_size(log.pop('size'))
             if blob:
-                log['log'] = log['log'].decode('utf-8', 'replace')
+                log['log'] = self._str_from_blob(log['log'])
             test['logs'][log['type']] = log
         test['cmd'] = test["name"]
         if '--features' in test["name"]:
@@ -197,14 +197,8 @@ class UIDB (common_db.DB):
         build = res.fetchone()
         if build["finished"] is not None and build["started"] is not None:
             build["build_time"] = str(build["finished"] - build["started"])
-        try:
-            build["stderr"] =  build["stderr"].decode()
-        except:
-            pass
-        try:
-            build["stdout"] =  build["stdout"].decode()
-        except:
-            pass
+        build['stdout'] = self._str_from_blob(build['stdout'])
+        build['stderr'] = self._str_from_blob(build['stderr'])
         run = self.get_data_about_run(build['run_id'])
         build.update(run)
         return build
