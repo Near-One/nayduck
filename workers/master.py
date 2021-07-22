@@ -217,8 +217,8 @@ def keep_pulling():
             success = build(spec, runner)
             print('Build {}; updating database'.format(
                 'succeeded' if success else 'failed'))
-            server.update_run_status(spec.build_id, success,
-                                     out=runner.stdout, err=runner.stderr)
+            server.update_build_status(spec.build_id, success,
+                                       out=runner.stdout, err=runner.stderr)
             print('Done; starting another pool iteration')
         except Exception as e:
             print(e)

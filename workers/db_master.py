@@ -61,14 +61,35 @@ class MasterDB (common_db.DB):
         row['expensive'] = bool(row['expensive'])
         return row
 
-    def update_run_status(self, build_id: int, success: bool, *,
-                          out: bytes, err: bytes) -> None:
-        status = 'BUILD DONE' if success else 'BUILD FAILED'
-        sql = "UPDATE builds SET finished = now(), status = %s, stderr=%s, stdout = %s WHERE build_id=%s"
-        self._execute_sql(sql, (status, err, out, build_id))
-        if not success:
-            sql = "UPDATE tests SET status = 'CANCELED' WHERE build_id=%s and status='PENDING'"
-            self._execute_sql(sql, (build_id,))
+    def update_build_status(self, build_id: int, success: bool, *,
+                            out: bytes, err: bytes) -> None:
+        """Updates build status in the database.
+
+        If the build failed also updates all dependent tests to CANCELED status.
+
+        Args:
+            build_id: Id of the build.
+            success: Whether the build has succeeded.
+            out: Standard output of the build process.
+            err: Standard error output of the build process.
+        """
+        if success:
+            sql = '''UPDATE builds
+                        SET finished = NOW(),
+                            status = "BUILD DONE",
+                            stderr = %s,
+                            stdout = %s
+                      WHERE build_id = %s'''
+        else:
+            sql = '''UPDATE builds JOIN tests USING (build_id)
+                        SET builds.finished = NOW(),
+                            builds.status = "BUILD FAILED",
+                            builds.stderr = %s,
+                            builds.stdout = %s,
+                            tests.status = "CANCELED"
+                      WHERE builds.build_id = %s
+                        AND tests.status = "PENDING"'''
+        self._execute_sql(sql, (err, out, build_id))
 
     def handle_restart(self, ip_address):
         sql = "UPDATE builds SET started = null, status = 'PENDING', ip=null  WHERE status = 'BUILDING' and ip=%s"
