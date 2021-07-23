@@ -11,21 +11,21 @@ import common_db
 
 class MasterDB (common_db.DB):
     def get_new_build(
-            self, ip_address: str
+            self, ipv4: int
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Returns a pending build to process or None if none found.
 
         Args:
-            ip_address: IP address of the master making the request.  This will
-                be stored in the database so workers will know where to find
-                build artefacts.
+            ipv4: IP address of the master (as an integer) making the request.
+                This will be stored in the database so workers will know where
+                to find build artefacts.
         Returns:
             A build to process or None if none are present.
         """
-        return self._with_transaction(lambda: self.__get_new_build(ip_address))
+        return self._with_transaction(lambda: self.__get_new_build(ipv4))
 
     def __get_new_build(
-            self, ip_address: str
+            self, ipv4: int
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Implementation of get_new_build method (which see).
 
@@ -35,12 +35,12 @@ class MasterDB (common_db.DB):
         sql = '''UPDATE builds
                     SET started = NOW(),
                         status = 'BUILDING',
-                        ip = %s,
+                        master_ip = %s,
                         build_id = (@build_id := build_id)
                     WHERE status = 'PENDING'
                     ORDER BY priority, build_id
                     LIMIT 1'''
-        result = self._execute_sql(sql, (ip_address,))
+        result = self._execute_sql(sql, (ipv4,))
         if result.rowcount == 0:
             return None
         # We're executing this query once in a blue moon so it doesn't need to
@@ -91,14 +91,18 @@ class MasterDB (common_db.DB):
                         AND tests.status = "PENDING"'''
         self._execute_sql(sql, (err, out, build_id))
 
-    def handle_restart(self, ip_address):
-        sql = "UPDATE builds SET started = null, status = 'PENDING', ip=null  WHERE status = 'BUILDING' and ip=%s"
-        self._execute_sql(sql, (ip_address,))
-
+    def handle_restart(self, ipv4: int) -> None:
+        sql = '''UPDATE builds
+                    SET started = null,
+                        status = 'PENDING',
+                        master_ip = 0
+                  WHERE status = 'BUILDING'
+                    AND master_ip = %s'''
+        self._execute_sql(sql, (ipv4,))
 
     def with_builds_without_pending_tests(
             self,
-            ip_address: str,
+            ipv4: int,
             callback: typing.Callable[[typing.Iterable[int]], typing.Any]
     ) -> None:
         """Runs cleanup callback on IDs of builds with no unfinished tests.
@@ -108,18 +112,18 @@ class MasterDB (common_db.DB):
         as no longer available.
 
         Args:
-            ip_address: IP of the master.
+            ipv4: IP of the master as an integer.
             callback: Callback to call with sequence of build IDs to cleanup.
         """
         sql = '''SELECT build_id
                    FROM builds JOIN tests USING (build_id)
-                  WHERE ip = %s
+                  WHERE master_ip = %s
                     AND tests.status NOT IN ('PENDING', 'RUNNING')
                   GROUP BY 1'''
-        result = self._execute_sql(sql, (ip_address,))
+        result = self._execute_sql(sql, (ipv4,))
         builds = tuple(int(build['build_id']) for build in result.fetchall())
         if builds:
-            CALLBACK(builds)
-            sql = 'UPDATE builds SET ip = NULL WHERE build_id IN ({})'
+            callback(builds)
+            sql = 'UPDATE builds SET master_ip = 0 WHERE build_id IN ({})'
             sql = sql.format(', '.join(str(build_id) for build_id in builds))
             self._execute_sql(sql)

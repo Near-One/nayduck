@@ -1,8 +1,12 @@
 import os
 import pathlib
 import shutil
+import socket
+import struct
 import subprocess
 import typing
+
+import psutil
 
 
 REPO_URL = 'https://github.com/nearprotocol/nearcore'
@@ -95,3 +99,30 @@ def checkout(sha: str,
     rmdirs(repo_dir)
     return (runner(('git', 'clone', REPO_URL), cwd=cwd) and
             runner(('git', 'checkout', sha), cwd=repo_dir))
+
+
+def get_ip() -> int:
+    """Returns private IPv4 address of the current host as an integer.
+
+    Returns:
+        A string with the hosts private IP address.
+    Raises:
+        SystemExit: if no private IP address could be found for the host.
+    """
+    for iface in psutil.net_if_addrs().values():
+        for addr in iface:
+            if addr.family != socket.AF_INET:
+                continue
+            ip_addr = struct.unpack('!I', socket.inet_aton(addr.address))[0]
+            # Check if it's a private address.  We don't want to return any kind
+            # of public addresses or localhost.
+            if ((ip_addr & 0xFF000000) == 0x0A000000 or  # 10.0.0.0/8
+                (ip_addr & 0xFFF00000) == 0x0C100000 or  # 172.16.0.0/12
+                (ip_addr & 0xFFFF0000) == 0xC0A80000):  # 192.168.0.0/16bbb
+                return ip_addr
+    raise SystemExit('Unable to determine private IP address')
+
+
+def int_to_ip(addr: int) -> str:
+    """Formats IPv4 represented as an integer as a string."""
+    return socket.inet_ntoa(struct.pack('!I', addr))

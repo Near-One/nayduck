@@ -134,7 +134,7 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
         return False
 
 
-def wait_for_free_space(server: MasterDB, ip_address: str) -> None:
+def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
     If there's less than 20% of free space on /datadrive file system, delete
@@ -143,16 +143,15 @@ def wait_for_free_space(server: MasterDB, ip_address: str) -> None:
 
     Args:
         server: Database to query for finished tests.
-        ip_address: This builder's IP address used to retrieve list of builds
-            we've performed from the database.
+        ipv4: This builder's IP address (as an integer) used to retrieve list of
+            builds we've performed from the database.
     """
     def enough_space() -> bool:
         return psutil.disk_usage('/datadrive').percent < 80.0
 
     def clean_finished() -> bool:
         server.with_builds_without_pending_tests(
-            ip_address, lambda ids: utils.rmdirs(
-                *[Path(str(bid)) for bid in ids]))
+            ipv4, lambda ids: utils.rmdirs(*[Path(str(bid)) for bid in ids]))
         return enough_space()
 
     if enough_space() or clean_finished():
@@ -171,43 +170,19 @@ def wait_for_free_space(server: MasterDB, ip_address: str) -> None:
     print('Got enough free space; continuing')
 
 
-def get_ip() -> str:
-    """Returns private IPv4 address of the current host.
-
-    Returns:
-        A string with the hosts private IP address.
-    Raises:
-        SystemExit: if no private IP address could be found for the host.
-    """
-    for iface in psutil.net_if_addrs().values():
-        for addr in iface:
-            if addr.family != socket.AF_INET:
-                continue
-            ip_addr = addr.address
-            octets = [int(octet) for octet in ip_addr.split('.')]
-            if len(octets) != 4:  # Sanity check
-                continue
-            # Check if it's a private address.  We don't want to return any kind
-            # of public addresses or localhost.
-            if (octets[0] == 10 or
-                (octets[0] == 172 and 16 <= octets[1] <= 31) or
-                (octets[0] == 192 and octets[1] == 168)):
-                return ip_addr
-    sys.exit('Unable to determine private IP address')
-
-
 def keep_pulling():
-    ip_address = get_ip()
-    print('Starting master at {}'.format(ip_address))
+    ipv4 = utils.get_ip()
+    print('Starting master at {} ({})'.format(
+        socket.gethostname(), utils.int_to_ip(ipv4)))
 
     server = MasterDB()
-    server.handle_restart(ip_address)
+    server.handle_restart(ipv4)
   
     while True:
         time.sleep(5)
-        wait_for_free_space(server, ip_address)
+        wait_for_free_space(server, ipv4)
         try:
-            new_build = server.get_new_build(ip_address)
+            new_build = server.get_new_build(ipv4)
             if not new_build:
                 continue
 

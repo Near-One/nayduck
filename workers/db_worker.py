@@ -13,34 +13,33 @@ import common_db
 
 class WorkerDB (common_db.DB):
     def get_pending_test(
-            self, hostname: str
+            self, include_mocknet: bool, ipv4: int
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Returns a pending test to process or None if none found.
 
         Args:
-            hostname: hostname of the worker.  This is used to decide whether to
-                return mocknet tests and also is stored in the database to be
-                able to cleanup the database on restarts.
+            include_mocknet: Whether to consider mocknet tests in the result.
+            ipv4: IP address of the worker as an integer.  This is stored in the
+                database to be able to continue with the test after worker
+                process restart.
         Returns:
             A build to process or None if none are present.
         """
-        return self._with_transaction(lambda: self.__get_pending_test(hostname))
+        return self._with_transaction(lambda: self.__get_pending_test(
+            include_mocknet, ipv4))
 
     def __get_pending_test(
-            self, hostname: str
+            self, mocknet: bool, ipv4: int
     ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Implementation of get_pending_test method (which see).
 
         This method must be run inside of a transaction because it uses
         variables and so we cannot tolerate disconnects between the two queries.
         """
-        # If mocknet tests are allowed, prefer them to other tests (i.e. sort
-        # them before others).  Otherwise, filter out mocknet tests.
-        mocknet = 'mocknet' in hostname
         sql = '''UPDATE tests
                     SET started = NOW(),
                         status = 'RUNNING',
-                        hostname = %s,
+                        worker_ip = %s,
                         test_id = (@test_id := test_id)
                   WHERE status = 'PENDING'
                     AND build_id IN (SELECT build_id
@@ -52,11 +51,11 @@ class WorkerDB (common_db.DB):
                   LIMIT 1'''.format(
                       where='' if mocknet else 'AND name NOT LIKE "%mocknet %"',
                       order_by='name NOT LIKE "mocknet %", ' if mocknet else '')
-        res = self._execute_sql(sql, (hostname, int(time.time())))
+        res = self._execute_sql(sql, (ipv4, int(time.time())))
         if res.rowcount == 0:
             return None
         sql = '''SELECT t.test_id, t.run_id, t.build_id, t.name,
-                        b.ip, b.is_release,
+                        b.master_ip, b.is_release,
                         r.sha
                    FROM tests t, runs r, builds b
                   WHERE t.test_id = @test_id
@@ -89,11 +88,17 @@ class WorkerDB (common_db.DB):
             log.patterns
         ) for log in logs), replace=True)
 
-    def remark_test_pending(self, id):
-        after = int(time.time()) + 3*60
-        sql = "UPDATE tests SET started = null, hostname=null, status='PENDING', select_after=%s WHERE test_id= %s"
-        self._execute_sql(sql, (after, id))
+    def remark_test_pending(self, test_id: int, delay: int=3*60) -> None:
+        sql = '''UPDATE tests
+                    SET started = NULL,
+                        worker_ip = NULL,
+                        status = 'PENDING',
+                        select_after = %s
+                  WHERE test_id = %s'''
+        self._execute_sql(sql, (int(time.time()) + delay, test_id))
 
-    def handle_restart(self, hostname):
-        sql = "UPDATE tests SET started = null, status = 'PENDING', hostname=null  WHERE status = 'RUNNING' and hostname=%s"
-        self._execute_sql(sql, (hostname,))
+    def handle_restart(self, ipv4: int) -> None:
+        sql = '''UPDATE tests
+                    SET started = NULL, status = 'PENDING', worker_ip = 0
+                  WHERE status = 'RUNNING' AND worker_ip = %s'''
+        self._execute_sql(sql, (ipv4,))

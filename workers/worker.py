@@ -398,12 +398,14 @@ def save_logs(server: WorkerDB, test_id: int, directory: Path) -> None:
     server.save_short_logs(test_id, logs)
 
 
-def scp_build(build_id, ip, test, build_type="debug"):
+def scp_build(build_id, master_ip, test, build_type="debug"):
     if test[0] == 'mocknet':
         return
 
+    master_auth = 'azureuser@' + utils.int_to_ip(master_ip)
+
     def scp(src: str, dst: str) -> None:
-        src = f'azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/{src}'
+        src = f'{master_auth}:/datadrive/nayduck/workers/{build_id}/{src}'
         dst = WORKDIR / 'nearcore' / dst
         utils.mkdirs(dst)
         cmd = ('scp', '-o', 'StrictHostKeyChecking=no', src, dst)
@@ -451,7 +453,7 @@ def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
             json.dump(config_override, f)
 
     try:
-        scp_build(test['build_id'], test['ip'], tokens,
+        scp_build(test['build_id'], test['master_ip'], tokens,
                   'release' if release else 'debug')
     except (OSError, subprocess.SubprocessError) as ex:
         server.update_test_status('SCP FAILED', test['test_id'])
@@ -469,13 +471,16 @@ def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
 
 
 def main():
+    ipv4 = utils.get_ip()
     hostname = socket.gethostname()
-    print('Starting worker at {}'.format(hostname))
+    print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)))
+
+    mocknet = 'mocknet' in hostname
     server = WorkerDB()
-    server.handle_restart(hostname)
+    server.handle_restart(ipv4)
     while True:
         try:
-            test = server.get_pending_test(hostname)
+            test = server.get_pending_test(mocknet, ipv4)
             if test:
                 handle_test(server, test)
             else:
