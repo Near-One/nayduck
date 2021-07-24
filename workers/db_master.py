@@ -51,7 +51,7 @@ class MasterDB (common_db.DB):
                         r.sha,
                         b.features,
                         b.is_release,
-                        SUM(t.name LIKE "%expensive %") AS expensive
+                        SUM(t.category = "expensive") AS expensive
                    FROM builds b
                    JOIN runs r ON (r.id = b.run_id)
                    JOIN tests t USING (build_id)

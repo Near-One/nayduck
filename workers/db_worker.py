@@ -49,8 +49,8 @@ class WorkerDB (common_db.DB):
                     AND select_after < %s
                   ORDER BY {order_by} priority, test_id
                   LIMIT 1'''.format(
-                      where='' if mocknet else 'AND name NOT LIKE "%mocknet %"',
-                      order_by='name NOT LIKE "mocknet %", ' if mocknet else '')
+                      where='' if mocknet else 'AND category != "mocknet"',
+                      order_by='category != "mocknet", ' if mocknet else '')
         res = self._execute_sql(sql, (ipv4, int(time.time())))
         if res.rowcount == 0:
             return None

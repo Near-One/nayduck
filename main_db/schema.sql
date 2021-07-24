@@ -55,6 +55,7 @@ CREATE TABLE `tests` (
   `is_release` tinyint(1) DEFAULT '0',
   `remote` tinyint(1) DEFAULT '0',
   `worker_ip` int(10) unsigned NOT NULL DEFAULT '0',
+  `category` enum('pytest','mocknet','lib','expensive') NOT NULL,
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),
   KEY `run_id` (`build_id`),  

@@ -279,6 +279,8 @@ class UIDB (common_db.DB):
             self.is_remote = is_remote
             self.build = build
 
+        category = property(lambda self: self.name.split()[0])
+
     def schedule_a_run(self, *, branch: str, sha: str, user: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
                       tests: typing.Sequence['UIDB.TestSpec'],
@@ -336,12 +338,13 @@ class UIDB (common_db.DB):
                                           priority=priority)
 
         # Into Tests
-        columns = ('run_id', 'build_id', 'name', 'priority', 'is_release',
-                   'remote')
+        columns = ('run_id', 'build_id', 'name', 'category', 'priority',
+                   'is_release', 'remote')
         self._multi_insert('tests', columns, ((
             run_id,
             test.build.build_id,
             test.name,
+            test.category,
             priority,
             test.is_release,
             test.is_remote
