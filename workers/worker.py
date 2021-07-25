@@ -315,6 +315,9 @@ def save_logs(server, test_id, directory: Path):
             
 
 def scp_build(build_id, ip, test, build_type="debug"):
+    if test[0] == 'mocknet':
+        return
+
     def scp(src: str, dst: str) -> None:
         src = f'azureuser@{ip}:/datadrive/nayduck/workers/{build_id}/{src}'
         dst = WORKDIR / 'nearcore' / dst
@@ -375,7 +378,6 @@ def checkout(sha: str) -> bool:
 
 
 def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
-    test_name = test['name']
     print(test)
     if not checkout(test['sha']):
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
@@ -387,40 +389,33 @@ def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
     outdir = outdir / str(test['test_id'])
     utils.mkdirs(outdir)
 
-    remote = False
+    tokens = test['name'].split()
+    if '--features' in tokens:
+        del tokens[tokens.index('--features'):]
+
     config_override = {}
-    if 'NEAR_PYTEST_CONFIG' in os.environ:
-         del os.environ['NEAR_PYTEST_CONFIG']
-    if '--remote' in test_name:
-        remote = True
-        config_override['local'] = False
-        config_override['preexist'] = True
+    remote = '--remote' in tokens
+    if remote:
+        config_override.update(local=False, preexist=True)
+        tokens.remove('--remote')
+    release = '--release' in tokens
+    if release:
+        config_override.update(release=True, near_root='../target/release/')
+        tokens.remove('--release')
+    os.environ.pop('NEAR_PYTEST_CONFIG', None)
+    if config_override:
         os.environ['NEAR_PYTEST_CONFIG'] = '/datadrive/nayduck/.remote'
-        test_name = test_name.replace(' --remote', '')
-    release = False
-    if '--release' in test_name:
-        release = True
-        config_override['release'] = True
-        config_override['near_root'] = '../target/release/'
-        os.environ['NEAR_PYTEST_CONFIG'] = '/datadrive/nayduck/.remote'
-        test_name = test_name.replace(' --release', '')
-    if 'NEAR_PYTEST_CONFIG' in os.environ:
         with open('/datadrive/nayduck/.remote', 'w') as f:
             json.dump(config_override, f)
 
-    if '--features' in test_name:
-        test_name = test_name[:test_name.find('--features')]
+    try:
+        scp_build(test['build_id'], test['ip'], tokens,
+                  'release' if release else 'debug')
+    except (OSError, subprocess.SubprocessError) as ex:
+        server.update_test_status('SCP FAILED', test['test_id'])
+        raise
 
-    if not ('mocknet' in test_name):
-        try:
-            scp_build(test['build_id'], test['ip'], test_name.split(),
-                      'release' if release else 'debug')
-        except (OSError, subprocess.SubprocessError) as ex:
-            server.update_test_status('SCP FAILED', test['test_id'])
-            raise
-
-    tokens = test_name.split()
-    if tokens and tokens[0] in ('pytest', 'mocknet'):
+    if tokens[0] in ('pytest', 'mocknet'):
         install_new_packages()
     server.test_started(test['test_id'])
     code = run_test(outdir, tokens, remote, 'release' if release else 'debug')
