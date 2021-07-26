@@ -26,7 +26,7 @@ class BuildSpec(typing.NamedTuple):
         build_id = int(data['build_id'])
         return cls(
             build_id=build_id,
-            build_dir=Path(str(build_id)),
+            build_dir=utils.BUILDS_DIR / str(build_id),
             sha=str(data['sha']),
             features=tuple(str(data['features']).strip().split()),
             is_release=bool(data['is_release']),
@@ -51,28 +51,27 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
     """
     print('Copying data')
 
-    utils.rmdirs(spec.build_dir)
-
     def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool=False):    # pylint: disable=invalid-name
         if create_dir:
             utils.mkdirs(dst)
         return runner(('cp', '-rl', '--', *srcs, dst))
 
+    utils.rmdirs(spec.build_dir)
+
     ok = True
-    ok = ok and cp(dst=spec.build_dir / 'target' / spec.build_type,
-                   srcs=[Path('nearcore') / 'target' / spec.build_type / exe
+    ok = ok and cp(dst=spec.build_dir / 'target', create_dir=True,
+                   srcs=[utils.REPO_DIR / 'target' / spec.build_type / exe
                          for exe in ('neard', 'near', 'genesis-populate',
-                                     'restaked')],
-                   create_dir=True)
+                                     'restaked')])
     ok = ok and cp(dst=spec.build_dir / 'near-test-contracts',
-                   srcs=[Path('nearcore') / 'runtime' / 'near-test-contracts' /
+                   srcs=[utils.REPO_DIR / 'runtime' / 'near-test-contracts' /
                          'res'])
 
     if not ok or not spec.is_expensive:
         return ok
 
     files = {}
-    deps_dir = Path('nearcore/target_expensive') / spec.build_type / 'deps'
+    deps_dir = utils.REPO_DIR / 'target_expensive' / spec.build_type / 'deps'
     for filename in os.listdir(deps_dir):
         if '.' in filename:
             continue
@@ -89,9 +88,9 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
         if prev_path != path and prev_ctime < ctime:
             files[test_name] = (path, ctime)
 
-    return not files or cp(
-        dst=spec.build_dir / 'target_expensive' / spec.build_type / 'deps',
-        srcs=[path for path, _ in files.values()], create_dir=True)
+    return not files or cp(dst=spec.build_dir / 'expensive',
+                           srcs=[path for path, _ in files.values()],
+                           create_dir=True)
 
 
 def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
@@ -103,7 +102,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
             cmd.extend(spec.features)
         if spec.is_release:
             cmd.append('--release')
-        return runner(cmd, cwd=Path('nearcore'))
+        return runner(cmd, cwd=utils.REPO_DIR)
 
     ok = True
     ok = ok and cargo('build', '-p', 'neard', '--features', 'adversarial')
@@ -144,7 +143,7 @@ def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
             builds we've performed from the database.
     """
     def enough_space() -> bool:
-        return psutil.disk_usage('/datadrive').percent < 80.0
+        return psutil.disk_usage(str(utils.WORKDIR)).percent < 80.0
 
     def clean_finished() -> bool:
         server.with_builds_without_pending_tests(
@@ -154,7 +153,7 @@ def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
     if enough_space() or clean_finished():
         return
 
-    utils.rmdirs(Path('nearcore/target'), Path('nearcore/target_expensive'))
+    utils.rmdirs(utils.REPO_DIR / 'target', utils.REPO_DIR / 'target_expensive')
     if enough_space():
         return
 

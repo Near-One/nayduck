@@ -10,6 +10,9 @@ import psutil
 
 
 REPO_URL = 'https://github.com/nearprotocol/nearcore'
+WORKDIR = pathlib.Path('/datadrive')
+BUILDS_DIR = WORKDIR / 'builds'
+REPO_DIR = WORKDIR / 'nearcore'
 
 
 def mkdirs(*paths: pathlib.Path) -> None:
@@ -68,9 +71,7 @@ class Runner:
         return b''
 
 
-def checkout(sha: str,
-             runner: typing.Optional[Runner]=None,
-             cwd: typing.Optional[pathlib.Path]=None) -> bool:
+def checkout(sha: str, runner: typing.Optional[Runner]=None) -> bool:
     """Checks out given SHA in the nearcore repository.
 
     If the repository directory exists updates the origin remote and then checks
@@ -80,7 +81,7 @@ def checkout(sha: str,
     If the repository directory does not exist, clones the origin and then tries
     to check out the commit.
 
-    The repository directory will be located in (WORKDIR / 'nearcore').
+    The repository directory will be located in REPO_DIR.
 
     Args:
         sha: Commit SHA to check out.
@@ -88,17 +89,16 @@ def checkout(sha: str,
         Whether operation succeeded.
     """
     runner = runner or Runner()
-    repo_dir = (cwd / 'nearcore') if cwd else pathlib.Path('nearcore')
-    if repo_dir.is_dir():
+    if REPO_DIR.is_dir():
         print('Checkout', sha)
-        if (runner(('git', 'remote', 'update', '-p'), cwd=repo_dir) and
-            runner(('git', 'checkout', sha), cwd=repo_dir)):
+        if (runner(('git', 'remote', 'update', '-p'), cwd=REPO_DIR) and
+            runner(('git', 'checkout', sha), cwd=REPO_DIR)):
             return True
 
     print('Clone', sha)
-    rmdirs(repo_dir)
-    return (runner(('git', 'clone', REPO_URL), cwd=cwd) and
-            runner(('git', 'checkout', sha), cwd=repo_dir))
+    rmdirs(REPO_DIR)
+    return (runner(('git', 'clone', REPO_URL), cwd=WORKDIR) and
+            runner(('git', 'checkout', sha), cwd=REPO_DIR))
 
 
 def get_ip() -> int:

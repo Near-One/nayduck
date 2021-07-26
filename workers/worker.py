@@ -24,7 +24,6 @@ FAIL_PATTERNS = [BACKTRACE_PATTERN]
 INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
-WORKDIR = Path('/datadrive')
 
 def get_sequential_test_cmd(cwd: Path,
                             test: typing.Sequence[str],
@@ -49,7 +48,7 @@ def get_sequential_test_cmd(cwd: Path,
 
 def install_new_packages():
     """Makes sure all Python requirements for the pytests are satisfied."""
-    requirements = WORKDIR / 'nearcore/pytest/requirements.txt'
+    requirements = utils.REPO_DIR / 'pytest/requirements.txt'
     subprocess.check_call(
         ('python', '-m', 'pip', 'install' ,'--user', '-q', '-r', requirements))
 
@@ -211,7 +210,7 @@ def execute_test_command(dir_name: Path,
 
 
 def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
-    cwd = WORKDIR / 'nearcore'
+    cwd = utils.REPO_DIR
     if test[0] in ('pytest', 'mocknet'):
         cwd = cwd / 'pytest'
 
@@ -415,28 +414,28 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
     master_auth = 'azureuser@' + utils.int_to_ip(master_ip)
 
     def scp(src: str, dst: str) -> None:
-        src = f'{master_auth}:/datadrive/nayduck/workers/{build_id}/{src}'
-        dst = WORKDIR / 'nearcore' / dst
+        src = f'{master_auth}:{utils.BUILDS_DIR}/{build_id}/{src}'
+        dst = utils.REPO_DIR / dst
         utils.mkdirs(dst)
         cmd = ('scp', '-o', 'StrictHostKeyChecking=no', src, dst)
         subprocess.check_call(cmd)
 
-    scp(f'target/{build_type}/*', f'target/{build_type}')
+    scp('target/*', f'target/{build_type}')
     scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
 
     if test[0] in ('expensive', 'lib'):
         idx = 1 + (test[0] == 'expensive') + test[1].startswith('--')
         test_name = test[idx].replace('-', '_')
-        scp(f'target_expensive/{build_type}/deps/{test_name}-*',
+        scp(f'expensive/{test_name}-*',
             f'target_expensive/{build_type}/deps')
 
 
 def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
     print(test)
-    if not utils.checkout(test['sha'], cwd=WORKDIR):
+    if not utils.checkout(test['sha']):
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
         return
-    outdir = WORKDIR / 'output'
+    outdir = utils.WORKDIR / 'output'
     utils.rmdirs(outdir,
                  Path.home() / '.rainbow',
                  Path.home() / '.rainbow-bridge')
