@@ -47,14 +47,13 @@ class MasterDB(common_db.DB):
                         r.sha,
                         b.features,
                         b.is_release,
-                        SUM(t.category = "expensive") AS expensive
+                        SUM(t.category = "expensive") != 0 AS expensive
                    FROM builds b
                    JOIN runs r ON (r.id = b.run_id)
                    JOIN tests t USING (build_id)
                   WHERE b.build_id = @build_id
                   LIMIT 1'''
         row = self._execute_sql(sql).fetchone()
-        row['expensive'] = bool(row['expensive'])
         return row
 
     def update_build_status(self, build_id: int, success: bool, *, out: bytes,
