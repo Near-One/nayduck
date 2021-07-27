@@ -296,8 +296,7 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
         _verify_token(server, request_json)
 
         repo_dir = _update_repo()
-        sha, user, title = _run(
-            'git', 'log', '--format=%H\n%ae\n%s', '-n1', req.sha,
+        sha, title = _run('git', 'log', '--format=%H\n%s', '-n1', req.sha,
             cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
 
         builds = {}
@@ -317,6 +316,6 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
         # what to do they start with builds which unlock the largest number of
         # tests.
         return server.schedule_a_run(
-            branch=req.branch, sha=sha, user=user.split('@')[0], title=title,
+            branch=req.branch, sha=sha, title=title, requester=req.requester,
             builds=sorted(builds.values(), key=lambda build: -build.test_count),
-            tests=tests, requester=req.requester)
+            tests=tests)

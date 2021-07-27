@@ -295,7 +295,7 @@ class UIDB(common_db.DB):
 
         category = property(lambda self: self.name.split()[0])
 
-    def schedule_a_run(self, *, branch: str, sha: str, user: str, title: str,
+    def schedule_a_run(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
                       tests: typing.Sequence['UIDB.TestSpec'],
                       requester: str) -> int:
@@ -310,7 +310,6 @@ class UIDB(common_db.DB):
                 should be the branch name which contains commit the build is
                 for.
             sha: Commit sha to run the tests on.
-            user: Author of the commit.
             title: Subject of the commit.
             builds: A sequence of builds necessary for the tests to run.  The
                 builds are modified in place by having their build_id set.
@@ -323,10 +322,10 @@ class UIDB(common_db.DB):
             Id of the scheduled run.
         """
         return self._with_transaction(lambda: self.__do_schedule(
-            branch=branch, sha=sha, user=user, title=title, builds=builds,
+            branch=branch, sha=sha, title=title, builds=builds,
             tests=tests, requester=requester))
 
-    def __do_schedule(self, *, branch: str, sha: str, user: str, title: str,
+    def __do_schedule(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
                       tests: typing.Sequence['UIDB.TestSpec'],
                       requester: str) -> int:
@@ -337,7 +336,6 @@ class UIDB(common_db.DB):
         run_id = self._insert('runs',
                               branch=branch,
                               sha=sha,
-                              user=user,
                               title=title,
                               requester=requester)
 

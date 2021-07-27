@@ -80,7 +80,6 @@ function TestHistory (props) {
           <tr>
             <th>Commit</th>
             <th style={{"width": "40%"}}>Title</th>
-            <th>User</th>
             <th>Status</th>
             <th>Logs</th>
             <th>Test Time / Run Time</th>
@@ -92,7 +91,6 @@ function TestHistory (props) {
             <td>{a_test.branch} (<a href={GitRepo()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
             </td>
             <td> <NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
-            <td>{a_test.user}</td>
             <td style={{"color": status_color(a_test.status)}}>{a_test.status}</td>
             <td>
                 {a_test.logs.map((log,j) =>
