@@ -38,7 +38,8 @@ CREATE TABLE `builds` (
   `master_ip` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`build_id`),
   KEY `builds_ibfk_1` (`run_id`),
-  KEY `builds_done` (`master_ip`,`status`),
+  KEY `builds_status` (`status`),
+  KEY `builds_ip` (`master_ip`),
   CONSTRAINT `builds_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
@@ -59,9 +60,9 @@ CREATE TABLE `tests` (
   `category` enum('pytest','mocknet','lib','expensive') NOT NULL,
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),
-  KEY `build_id` (`build_id`),
   KEY `name` (`name`),
-  KEY `tests_pick` (`status`,`build_id`,`select_after`,`category`),
+  KEY `tests_pick` (`status`,`select_after`,`build_id`,`category`),
+  KEY `build_status` (`build_id`,`status`),
   CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `tests_ibfk_2` FOREIGN KEY (`build_id`) REFERENCES `builds` (`build_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

@@ -29,17 +29,14 @@ class MasterDB(common_db.DB):
         This method must be run inside of a transaction because it uses
         variables and so we cannot tolerate disconnects between the two queries.
         """
-        # We are filtering on `master_ip = 0` in the query so that we can use
-        # a (master_ip, status) index we have on builds table.  Without that we
-        # would need to create a new index on just the status column.
         sql = '''UPDATE builds
                     SET started = NOW(),
                         status = 'BUILDING',
                         master_ip = %s,
                         build_id = (@build_id := build_id)
-                    WHERE master_ip = 0 AND status = 'PENDING'
-                    ORDER BY priority, build_id
-                    LIMIT 1'''
+                  WHERE status = 'PENDING'
+                  ORDER BY priority, build_id
+                  LIMIT 1'''
         result = self._execute_sql(sql, (ipv4,))
         if result.rowcount == 0:
             return None
@@ -118,10 +115,10 @@ class MasterDB(common_db.DB):
             callback: Callback to call with sequence of build IDs to cleanup.
         """
         sql = '''SELECT build_id
-                   FROM builds JOIN tests USING (build_id)
-                  WHERE master_ip = %s
-                    AND tests.status NOT IN ('PENDING', 'RUNNING')
-                  GROUP BY 1'''
+                   FROM builds LEFT JOIN tests USING (build_id)
+                  WHERE master_ip != %s
+                  GROUP BY 1
+                 HAVING SUM(tests.status IN ('PENDING', 'RUNNING')) = 0'''
         result = self._execute_sql(sql, (ipv4,))
         builds = tuple(int(build['build_id']) for build in result.fetchall())
         if builds:
