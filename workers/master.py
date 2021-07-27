@@ -172,28 +172,29 @@ def keep_pulling():
     print('Starting master at {} ({})'.format(
         socket.gethostname(), utils.int_to_ip(ipv4)))
 
-    server = MasterDB()
-    server.handle_restart(ipv4)
+    with MasterDB() as server:
+        server.handle_restart(ipv4)
 
-    while True:
-        time.sleep(5)
-        wait_for_free_space(server, ipv4)
-        try:
-            new_build = server.get_new_build(ipv4)
-            if not new_build:
-                continue
+        while True:
+            time.sleep(5)
+            wait_for_free_space(server, ipv4)
+            try:
+                new_build = server.get_new_build(ipv4)
+                if not new_build:
+                    continue
 
-            print(new_build)
-            spec = BuildSpec.from_dict(new_build)
-            runner = utils.Runner(capture=True)
-            success = build(spec, runner)
-            print('Build {}; updating database'.format(
-                'succeeded' if success else 'failed'))
-            server.update_build_status(spec.build_id, success,
-                                       out=runner.stdout, err=runner.stderr)
-            print('Done; starting another pool iteration')
-        except Exception as ex:
-            print(ex)
+                print(new_build)
+                spec = BuildSpec.from_dict(new_build)
+                runner = utils.Runner(capture=True)
+                success = build(spec, runner)
+                print('Build {}; updating database'.format(
+                    'succeeded' if success else 'failed'))
+                server.update_build_status(spec.build_id, success,
+                                           out=runner.stdout, err=runner.stderr)
+                print('Done; starting another pool iteration')
+            except Exception:
+                traceback.print_exc()
+
 
 if __name__ == '__main__':
     os.environ.update(CARGO_PROFILE_RELEASE_LTO='false',

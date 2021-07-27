@@ -21,6 +21,13 @@ class DB:
         )
         self.mycursor = self.mydb.cursor(buffered=True, dictionary=True)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.mycursor.close()
+        self.mydb.close()
+
     def _execute_sql(self, sql: str, val: typing.Sequence[typing.Any]=()):
         """Executes given SQL statement.
 

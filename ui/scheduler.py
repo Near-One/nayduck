@@ -292,30 +292,31 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
         Failure: on any kind of error.
     """
     req = Request.from_json_request(request_json)
-    server = UIDB()
-    _verify_token(server, request_json)
+    with UIDB() as server:
+        _verify_token(server, request_json)
 
-    repo_dir = _update_repo()
-    sha, user, title = _run(
-        'git', 'log', '--format=%H\n%ae\n%s', '-n1', req.sha,
-        cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
+        repo_dir = _update_repo()
+        sha, user, title = _run(
+            'git', 'log', '--format=%H\n%ae\n%s', '-n1', req.sha,
+            cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
 
-    builds = {}
-    tests = []
-    for test in req.tests:
-        is_release = '--release' in test
-        pos = test.find('--features')
-        features = '' if pos < 0 else test[pos:]
-        build = builds.setdefault((is_release, features), UIDB.BuildSpec(
-            is_release=is_release, features=features))
-        build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-        test = UIDB.TestSpec(name=test, build=build,
-                             is_remote='--remote' in test)
-        tests.append(test)
+        builds = {}
+        tests = []
+        for test in req.tests:
+            is_release = '--release' in test
+            pos = test.find('--features')
+            features = '' if pos < 0 else test[pos:]
+            build = builds.setdefault((is_release, features), UIDB.BuildSpec(
+                is_release=is_release, features=features))
+            build.add_test(has_non_mocknet=not test.startswith('mocknet '))
+            test = UIDB.TestSpec(name=test, build=build,
+                                 is_remote='--remote' in test)
+            tests.append(test)
 
-    # Sort builds by number of dependent tests so that when masters choose what
-    # to do they start with builds which unlock the largest number of tests.
-    return server.schedule_a_run(
-        branch=req.branch, sha=sha, user=user.split('@')[0], title=title,
-        builds=sorted(builds.values(), key=lambda build: -build.test_count),
-        tests=tests, requester=req.requester)
+        # Sort builds by number of dependent tests so that when masters choose
+        # what to do they start with builds which unlock the largest number of
+        # tests.
+        return server.schedule_a_run(
+            branch=req.branch, sha=sha, user=user.split('@')[0], title=title,
+            builds=sorted(builds.values(), key=lambda build: -build.test_count),
+            tests=tests, requester=req.requester)

@@ -58,8 +58,8 @@ def get_str(req: typing.Any, key: str) -> str:
 
 @app.route('/', methods=['GET'])
 def get_runs():
-    server = UIDB()
-    all_runs = server.get_all_runs()
+    with UIDB() as server:
+        all_runs = server.get_all_runs()
     return flask.jsonify(all_runs)
 
 
@@ -67,8 +67,8 @@ def get_runs():
 def get_a_run():
     request_json = flask.request.get_json(force=True)
     run_id = get_int(request_json, 'run_id')
-    server = UIDB()
-    a_run = server.get_one_run(run_id)
+    with UIDB() as server:
+        a_run = server.get_one_run(run_id)
     return flask.jsonify(a_run)
 
 
@@ -76,8 +76,8 @@ def get_a_run():
 def get_a_test():
     request_json = flask.request.get_json(force=True)
     test_id = get_int(request_json, 'test_id')
-    server = UIDB()
-    a_test = server.get_one_test(test_id)
+    with UIDB() as server:
+        a_test = server.get_one_test(test_id)
     return flask.jsonify(a_test)
 
 
@@ -85,8 +85,8 @@ def get_a_test():
 def get_build_info():
     request_json = flask.request.get_json(force=True)
     build_id = get_int(request_json, 'build_id')
-    server = UIDB()
-    a_test = server.get_build_info(build_id)
+    with UIDB() as server:
+        a_test = server.get_build_info(build_id)
     return flask.jsonify(a_test)
 
 
@@ -94,8 +94,8 @@ def get_build_info():
 def test_history():
     request_json = flask.request.get_json(force=True)
     test_id = get_int(request_json, 'test_id')
-    server = UIDB()
-    history = server.get_test_history_by_id(test_id)
+    with UIDB() as server:
+        history = server.get_test_history_by_id(test_id)
     return flask.jsonify(history)
 
 
@@ -104,8 +104,8 @@ def branch_history():
     request_json = flask.request.get_json(force=True)
     test_id = get_int(request_json, 'test_id')
     branch = get_str(request_json, 'branch')
-    server = UIDB()
-    history = [server.get_histoty_for_base_branch(test_id, branch)]
+    with UIDB() as server:
+        history = [server.get_histoty_for_base_branch(test_id, branch)]
     return flask.jsonify(history)
 
 
@@ -113,8 +113,8 @@ def branch_history():
 def cancel_the_run():
     request_json = flask.request.get_json(force=True)
     run_id = get_int(request_json, 'run_id')
-    server = UIDB()
-    server.cancel_the_run(run_id)
+    with UIDB() as server:
+        server.cancel_the_run(run_id)
     return flask.jsonify({})
 
 
@@ -122,8 +122,8 @@ def cancel_the_run():
 def get_auth_code():
     request_json = flask.request.get_json(force=True)
     login = get_str(request_json, 'github_login')
-    server = UIDB()
-    code = server.get_auth_code(login)
+    with UIDB() as server:
+        code = server.get_auth_code(login)
     return flask.jsonify({'code': code})
 
 

@@ -506,21 +506,21 @@ def main():
     print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)))
 
     mocknet = 'mocknet' in hostname
-    server = WorkerDB()
-    server.handle_restart(ipv4)
-    while True:
-        try:
-            test = server.get_pending_test(mocknet, ipv4)
-            if test:
-                handle_test(server, test)
-            else:
+    with WorkerDB() as server:
+        server.handle_restart(ipv4)
+        while True:
+            try:
+                test = server.get_pending_test(mocknet, ipv4)
+                if test:
+                    handle_test(server, test)
+                else:
+                    time.sleep(10)
+            except KeyboardInterrupt:
+                print('Got SIGINT; terminating')
+                break
+            except Exception:
+                traceback.print_exc()
                 time.sleep(10)
-        except KeyboardInterrupt:
-            print('Got SIGINT; terminating')
-            break
-        except Exception:
-            traceback.print_exc()
-            time.sleep(10)
 
 
 if __name__ == '__main__':
