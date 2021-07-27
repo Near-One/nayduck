@@ -1,8 +1,11 @@
+import datetime
+import os
 import pathlib
 import re
 import shlex
 import shutil
 import subprocess
+import traceback
 import typing
 
 import requests
@@ -76,6 +79,27 @@ def _update_repo() -> pathlib.Path:
     return repo_dir
 
 
+class CommitInfo(typing.NamedTuple):
+    sha: str
+    title: str
+
+    @classmethod
+    def for_commit(cls, repo_dir: pathlib.Path, sha: str) -> 'CommitInfo':
+        """Returns commit information for given commit in given repository.
+
+        Args:
+            repo_dir: Directory where the repository is located.  Can be
+                obtained from _update_repo function.
+            sha: A commit reference to retrieve information about.
+        Raises:
+            Failure: if git command returns an error (most probably because the
+                commit does not exist).
+        """
+        sha, title = _run('git', 'log', '--format=%H\n%s', '-n1', sha,
+                          cwd=repo_dir).decode('utf-8', 'replace').splitlines()
+        return cls(sha=sha, title=title)
+
+
 _VALID_FEATURE = re.compile(r'^[a-zA-Z0-9_][-a-zA-Z0-9_]*$')
 _TEST_COUNT_LIMIT = 1024
 _SENTINEL = object()
@@ -86,6 +110,7 @@ class Request(typing.NamedTuple):
     sha: str
     requester: str
     tests: typing.List[str]
+    is_nightly: bool
 
     @classmethod
     def from_json_request(cls, request_json: typing.Any) -> 'Request':
@@ -123,10 +148,11 @@ class Request(typing.NamedTuple):
                           'one of the fields has wrong type')
 
         return cls(branch=branch, sha=sha, requester=requester,
-                   tests=cls._verify_tests(tests))
+                   tests=cls.verify_tests(tests), is_nightly=False)
 
     @classmethod
-    def _verify_tests(cls, tests: typing.List[typing.Any]) -> typing.List[str]:
+    def verify_tests(cls,
+                     tests: typing.Iterable[typing.Any]) -> typing.List[str]:
         """Verifies that requested tests are valid.
 
         See Request._verify_single_test for description of what it means for
@@ -294,28 +320,117 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
     req = Request.from_json_request(request_json)
     with UIDB() as server:
         _verify_token(server, request_json)
+        commit = CommitInfo.for_commit(_update_repo(), req.sha)
+        return _do_schedule_a_run(server, req, commit)
 
-        repo_dir = _update_repo()
-        sha, title = _run('git', 'log', '--format=%H\n%s', '-n1', req.sha,
-            cwd=repo_dir).decode('utf-8', errors='replace').splitlines()
 
-        builds = {}
-        tests = []
-        for test in req.tests:
-            is_release = '--release' in test
-            pos = test.find('--features')
-            features = '' if pos < 0 else test[pos:]
-            build = builds.setdefault((is_release, features), UIDB.BuildSpec(
-                is_release=is_release, features=features))
-            build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-            test = UIDB.TestSpec(name=test, build=build,
-                                 is_remote='--remote' in test)
-            tests.append(test)
+def _do_schedule_a_run(server: UIDB, req: Request, commit: CommitInfo) -> int:
+    """Saves given run requests to the database.
 
-        # Sort builds by number of dependent tests so that when masters choose
-        # what to do they start with builds which unlock the largest number of
-        # tests.
-        return server.schedule_a_run(
-            branch=req.branch, sha=sha, title=title, requester=req.requester,
-            builds=sorted(builds.values(), key=lambda build: -build.test_count),
-            tests=tests)
+    Args:
+        server: Database connection to use.
+        req: Description of the run.
+        commit: Commit to run the tests on.  Overrides req.sha.
+    Returns:
+        Numeric identifier of the scheduled test run.
+    Raises:
+        Failure: on any kind of error.
+    """
+    builds = {}
+    tests = []
+    for test in req.tests:
+        is_release = '--release' in test
+        pos = test.find('--features')
+        features = '' if pos < 0 else test[pos:]
+        build = builds.setdefault((is_release, features), UIDB.BuildSpec(
+            is_release=is_release, features=features))
+        build.add_test(has_non_mocknet=not test.startswith('mocknet '))
+        test = UIDB.TestSpec(name=test, build=build,
+                             is_remote='--remote' in test)
+        tests.append(test)
+
+    # Sort builds by number of dependent tests so that when masters choose
+    # what to do they start with builds which unlock the largest number of
+    # tests.
+    return server.schedule_a_run(
+        branch=req.branch, sha=commit.sha, title=commit.title,
+        requester=req.requester, is_nightly=req.is_nightly, tests=tests,
+        builds=sorted(builds.values(), key=lambda build: -build.test_count))
+
+
+def schedule_nightly_run():
+    """Schedules a new nightly run if last one was over 24 hours ago."""
+    with UIDB() as server:
+        try:
+            return _schedule_nightly_impl(server)
+        except Exception:
+            traceback.print_exc()
+
+
+def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
+    """Reads tests from the repository nightly/nightly.txt file.
+
+    Reads the `nightly/nightly.txt` file in the repository to get the list of
+    nightly tests to run.  Verifies all the tests and returns them as a list.
+    `./<path>` includes are properly handled.
+
+    The function uses `scripts/nayduck.py` from the repository to perform the
+    reading.  Specifically, the `read_tests_from_file` function defined in that
+    file.
+
+    The function uses `git show` to read files directly from the git repository
+    without checking out the contents of all the files.
+
+    Args:
+        repo_dir: Path to the git repository (possibly bare one) to read the
+            files from.
+        sha: Commit sha to read the files at.
+    Returns:
+        List of nightly tests to schedule.
+    Raises:
+        Failure: if any of the test is not valid, there are no tests given or
+            there are too many tests given.
+    """
+    def get_repo_file(filename: str) -> str:
+        data = _run('git' ,'show', f'{sha}:{filename}', cwd=repo_dir)
+        return data.decode('utf-8', 'replace')
+
+    def reader(path: pathlib.Path) -> str:
+        filename = os.path.normpath(path)
+        if filename.startswith('..') or not filename.endswith('.txt'):
+            print(f'Refusing to load tests from {path}')
+            return ''
+        return get_repo_file(filename)
+
+    mod = {'__file__': 'scripts/nayduck.py'}
+    exec(get_repo_file(mod['__file__']), mod)  # pylint: disable=exec-used
+    lines = mod['read_tests_from_file'](pathlib.Path(mod['DEFAULT_TEST_FILE']),
+                                        reader=reader)
+    return Request.verify_tests(lines)
+
+
+def _schedule_nightly_impl(server: UIDB) -> datetime.timedelta:
+    """Implementation of schedule_nightly_run."""
+    last = server.last_nightly_run()
+    delta = datetime.datetime.utcnow() - last['timestamp']
+    need_new_run = delta >= datetime.timedelta(hours=24)
+    print('Last nightly at {}; {} ago; sha={}{}'.format(
+        last['timestamp'], delta, last['sha'],
+        '' if need_new_run else '; no need for a new run'))
+    if not need_new_run:
+        return datetime.timedelta(hours=24) - delta
+
+    repo_dir = _update_repo()
+    commit = CommitInfo.for_commit(repo_dir, 'origin/master')
+    need_new_run = last['sha'] != commit.sha
+    print('origin/master sha={}{}'.format(
+        commit.sha, '' if need_new_run else '; no need for a new run'))
+    if not need_new_run:
+        return datetime.timedelta(hours=24)
+
+    tests = _read_tests(repo_dir, commit.sha)
+    req = Request(branch='master', sha=commit.sha, requester='NayDuck',
+                  tests=tests, is_nightly=True)
+    run_id = _do_schedule_a_run(server, req, commit)
+    print('Scheduled new nightly run: {}'.format(run_id))
+    return datetime.timedelta(hours=24)

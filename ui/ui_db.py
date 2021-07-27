@@ -298,7 +298,7 @@ class UIDB(common_db.DB):
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
                       tests: typing.Sequence['UIDB.TestSpec'],
-                      requester: str) -> int:
+                      requester: str, is_nightly: bool) -> int:
         """Schedules a run with given set of pending tests to the database.
 
         Adds a run comprising of all specified tests as well as all builds the
@@ -314,30 +314,30 @@ class UIDB(common_db.DB):
             builds: A sequence of builds necessary for the tests to run.  The
                 builds are modified in place by having their build_id set.
             tests: A sequence of tests to add as a sequence of TestSpec objects.
-            requester: User who requested the tests.  If the requester is
-                NayDuck, the tests will be run with lower priority.  In other
-                words, user-requested tests are run before any NayDuck requested
-                ones.
+            requester: User who requested the tests.
+            is_nightly: Whether this request is a nightly run requests.  It will
+                be marked as such in the database so that the scheduler can
+                figure out when was the last nightly run.  Furthermore, nightly
+                runs are run with lower priority.
         Returns:
             Id of the scheduled run.
         """
         return self._with_transaction(lambda: self.__do_schedule(
             branch=branch, sha=sha, title=title, builds=builds,
-            tests=tests, requester=requester))
+            tests=tests, requester=requester, is_nightly=is_nightly))
 
     def __do_schedule(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
                       tests: typing.Sequence['UIDB.TestSpec'],
-                      requester: str) -> int:
+                      requester: str, is_nightly: bool) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
-        priority = int(requester == 'NayDuck')
-
         # Into Runs
         run_id = self._insert('runs',
                               branch=branch,
                               sha=sha,
                               title=title,
-                              requester=requester)
+                              requester=requester,
+                              is_nightly=is_nightly)
 
         # Into Builds
         for build in builds:
@@ -347,7 +347,7 @@ class UIDB(common_db.DB):
                                           status=build_status,
                                           features=build.features,
                                           is_release=build.is_release,
-                                          priority=priority)
+                                          priority=int(is_nightly))
 
         # Into Tests
         columns = ('run_id', 'build_id', 'name', 'category', 'priority',
@@ -357,9 +357,17 @@ class UIDB(common_db.DB):
             test.build.build_id,
             test.name,
             test.category,
-            priority,
+            int(is_nightly),
             test.is_release,
             test.is_remote
         ) for test in tests))
 
         return run_id
+
+    def last_nightly_run(self) -> typing.Dict[str, typing.Any]:
+        """Returns the last nightly run."""
+        return self._execute_sql('''SELECT timestamp, sha
+                                      FROM runs
+                                     WHERE is_nightly
+                                     ORDER BY timestamp DESC
+                                     LIMIT 1''').fetchone()

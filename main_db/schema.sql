@@ -19,7 +19,9 @@ CREATE TABLE `runs` (
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `title` varchar(200) NOT NULL,
   `requester` varchar(50) NOT NULL,
-  PRIMARY KEY (`id`)
+  `is_nightly` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `nightly` (`is_nightly`,`timestamp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `builds`;

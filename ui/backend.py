@@ -1,8 +1,10 @@
+import datetime
 import os
 import traceback
 import typing
 
 import flask
+import flask_apscheduler
 import flask_cors
 
 from ui_db import UIDB
@@ -14,6 +16,10 @@ NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
 
 app = flask.Flask(__name__)
 flask_cors.CORS(app, origins=NAYDUCK_UI)
+
+sched = flask_apscheduler.APScheduler()
+sched.init_app(app)
+sched.start()
 
 
 def get_int(req: typing.Any, key: str) -> int:
@@ -143,5 +149,16 @@ def request_a_run():
     return flask.jsonify(response)
 
 
+
+def schedule_nightly_run_check(delta: datetime.timedelta):
+    def check():
+        schedule_nightly_run_check(max(scheduler.schedule_nightly_run(),
+                                       datetime.timedelta(minutes=3)))
+    sched.add_job(func=check, trigger='date', id='nightly_run_check',
+                  misfire_grace_time=None, coalesce=True,
+                  run_date=(datetime.datetime.now() + delta))
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5005)
+    schedule_nightly_run_check(datetime.timedelta(seconds=10))
+    app.run(debug=False, host='0.0.0.0', port=5005)

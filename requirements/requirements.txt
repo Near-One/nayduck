@@ -1,22 +1,7 @@
-flask
-python-rc
-mysql-connector-python
-flask_cors
-psutil
-base58
-ed25519
-pynacl
+Flask-APScheduler
 azure-storage-blob
-pytest
-boto3
-fabric
-tornado
+flask
+flask_cors
+mysql-connector-python
+psutil
 requests
-retry
-ed25519
-base58
-prometheus-client
-tqdm
-deepdiff
-pip3 install github
-semver
