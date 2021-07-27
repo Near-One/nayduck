@@ -503,4 +503,9 @@ def main():
 
 
 if __name__ == '__main__':
+    os.environ.update(CARGO_PROFILE_RELEASE_LTO='false',
+                      CARGO_PROFILE_DEV_DEBUG='0',
+                      CARGO_PROFILE_TEST_DEBUG='0')
+    if shutil.which('lld'):
+        os.environ['RUSTFLAGS'] = '-C link-arg=-fuse-ld=lld'
     main()
