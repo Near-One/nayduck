@@ -91,7 +91,12 @@ def checkout(sha: str, runner: typing.Optional[Runner]=None) -> bool:
     runner = runner or Runner()
     if REPO_DIR.is_dir():
         print('Checkout', sha)
-        if (runner(('git', 'remote', 'update', '-p'), cwd=REPO_DIR) and
+        result = subprocess.run(
+            ('git', 'rev-parse', '--verify', '-q', sha + '^{commit}'),
+            stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+            check=False, cwd=REPO_DIR)
+        if ((result.returncode or
+             runner(('git', 'remote', 'update', '-p'), cwd=REPO_DIR)) and
             runner(('git', 'checkout', sha), cwd=REPO_DIR)):
             return True
 
