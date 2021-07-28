@@ -407,7 +407,13 @@ def save_logs(server: WorkerDB, test_id: int, directory: Path) -> None:
     server.save_short_logs(test_id, logs)
 
 
+_LAST_COPIED_BUILD_ID = None
+_COPIED_EXPENSIVE_DEPS = []
+
+
 def scp_build(build_id, master_ip, test, build_type='debug'):
+    global _LAST_COPIED_BUILD_ID, _COPIED_EXPENSIVE_DEPS  # pylint: disable=global-statement
+
     if test[0] == 'mocknet':
         return
 
@@ -420,19 +426,29 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
         cmd = ('scp', '-o', 'StrictHostKeyChecking=no', src, dst)
         subprocess.check_call(cmd)
 
-    scp('target/*', f'target/{build_type}')
-    # For backwards compatibility create alias from near to neard.  We used to
-    # build both binaries but they are really the same so instead master no
-    # longer builds them and instead we just link the files.
-    subprocess.check_call(
-        ('ln', '-sf', utils.REPO_DIR / 'target' / build_type / 'near', 'neard'))
-    scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
+    if _LAST_COPIED_BUILD_ID != build_id:
+        _LAST_COPIED_BUILD_ID = None
+        _COPIED_EXPENSIVE_DEPS = []
+        utils.rmdirs(utils.REPO_DIR / 'target',
+                     utils.REPO_DIR / 'target_expensive',
+                     utils.REPO_DIR / 'runtime/near-test-contracts/res')
+        scp('target/*', f'target/{build_type}')
+        # For backwards compatibility create alias from near to neard.  We used
+        # to build both binaries but they are really the same so instead master
+        # no longer builds them and instead we just link the files.
+        subprocess.check_call(
+            ('ln', '-sf', '--',
+             utils.REPO_DIR / 'target' / build_type / 'near', 'neard'))
+        scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
+        _LAST_COPIED_BUILD_ID = build_id
 
     if test[0] in ('expensive', 'lib'):
         idx = 1 + (test[0] == 'expensive') + test[1].startswith('--')
         test_name = test[idx].replace('-', '_')
-        scp(f'expensive/{test_name}-*',
-            f'target_expensive/{build_type}/deps')
+        if test_name not in _COPIED_EXPENSIVE_DEPS:
+            scp(f'expensive/{test_name}-*',
+                f'target_expensive/{build_type}/deps')
+            _COPIED_EXPENSIVE_DEPS.append(test_name)
 
 
 def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
