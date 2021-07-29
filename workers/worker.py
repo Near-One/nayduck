@@ -421,6 +421,11 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
         subprocess.check_call(cmd)
 
     scp('target/*', f'target/{build_type}')
+    # For backwards compatibility create alias from near to neard.  We used to
+    # build both binaries but they are really the same so instead master no
+    # longer builds them and instead we just link the files.
+    subprocess.check_call(
+        ('ln', '-sf', utils.REPO_DIR / 'target' / build_type / 'near', 'neard'))
     scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
 
     if test[0] in ('expensive', 'lib'):

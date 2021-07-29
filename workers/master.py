@@ -62,8 +62,7 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
     ok = True
     ok = ok and cp(dst=spec.build_dir / 'target', create_dir=True,
                    srcs=[utils.REPO_DIR / 'target' / spec.build_type / exe
-                         for exe in ('neard', 'near', 'genesis-populate',
-                                     'restaked')])
+                         for exe in ('neard', 'genesis-populate', 'restaked')])
     ok = ok and cp(dst=spec.build_dir / 'near-test-contracts',
                    srcs=[utils.REPO_DIR / 'runtime' / 'near-test-contracts' /
                          'res'])
@@ -106,7 +105,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
         return runner(cmd, cwd=utils.REPO_DIR)
 
     ok = True
-    ok = ok and cargo('build', '-p', 'neard', '--features', 'adversarial')
+    ok = ok and cargo('build', '-p', 'neard', '--bin', 'neard',
+                      '--features', 'adversarial')
     ok = ok and cargo('build', '-p', 'genesis-populate', '-p', 'restaked',
                       '-p', 'near-test-contracts', add_features=False)
     if spec.is_expensive:
