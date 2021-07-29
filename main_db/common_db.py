@@ -144,7 +144,7 @@ class DB:
         return data
 
     @classmethod
-    def _str_from_blob(cls, blob: bytes) -> bytes:
+    def _str_from_blob(cls, blob: typing.Optional[bytes]) -> str:
         """Converts BLOB read from database into a string.
 
         This conversion is necessary because the data may be compressed in which
@@ -152,10 +152,13 @@ class DB:
         assuming UTF-8 encoding using a replacement character to handle errors.
 
         Args:
-            blob: BLOB data read from the database.
+            blob: BLOB data read from the database (or None).
         Returns:
-            String stored in the database.
+            String stored in the database.  None values are converted to empty
+            strings.
         """
+        if not blob:
+            return ''
         if blob.startswith(b'\x1f\x8b'):
             blob = gzip.decompress(blob)
         return blob.decode('utf-8', 'replace')
