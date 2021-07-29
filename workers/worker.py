@@ -39,7 +39,7 @@ def get_sequential_test_cmd(cwd: Path,
             files = os.listdir(path)
             for filename in files:
                 if filename.startswith(name_prefix):
-                    return [path / filename, test[idx],
+                    return [path / filename, test[idx + 1],
                             '--exact', '--nocapture']
     except Exception:
         print(test)
@@ -155,6 +155,17 @@ def analyse_test_outcome(test: typing.Sequence[str],
         return 'FAILED'
 
     if test[0] == 'expensive' or test[0] == 'lib':
+        stdout.seek(0)
+        for line in stdout:
+            line = line.strip().decode('utf-8', 'replace')
+            if line:
+                if line == 'running 0 tests':
+                    # If user specified incorrect test name the test executable
+                    # will run no tests since the filter we provide won't match
+                    # anything.  Report that as a failure rather than ignored
+                    # test.
+                    return 'FAILED'
+                break
         stderr.seek(0)
         for line in stderr:
             if line.strip().decode('utf-8', 'replace') in FAIL_PATTERNS:
