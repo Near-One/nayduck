@@ -8,7 +8,6 @@ import typing
 
 import psutil
 
-
 REPO_URL = 'https://github.com/nearprotocol/nearcore'
 WORKDIR = pathlib.Path('/datadrive')
 BUILDS_DIR = WORKDIR / 'builds'
@@ -32,12 +31,15 @@ def list_test_node_dirs() -> typing.List[pathlib.Path]:
     directory = pathlib.Path.home() / '.near'
     if not directory.is_dir():
         return []
-    return [directory / entry
-            for entry in os.listdir(directory)
-            if entry.startswith('test')]
+    return [
+        directory / entry
+        for entry in os.listdir(directory)
+        if entry.startswith('test')
+    ]
 
 
 class Runner:
+
     def __init__(self, capture=False):
         self._stdout_data: typing.Sequence[typing.Union[str, bytes]] = []
         self._stderr_data: typing.Sequence[typing.Union[str, bytes]] = []
@@ -47,8 +49,12 @@ class Runner:
             self._stdout = self._stderr = None
 
     def __call__(self, cmd: typing.Sequence[str], **kw: typing.Any) -> bool:
-        res = subprocess.run(cmd, **kw, check=False, stdin=subprocess.DEVNULL,
-                             stdout=self._stdout, stderr=self._stderr)
+        res = subprocess.run(cmd,
+                             **kw,
+                             check=False,
+                             stdin=subprocess.DEVNULL,
+                             stdout=self._stdout,
+                             stderr=self._stderr)
         if res.stdout:
             self._stdout_data.append(self.__to_bytes(res.stdout))
         if res.stderr:
@@ -71,7 +77,7 @@ class Runner:
         return b''
 
 
-def checkout(sha: str, runner: typing.Optional[Runner]=None) -> bool:
+def checkout(sha: str, runner: typing.Optional[Runner] = None) -> bool:
     """Checks out given SHA in the nearcore repository.
 
     If the repository directory exists updates the origin remote and then checks
@@ -93,17 +99,19 @@ def checkout(sha: str, runner: typing.Optional[Runner]=None) -> bool:
         print('Checkout', sha)
         result = subprocess.run(
             ('git', 'rev-parse', '--verify', '-q', sha + '^{commit}'),
-            stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
-            check=False, cwd=REPO_DIR)
-        if ((result.returncode or
-             runner(('git', 'remote', 'update', '-p'), cwd=REPO_DIR)) and
-            runner(('git', 'checkout', sha), cwd=REPO_DIR)):
+            stdout=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            check=False,
+            cwd=REPO_DIR)
+        if ((result.returncode or runner(
+            ('git', 'remote', 'update', '-p'), cwd=REPO_DIR)) and runner(
+                ('git', 'checkout', sha), cwd=REPO_DIR)):
             return True
 
     print('Clone', sha)
     rmdirs(REPO_DIR)
-    return (runner(('git', 'clone', REPO_URL), cwd=WORKDIR) and
-            runner(('git', 'checkout', sha), cwd=REPO_DIR))
+    return (runner(('git', 'clone', REPO_URL), cwd=WORKDIR) and runner(
+        ('git', 'checkout', sha), cwd=REPO_DIR))
 
 
 def get_ip() -> int:
@@ -131,3 +139,12 @@ def get_ip() -> int:
 def int_to_ip(addr: int) -> str:
     """Formats IPv4 represented as an integer as a string."""
     return socket.inet_ntoa(struct.pack('!I', addr))
+
+
+def setup_environ() -> None:
+    """Configures environment variables for workers and masters."""
+    os.environ.update(CARGO_PROFILE_RELEASE_LTO='false',
+                      CARGO_PROFILE_DEV_DEBUG='0',
+                      CARGO_PROFILE_TEST_DEBUG='0')
+    if shutil.which('lld'):
+        os.environ['RUSTFLAGS'] = '-C link-arg=-fuse-ld=lld'

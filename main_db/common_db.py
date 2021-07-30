@@ -6,6 +6,7 @@ import mysql.connector
 
 
 class DB:
+
     def __init__(self):
         self.host = os.environ['DB_HOST']
         self.user = os.environ['DB_USER']
@@ -28,7 +29,7 @@ class DB:
         self.mycursor.close()
         self.mydb.close()
 
-    def _execute_sql(self, sql: str, val: typing.Sequence[typing.Any]=()):
+    def _execute_sql(self, sql: str, val: typing.Sequence[typing.Any] = ()):
         """Executes given SQL statement.
 
         Args:
@@ -69,7 +70,8 @@ class DB:
         cursor = self._execute_sql(sql, values)
         return cursor.lastrowid
 
-    def _multi_insert(self, table: str,
+    def _multi_insert(self,
+                      table: str,
                       columns: typing.Collection[str],
                       rows: typing.Iterable[typing.Collection[typing.Any]],
                       *,
@@ -98,9 +100,9 @@ class DB:
         self._execute_sql(sql, vals)
 
     def _with_transaction(
-            self,
-            callback: typing.Callable[[], typing.TypeVar('T')]
-    ) -> typing.TypeVar('T'):
+        self,
+        callback: typing.Callable[[],
+                                  typing.TypeVar('T')]) -> typing.TypeVar('T'):
         """Executes callback inside of a SQL transaction.
 
         Starts a transaction before calling the callback and ends it once the

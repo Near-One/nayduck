@@ -23,6 +23,7 @@ def _prettify_size(size: int) -> str:
 
 
 class UIDB(common_db.DB):
+
     def cancel_the_run(self, run_id, status='CANCELED'):
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
@@ -52,21 +53,19 @@ class UIDB(common_db.DB):
     _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
                           'build_failed', 'canceled', 'timeout')
     _NO_STATUSES = dict.fromkeys(_STATUS_CATEGORIES + ('failed',), 0)
-    _NO_BUILDS = (
-        {
-            'build_id': 0,
-            'status': 'TEST SPECIFIC',
-            'is_release': False,
-            'features': '',
-            'tests': _NO_STATUSES,
-        },
-    )
+    _NO_BUILDS = ({
+        'build_id': 0,
+        'status': 'TEST SPECIFIC',
+        'is_release': False,
+        'features': '',
+        'tests': _NO_STATUSES,
+    },)
 
     def get_all_runs(self):
         # Get the last 100 runs
         sql = 'SELECT * FROM runs ORDER BY id DESC LIMIT 100'
-        all_runs = dict((int(run['id']), run)
-                        for run in self._execute_sql(sql).fetchall())
+        all_runs = dict(
+            (int(run['id']), run) for run in self._execute_sql(sql).fetchall())
         run_id_range = min(all_runs), max(all_runs)
 
         statuses = self.__get_statuses_for_runs(*run_id_range)
@@ -105,9 +104,8 @@ class UIDB(common_db.DB):
                   GROUP BY 1, 2, 3'''
         result = self._execute_sql(sql, (min_run_id, max_run_id))
         for test in result.fetchall():
-            counter = statuses[
-                (int(test['run_id']), int(test['build_id'] or 0))
-            ]
+            counter = statuses[(int(test['run_id']), int(test['build_id'] or
+                                                         0))]
             status = test['status'].lower().replace(' ', '_')
             if status in self._STATUS_CATEGORIES:
                 counter[status.lower().replace(' ', '_')] += int(test['cnt'])
@@ -122,7 +120,8 @@ class UIDB(common_db.DB):
                   LIMIT 1'''
         result = self._execute_sql(sql, (test_id,))
         res = result.fetchone()
-        return self.get_test_history(res['name'], res['branch'],
+        return self.get_test_history(res['name'],
+                                     res['branch'],
                                      interested_in_logs=True)
 
     def get_test_history(self, test_name, branch, interested_in_logs=False):
@@ -185,10 +184,9 @@ class UIDB(common_db.DB):
             test['logs'][log['type']] = log
         test['cmd'] = test['name']
         if '--features' in test['name']:
-            test['name'] =  test['name'][ : test['name'].find('--features')]
-        test['name'] = ' '.join(word
-                                for word in test['name'].split()
-                                if not word.startswith('--'))
+            test['name'] = test['name'][:test['name'].find('--features')]
+        test['name'] = ' '.join(
+            word for word in test['name'].split() if not word.startswith('--'))
         if test['finished'] is not None and test['started'] is not None:
             test['test_time'] = str(test['finished'] - test['started'])
         history = self.get_test_history(test['cmd'], branch)
@@ -244,7 +242,8 @@ class UIDB(common_db.DB):
         tests = res.fetchall()
         for test in tests:
             run_data = self.get_data_about_run(test['run_id'])
-            new_data = self.get_data_about_test(test, run_data['branch'],
+            new_data = self.get_data_about_test(test,
+                                                run_data['branch'],
                                                 blob=True)
             test.update(new_data)
             test.update(run_data)
@@ -296,9 +295,9 @@ class UIDB(common_db.DB):
         category = property(lambda self: self.name.split()[0])
 
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
-                      builds: typing.Sequence['UIDB.BuildSpec'],
-                      tests: typing.Sequence['UIDB.TestSpec'],
-                      requester: str, is_nightly: bool) -> int:
+                       builds: typing.Sequence['UIDB.BuildSpec'],
+                       tests: typing.Sequence['UIDB.TestSpec'], requester: str,
+                       is_nightly: bool) -> int:
         """Schedules a run with given set of pending tests to the database.
 
         Adds a run comprising of all specified tests as well as all builds the
@@ -322,14 +321,19 @@ class UIDB(common_db.DB):
         Returns:
             Id of the scheduled run.
         """
-        return self._with_transaction(lambda: self.__do_schedule(
-            branch=branch, sha=sha, title=title, builds=builds,
-            tests=tests, requester=requester, is_nightly=is_nightly))
+        return self._with_transaction(
+            lambda: self.__do_schedule(branch=branch,
+                                       sha=sha,
+                                       title=title,
+                                       builds=builds,
+                                       tests=tests,
+                                       requester=requester,
+                                       is_nightly=is_nightly))
 
     def __do_schedule(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
-                      tests: typing.Sequence['UIDB.TestSpec'],
-                      requester: str, is_nightly: bool) -> int:
+                      tests: typing.Sequence['UIDB.TestSpec'], requester: str,
+                      is_nightly: bool) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
         # Into Runs
         run_id = self._insert('runs',
@@ -352,15 +356,11 @@ class UIDB(common_db.DB):
         # Into Tests
         columns = ('run_id', 'build_id', 'name', 'category', 'priority',
                    'is_release', 'remote')
-        self._multi_insert('tests', columns, ((
-            run_id,
-            test.build.build_id,
-            test.name,
-            test.category,
-            int(is_nightly),
-            test.is_release,
-            test.is_remote
-        ) for test in tests))
+        self._multi_insert(
+            'tests', columns,
+            ((run_id, test.build.build_id, test.name, test.category,
+              int(is_nightly), test.is_release, test.is_remote)
+             for test in tests))
 
         return run_id
 

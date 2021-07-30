@@ -17,7 +17,6 @@ import psutil
 from db_worker import WorkerDB
 import utils
 
-
 DEFAULT_TIMEOUT = 180
 BACKTRACE_PATTERN = 'stack backtrace:'
 FAIL_PATTERNS = [BACKTRACE_PATTERN]
@@ -25,8 +24,7 @@ INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 
 
-def get_sequential_test_cmd(cwd: Path,
-                            test: typing.Sequence[str],
+def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
                             build_type: str) -> typing.Sequence[str]:
     try:
         if test[0] in ('pytest', 'mocknet'):
@@ -38,8 +36,9 @@ def get_sequential_test_cmd(cwd: Path,
             files = os.listdir(path)
             for filename in files:
                 if filename.startswith(name_prefix):
-                    return [path / filename, test[idx + 1],
-                            '--exact', '--nocapture']
+                    return [
+                        path / filename, test[idx + 1], '--exact', '--nocapture'
+                    ]
     except Exception:
         print(test)
         raise
@@ -50,7 +49,7 @@ def install_new_packages():
     """Makes sure all Python requirements for the pytests are satisfied."""
     requirements = utils.REPO_DIR / 'pytest/requirements.txt'
     subprocess.check_call(
-        ('python', '-m', 'pip', 'install' ,'--user', '-q', '-r', requirements))
+        ('python', '-m', 'pip', 'install', '--user', '-q', '-r', requirements))
 
 
 def kill_process_tree(pid: int) -> None:
@@ -63,6 +62,7 @@ def kill_process_tree(pid: int) -> None:
     Args:
         pid: Process ID of the parent whose process tree to kill.
     """
+
     def send_to_all(procs: typing.List[psutil.Process], sig: int) -> None:
         for proc in procs:
             try:
@@ -82,8 +82,7 @@ def kill_process_tree(pid: int) -> None:
 
 def run_command_with_tmpdir(cmd: typing.Sequence[str],
                             stdout: typing.IO[typing.AnyStr],
-                            stderr: typing.IO[typing.AnyStr],
-                            cwd: Path,
+                            stderr: typing.IO[typing.AnyStr], cwd: Path,
                             timeout: int) -> str:
     """Executes a command and cleans up its temporary files once it’s done.
 
@@ -117,8 +116,7 @@ def run_command_with_tmpdir(cmd: typing.Sequence[str],
             raise
 
 
-def analyse_test_outcome(test: typing.Sequence[str],
-                         ret: int,
+def analyse_test_outcome(test: typing.Sequence[str], ret: int,
                          stdout: typing.BinaryIO,
                          stderr: typing.BinaryIO) -> str:
     """Returns test's outcome based on exit code and test's output.
@@ -135,11 +133,9 @@ def analyse_test_outcome(test: typing.Sequence[str],
     Returns:
         Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE' or 'IGNORED'.
     """
-    if ret == 13:
-        return 'POSTPONE'
 
-    def get_last_line(rd: typing.BinaryIO) -> str:
-        """Returns last non-empty line of a file or empty string if"""
+    def get_last_line(rd: typing.BinaryIO) -> bytes:
+        """Returns last non-empty line of a file or empty string."""
         rd.seek(0)
         last_line = b''
         for line in rd:
@@ -148,38 +144,43 @@ def analyse_test_outcome(test: typing.Sequence[str],
                 last_line = line
         return last_line
 
-    if ret != 0:
-        if b'1 passed; 0 failed;' in get_last_line(stdout):
-            return 'PASSED'
-        return 'FAILED'
-
-    if test[0] == 'expensive' or test[0] == 'lib':
+    def analyze_rust_test():
+        """Analyses outcome of an expensive or lib tests."""
         stdout.seek(0)
         for line in stdout:
-            line = line.strip().decode('utf-8', 'replace')
-            if line:
-                if line == 'running 0 tests':
-                    # If user specified incorrect test name the test executable
-                    # will run no tests since the filter we provide won't match
-                    # anything.  Report that as a failure rather than ignored
-                    # test.
-                    return 'FAILED'
-                break
+            line = line.strip()
+            if not line:
+                continue
+            if line.decode('utf-8', 'replace') == 'running 0 tests':
+                # If user specified incorrect test name the test executable will
+                # run no tests since the filter we provide won't match anything.
+                # Report that as a failure rather than ignored test.
+                return 'FAILED'
+            break
         stderr.seek(0)
         for line in stderr:
             if line.strip().decode('utf-8', 'replace') in FAIL_PATTERNS:
                 return 'FAILED'
         if b'0 passed' in get_last_line(stdout):
             return 'IGNORED'
+        return 'PASSED'
+
+    if ret == 13:
+        return 'POSTPONE'
+
+    if ret != 0:
+        if b'1 passed; 0 failed;' in get_last_line(stdout):
+            return 'PASSED'
+        return 'FAILED'
+
+    if test[0] == 'expensive' or test[0] == 'lib':
+        return analyze_rust_test()
 
     return 'PASSED'
 
 
-def execute_test_command(dir_name: Path,
-                         test: typing.Sequence[str],
-                         build_type: str,
-                         cwd: Path,
-                         timeout: int) -> str:
+def execute_test_command(dir_name: Path, test: typing.Sequence[str],
+                         build_type: str, cwd: Path, timeout: int) -> str:
     """Executes a test command and returns test's outcome.
 
     Args:
@@ -232,8 +233,7 @@ def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
 
         if outcome != 'POSTPONE' and test[0] == 'pytest':
             for node_dir in utils.list_test_node_dirs():
-                shutil.copytree(node_dir,
-                                dir_name / PurePath(node_dir).name)
+                shutil.copytree(node_dir, dir_name / PurePath(node_dir).name)
     except Exception as ex:
         print(ex)
     return outcome
@@ -266,6 +266,7 @@ def find_patterns(rd: typing.BinaryIO,
 
 
 class LogFile:
+
     def __init__(self, name: str, path: Path) -> None:
         self.name = name
         self.path = path
@@ -284,9 +285,9 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
         if entry_path.is_dir():
             filename = entry.split('_')[0]
             for filename, suffix in (
-                    ('remote.log', '_remote'),
-                    ('companion.log', '_companion'),
-                    ('stderr', ''),
+                ('remote.log', '_remote'),
+                ('companion.log', '_companion'),
+                ('stderr', ''),
             ):
                 if (entry_path / filename).exists():
                     files.append(
@@ -307,6 +308,7 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
 
 
 _MAX_SHORT_LOG_SIZE = 10 * 1024
+
 
 def read_short_log(size: int, rd: typing.BinaryIO) -> None:
     """Reads a short log from given file.
@@ -337,8 +339,8 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> None:
         # If we can't find a start byte near the end than it's probably not
         # UTF-8 at all.
         if ((data[pos - 1] & 0xC0) == 0xC0 and
-            data[pos-1:].decode('utf-8', 'ignore') == ''):
-            data = data[:pos-1]
+                data[pos - 1:].decode('utf-8', 'ignore') == ''):
+            data = data[:pos - 1]
 
     rd.seek(-_MAX_SHORT_LOG_SIZE // 2 + 2, 2)
     ending = rd.read()
@@ -356,9 +358,9 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> None:
 _BLOB_CONTENT_SETTINGS = azure.storage.blob.ContentSettings(
     content_type='text/plain')
 
+
 def upload_log(service_client: azure.storage.blob.BlobServiceClient,
-               blob_name: str,
-               rd: typing.BinaryIO) -> typing.Optional[str]:
+               blob_name: str, rd: typing.BinaryIO) -> typing.Optional[str]:
     """Uploads file to Azure BLOB store.
 
     Args:
@@ -372,8 +374,9 @@ def upload_log(service_client: azure.storage.blob.BlobServiceClient,
     try:
         blob_client = service_client.get_blob_client(container='logs',
                                                      blob=blob_name)
-        blob_client.upload_blob(
-            rd, content_settings=_BLOB_CONTENT_SETTINGS, overwrite=True)
+        blob_client.upload_blob(rd,
+                                content_settings=_BLOB_CONTENT_SETTINGS,
+                                overwrite=True)
         return blob_client.url
     except Exception:
         traceback.print_exc()
@@ -437,8 +440,8 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
         # to build both binaries but they are really the same so instead master
         # no longer builds them and instead we just link the files.
         subprocess.check_call(
-            ('ln', '-sf', '--',
-             utils.REPO_DIR / 'target' / build_type / 'near', 'neard'))
+            ('ln', '-sf', '--', utils.REPO_DIR / 'target' / build_type / 'near',
+             'neard'))
         scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
         _LAST_COPIED_BUILD_ID = build_id
 
@@ -485,7 +488,7 @@ def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
     try:
         scp_build(test['build_id'], test['master_ip'], tokens,
                   'release' if release else 'debug')
-    except (OSError, subprocess.SubprocessError) as ex:
+    except (OSError, subprocess.SubprocessError):
         server.update_test_status('SCP FAILED', test['test_id'])
         raise
 
@@ -524,9 +527,5 @@ def main():
 
 
 if __name__ == '__main__':
-    os.environ.update(CARGO_PROFILE_RELEASE_LTO='false',
-                      CARGO_PROFILE_DEV_DEBUG='0',
-                      CARGO_PROFILE_TEST_DEBUG='0')
-    if shutil.which('lld'):
-        os.environ['RUSTFLAGS'] = '-C link-arg=-fuse-ld=lld'
+    utils.setup_environ()
     main()

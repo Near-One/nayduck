@@ -24,7 +24,7 @@ class Failure(Exception):
         return {'code': 1, 'response': self.args[0]}
 
 
-def _run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
+def _run(*cmd: str, cwd: typing.Optional[pathlib.Path] = None) -> bytes:
     """Executes a command; returns its output as "bytes"; raises on failure.
 
     Args:
@@ -38,7 +38,9 @@ def _run(*cmd: str, cwd: typing.Optional[pathlib.Path]=None) -> bytes:
             returns non-zero exit status.
     """
     try:
-        return subprocess.check_output(cmd, cwd=cwd, input=None,
+        return subprocess.check_output(cmd,
+                                       cwd=cwd,
+                                       input=None,
                                        stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as ex:
         command = ' '.join(shlex.quote(arg) for arg in cmd)
@@ -74,7 +76,10 @@ def _update_repo() -> pathlib.Path:
             print(ex.args[0])
         shutil.rmtree(repo_dir)
 
-    _run('git', 'clone', '--mirror', 'https://github.com/near/nearcore',
+    _run('git',
+         'clone',
+         '--mirror',
+         'https://github.com/near/nearcore',
          cwd=home_dir)
     return repo_dir
 
@@ -95,14 +100,16 @@ class CommitInfo(typing.NamedTuple):
             Failure: if git command returns an error (most probably because the
                 commit does not exist).
         """
-        sha, title = _run('git', 'log', '--format=%H\n%s', '-n1', sha,
-                          cwd=repo_dir).decode('utf-8', 'replace').splitlines()
+        cmd = ('git', 'log', '--format=%H\n%s', '-n1', sha, '--')
+        sha, title = _run(*cmd, cwd=repo_dir).decode('utf-8',
+                                                     'replace').splitlines()
         return cls(sha=sha, title=title)
 
 
 _VALID_FEATURE = re.compile(r'^[a-zA-Z0-9_][-a-zA-Z0-9_]*$')
 _TEST_COUNT_LIMIT = 1024
 _SENTINEL = object()
+
 
 class Request(typing.NamedTuple):
     """Contents of a "Requests a Run" request."""
@@ -147,8 +154,11 @@ class Request(typing.NamedTuple):
             raise Failure('Invalid request object: '
                           'one of the fields has wrong type')
 
-        return cls(branch=branch, sha=sha, requester=requester,
-                   tests=cls.verify_tests(tests), is_nightly=False)
+        return cls(branch=branch,
+                   sha=sha,
+                   requester=requester,
+                   tests=cls.verify_tests(tests),
+                   is_nightly=False)
 
     @classmethod
     def verify_tests(cls,
@@ -217,7 +227,7 @@ class Request(typing.NamedTuple):
 
     @classmethod
     def _extract_features(
-            cls, test: str
+        cls, test: str
     ) -> typing.Tuple[typing.Sequence[str], typing.Optional[typing.Set[str]]]:
         """Extracts feature names from test.
 
@@ -286,13 +296,13 @@ class Request(typing.NamedTuple):
             raise Failure(f'Invalid test name "{name}" in: {test}')
 
 
-def _verify_token(server: UIDB,
-                  request_json: typing.Dict[str, typing.Any]) -> None:
+def _verify_token(server: UIDB, request_json: typing.Dict[str,
+                                                          typing.Any]) -> None:
     """Verifies if request has correct token; raises Failure if not."""
     token = request_json.get('token')
     if token is None:
-    #     raise Failure('Your client is too old. NayDuck requires Github auth. '
-    #                   'Sync your client to head.')
+        # raise Failure('Your client is too old. NayDuck requires Github auth. '
+        #               'Sync your client to head.')
         return
     github_login = isinstance(token, str) and server.get_github_login(token)
     if not github_login:
@@ -301,8 +311,9 @@ def _verify_token(server: UIDB,
         return
     github_req = f'https://api.github.com/users/{github_login}/orgs'
     response = requests.get(github_req)
-    if not any(org.get('login') in ('nearprotocol', 'near')
-               for org in response.json()):
+    if not any(
+            org.get('login') in ('nearprotocol', 'near')
+            for org in response.json()):
         raise Failure(f'{github_login} is not part of '
                       'NearProtocol or Near organisations.')
 
@@ -342,20 +353,27 @@ def _do_schedule_a_run(server: UIDB, req: Request, commit: CommitInfo) -> int:
         is_release = '--release' in test
         pos = test.find('--features')
         features = '' if pos < 0 else test[pos:]
-        build = builds.setdefault((is_release, features), UIDB.BuildSpec(
-            is_release=is_release, features=features))
+        build = builds.setdefault((is_release, features),
+                                  UIDB.BuildSpec(is_release=is_release,
+                                                 features=features))
         build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-        test = UIDB.TestSpec(name=test, build=build,
+        test = UIDB.TestSpec(name=test,
+                             build=build,
                              is_remote='--remote' in test)
         tests.append(test)
 
     # Sort builds by number of dependent tests so that when masters choose
     # what to do they start with builds which unlock the largest number of
     # tests.
-    return server.schedule_a_run(
-        branch=req.branch, sha=commit.sha, title=commit.title,
-        requester=req.requester, is_nightly=req.is_nightly, tests=tests,
-        builds=sorted(builds.values(), key=lambda build: -build.test_count))
+    return server.schedule_a_run(branch=req.branch,
+                                 sha=commit.sha,
+                                 title=commit.title,
+                                 requester=req.requester,
+                                 is_nightly=req.is_nightly,
+                                 tests=tests,
+                                 builds=sorted(
+                                     builds.values(),
+                                     key=lambda build: -build.test_count))
 
 
 def schedule_nightly_run():
@@ -365,6 +383,7 @@ def schedule_nightly_run():
             return _schedule_nightly_impl(server)
         except Exception:
             traceback.print_exc()
+            return datetime.timedelta(hours=1)
 
 
 def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
@@ -391,8 +410,9 @@ def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
         Failure: if any of the test is not valid, there are no tests given or
             there are too many tests given.
     """
+
     def get_repo_file(filename: str) -> str:
-        data = _run('git' ,'show', f'{sha}:{filename}', cwd=repo_dir)
+        data = _run('git', 'show', f'{sha}:{filename}', cwd=repo_dir)
         return data.decode('utf-8', 'replace')
 
     def reader(path: pathlib.Path) -> str:
@@ -429,8 +449,11 @@ def _schedule_nightly_impl(server: UIDB) -> datetime.timedelta:
         return datetime.timedelta(hours=24)
 
     tests = _read_tests(repo_dir, commit.sha)
-    req = Request(branch='master', sha=commit.sha, requester='NayDuck',
-                  tests=tests, is_nightly=True)
+    req = Request(branch='master',
+                  sha=commit.sha,
+                  requester='NayDuck',
+                  tests=tests,
+                  is_nightly=True)
     run_id = _do_schedule_a_run(server, req, commit)
     print('Scheduled new nightly run: {}'.format(run_id))
     return datetime.timedelta(hours=24)

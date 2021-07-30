@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import shutil
 import socket
 import stat
 import time
@@ -25,13 +24,12 @@ class BuildSpec(typing.NamedTuple):
     @classmethod
     def from_dict(cls, data: typing.Dict[str, typing.Any]) -> 'BuildSpec':
         build_id = int(data['build_id'])
-        return cls(
-            build_id=build_id,
-            build_dir=utils.BUILDS_DIR / str(build_id),
-            sha=str(data['sha']),
-            features=tuple(str(data['features']).strip().split()),
-            is_release=bool(data['is_release']),
-            is_expensive=bool(data['expensive']))
+        return cls(build_id=build_id,
+                   build_dir=utils.BUILDS_DIR / str(build_id),
+                   sha=str(data['sha']),
+                   features=tuple(str(data['features']).strip().split()),
+                   is_release=bool(data['is_release']),
+                   is_expensive=bool(data['expensive']))
 
     @property
     def build_type(self) -> str:
@@ -52,7 +50,7 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
     """
     print('Copying data')
 
-    def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool=False):    # pylint: disable=invalid-name
+    def cp(*, dst: Path, srcs: typing.Sequence[Path], create_dir: bool = False):  # pylint: disable=invalid-name
         if create_dir:
             utils.mkdirs(dst)
         return runner(('cp', '-rl', '--', *srcs, dst))
@@ -60,12 +58,15 @@ def copy(spec: BuildSpec, runner: utils.Runner) -> bool:
     utils.rmdirs(spec.build_dir)
 
     ok = True
-    ok = ok and cp(dst=spec.build_dir / 'target', create_dir=True,
-                   srcs=[utils.REPO_DIR / 'target' / spec.build_type / exe
-                         for exe in ('neard', 'genesis-populate', 'restaked')])
-    ok = ok and cp(dst=spec.build_dir / 'near-test-contracts',
-                   srcs=[utils.REPO_DIR / 'runtime' / 'near-test-contracts' /
-                         'res'])
+    ok = ok and cp(dst=spec.build_dir / 'target',
+                   create_dir=True,
+                   srcs=[
+                       utils.REPO_DIR / 'target' / spec.build_type / exe
+                       for exe in ('neard', 'genesis-populate', 'restaked')
+                   ])
+    ok = ok and cp(
+        dst=spec.build_dir / 'near-test-contracts',
+        srcs=[utils.REPO_DIR / 'runtime' / 'near-test-contracts' / 'res'])
 
     if not ok or not spec.is_expensive:
         return ok
@@ -105,17 +106,25 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
         return runner(cmd, cwd=utils.REPO_DIR)
 
     ok = True
-    ok = ok and cargo('build', '-p', 'neard', '--bin', 'neard',
-                      '--features', 'adversarial')
-    ok = ok and cargo('build', '-p', 'genesis-populate', '-p', 'restaked',
-                      '-p', 'near-test-contracts', add_features=False)
+    ok = ok and cargo('build', '-p', 'neard', '--bin', 'neard', '--features',
+                      'adversarial')
+    ok = ok and cargo('build',
+                      '-p',
+                      'genesis-populate',
+                      '-p',
+                      'restaked',
+                      '-p',
+                      'near-test-contracts',
+                      add_features=False)
     if spec.is_expensive:
         # It reads better when the command arguments are aligned so allow long
         # lines.  pylint: disable=line-too-long
+        # yapf: disable
         ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace',                                                         '--features=expensive_tests')
         ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-client', '-p', 'neard', '-p', 'near-chain', '--features=expensive_tests')
         ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive',                '-p', 'near-chunks',                                    '--features=expensive_tests', add_features=False)
         ok = ok and cargo('test', '--no-run', '--target-dir', 'target_expensive', '--workspace', '-p', 'nearcore',                                       '--features=expensive_tests')
+        # yapf: enable
 
     return ok
 
@@ -123,8 +132,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> bool:
 def build(spec: BuildSpec, runner: utils.Runner) -> bool:
     try:
         return (utils.checkout(spec.sha, runner=runner) and
-                build_target(spec, runner=runner) and
-                copy(spec, runner=runner))
+                build_target(spec, runner=runner) and copy(spec, runner=runner))
     except Exception:
         traceback.print_exc()
         runner.write_err(traceback.format_exc())
@@ -143,6 +151,7 @@ def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
         ipv4: This builder's IP address (as an integer) used to retrieve list of
             builds we've performed from the database.
     """
+
     def enough_space() -> bool:
         return psutil.disk_usage(str(utils.WORKDIR)).percent < 80.0
 
@@ -169,8 +178,8 @@ def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
 
 def keep_pulling():
     ipv4 = utils.get_ip()
-    print('Starting master at {} ({})'.format(
-        socket.gethostname(), utils.int_to_ip(ipv4)))
+    print('Starting master at {} ({})'.format(socket.gethostname(),
+                                              utils.int_to_ip(ipv4)))
 
     with MasterDB() as server:
         server.handle_restart(ipv4)
@@ -189,17 +198,15 @@ def keep_pulling():
                 success = build(spec, runner)
                 print('Build {}; updating database'.format(
                     'succeeded' if success else 'failed'))
-                server.update_build_status(spec.build_id, success,
-                                           out=runner.stdout, err=runner.stderr)
+                server.update_build_status(spec.build_id,
+                                           success,
+                                           out=runner.stdout,
+                                           err=runner.stderr)
                 print('Done; starting another pool iteration')
             except Exception:
                 traceback.print_exc()
 
 
 if __name__ == '__main__':
-    os.environ.update(CARGO_PROFILE_RELEASE_LTO='false',
-                      CARGO_PROFILE_DEV_DEBUG='0',
-                      CARGO_PROFILE_TEST_DEBUG='0')
-    if shutil.which('lld'):
-        os.environ['RUSTFLAGS'] = '-C link-arg=-fuse-ld=lld'
+    utils.setup_environ()
     keep_pulling()

@@ -7,9 +7,9 @@ import common_db  # pylint: disable=wrong-import-position
 
 
 class MasterDB(common_db.DB):
+
     def get_new_build(
-            self, ipv4: int
-    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
+            self, ipv4: int) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Returns a pending build to process or None if none found.
 
         Args:
@@ -22,8 +22,7 @@ class MasterDB(common_db.DB):
         return self._with_transaction(lambda: self.__get_new_build(ipv4))
 
     def __get_new_build(
-            self, ipv4: int
-    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
+            self, ipv4: int) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Implementation of get_new_build method (which see).
 
         This method must be run inside of a transaction because it uses
@@ -58,8 +57,8 @@ class MasterDB(common_db.DB):
         row['expensive'] = bool(row['expensive'])
         return row
 
-    def update_build_status(self, build_id: int, success: bool, *,
-                            out: bytes, err: bytes) -> None:
+    def update_build_status(self, build_id: int, success: bool, *, out: bytes,
+                            err: bytes) -> None:
         """Updates build status in the database.
 
         If the build failed also updates all dependent tests to CANCELED status.
@@ -100,10 +99,8 @@ class MasterDB(common_db.DB):
         self._execute_sql(sql, (ipv4,))
 
     def with_builds_without_pending_tests(
-            self,
-            ipv4: int,
-            callback: typing.Callable[[typing.Iterable[int]], typing.Any]
-    ) -> None:
+            self, ipv4: int, callback: typing.Callable[[typing.Iterable[int]],
+                                                       typing.Any]) -> None:
         """Runs cleanup callback on IDs of builds with no unfinished tests.
 
         Retrieves IDs of all builds assigned to this master which no pending

@@ -10,7 +10,6 @@ import flask_cors
 from ui_db import UIDB
 import scheduler
 
-
 NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
 
@@ -149,13 +148,18 @@ def request_a_run():
     return flask.jsonify(response)
 
 
-
 def schedule_nightly_run_check(delta: datetime.timedelta):
+
     def check():
-        schedule_nightly_run_check(max(scheduler.schedule_nightly_run(),
-                                       datetime.timedelta(minutes=3)))
-    sched.add_job(func=check, trigger='date', id='nightly_run_check',
-                  misfire_grace_time=None, coalesce=True,
+        schedule_nightly_run_check(
+            max(scheduler.schedule_nightly_run(),
+                datetime.timedelta(minutes=3)))
+
+    sched.add_job(func=check,
+                  trigger='date',
+                  id='nightly_run_check',
+                  misfire_grace_time=None,
+                  coalesce=True,
                   run_date=(datetime.datetime.now() + delta))
 
 
