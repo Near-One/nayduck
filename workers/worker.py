@@ -283,15 +283,14 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
     for entry in os.listdir(directory):
         entry_path = directory / entry
         if entry_path.is_dir():
-            filename = entry.split('_')[0]
+            base = entry.split('_')[0]
             for filename, suffix in (
                 ('remote.log', '_remote'),
                 ('companion.log', '_companion'),
                 ('stderr', ''),
             ):
                 if (entry_path / filename).exists():
-                    files.append(
-                        LogFile(filename + suffix, entry_path / filename))
+                    files.append(LogFile(base + suffix, entry_path / filename))
         elif entry in ('stderr', 'stdout', 'build_err', 'build_out'):
             files.append(LogFile(entry, directory / entry))
 
