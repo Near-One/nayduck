@@ -82,7 +82,7 @@ function TestHistory (props) {
             <th style={{"width": "40%"}}>Title</th>
             <th>Status</th>
             <th>Logs</th>
-            <th>Test Time / Run Time</th>
+            <th>Run Time</th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
@@ -99,7 +99,7 @@ function TestHistory (props) {
 
 
             </td>
-            <td>{a_test.test_time} / {a_test.run_time}</td>
+            <td>{a_test.run_time}</td>
             <td>{a_test.started}</td>
             <td>{a_test.finished}</td>
             </tr>

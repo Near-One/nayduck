@@ -64,16 +64,16 @@ function ARun (props) {
     var orderByTestTime = event => {
       var filtered = [...aRun];
       if (orderDescTestTime) {
-        var filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+        var filtered = filtered.sort((a, b) => a.run_time > b.run_time ? 1 : -1);
       } else {
-        var filtered = filtered.sort((a, b) => a.test_time < b.test_time ? 1 : -1);
+        var filtered = filtered.sort((a, b) => a.run_time < b.run_time ? 1 : -1);
       }
       setARun(filtered);
       filtered = [...filteredRuns]
       if (orderDescTestTime) {
-        filtered = filtered.sort((a, b) => a.test_time > b.test_time ? 1 : -1);
+        filtered = filtered.sort((a, b) => a.run_time > b.run_time ? 1 : -1);
       } else {
-        filtered = filtered.sort((a, b) => a.test_time < b.test_time ? 1 : -1);
+        filtered = filtered.sort((a, b) => a.run_time < b.run_time ? 1 : -1);
       }
       setFilteredRuns(filtered);
       setOrderDescTestTime(!orderDescTestTime);
@@ -106,7 +106,7 @@ function ARun (props) {
             </th>
             <th>Logs
             </th>
-            <th>Test Time <a href="javascript:;" style={{"text-decoration":"none"}} onClick={orderByTestTime}>&#8597;</a></th>
+            <th>Run Time <a href="javascript:;" style={{"text-decoration":"none"}} onClick={orderByTestTime}>&#8597;</a></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
@@ -134,7 +134,7 @@ function ARun (props) {
                  </a>
               )}
             </td>
-            <td>{a_run.test_time} </td>
+            <td>{a_run.run_time} </td>
             <td>{a_run.started}</td>
             <td>{a_run.finished}</td>
             </tr>

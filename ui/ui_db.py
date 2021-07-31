@@ -188,7 +188,7 @@ class UIDB(common_db.DB):
         test['name'] = ' '.join(
             word for word in test['name'].split() if not word.startswith('--'))
         if test['finished'] is not None and test['started'] is not None:
-            test['test_time'] = str(test['finished'] - test['started'])
+            test['run_time'] = str(test['finished'] - test['started'])
         history = self.get_test_history(test['cmd'], branch)
         test['history'] = self.history_stats(history)
         return test
