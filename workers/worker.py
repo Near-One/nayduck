@@ -459,9 +459,7 @@ def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
         return
     outdir = utils.WORKDIR / 'output'
-    utils.rmdirs(outdir,
-                 Path.home() / '.rainbow',
-                 Path.home() / '.rainbow-bridge')
+    utils.rmdirs(outdir, Path.home() / '.rainbow')
     outdir = outdir / str(test['test_id'])
     utils.mkdirs(outdir)
 
