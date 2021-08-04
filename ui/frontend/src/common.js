@@ -38,8 +38,15 @@ export function RenderHistory(a_run, title) {
         )
 }
 
-export function ServerIp() {
-    return process.env.REACT_APP_SERVER_IP
+export function fetchApi(path, post=false) {
+    const url = process.env.REACT_APP_SERVER_IP + '/api' + path;
+    const opts = {
+        headers: { 'Accept': 'application/json' },
+        method: post ? 'POST' : 'GET',
+    };
+    return fetch(url, opts)
+        .then(response => response.json())
+        .catch(err => console.log('Fetch Error :-S', err));
 }
 
 export function GitRepo() {

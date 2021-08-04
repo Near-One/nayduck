@@ -3,7 +3,7 @@ import {
     NavLink,
   } from "react-router-dom";
 
-import {RenderHistory, StatusColor, ServerIp, GitRepo} from "./common"
+import {RenderHistory, StatusColor, fetchApi, GitRepo} from "./common"
 
 function ATest (props) {
     const [aTest, setATest] = useState([]);
@@ -11,32 +11,11 @@ function ATest (props) {
     const baseBranch = "master";
 
     useEffect(() => {
-
-        fetch(ServerIp() + '/test', {
-          headers : {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-           },
-           method: 'POST',
-           body: JSON.stringify({'test_id': props.match.params.test_id}),
-          }).then((response) => response.json())
-          .then(data => {
-          setATest(data);
-          console.log(data);
-
-        });
-        fetch(ServerIp() + '/branch_history', {
-          headers : {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-           },
-           method: 'POST',
-           body: JSON.stringify({'test_id': props.match.params.test_id, 'branch': baseBranch}),
-          }).then((response) => response.json())
-          .then(data => {
-          setBaseBranchHistory(data);
-          console.log(data);
-        });
+        const basePath = '/test/' + (0 | props.match.params.test_id);
+        fetchApi(basePath)
+            .then(data => setATest(data));
+        fetchApi(basePath + '/history/' + baseBranch)
+            .then(data => setBaseBranchHistory(data));
     }, []);
 
     return (

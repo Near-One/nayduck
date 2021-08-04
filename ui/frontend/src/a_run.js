@@ -3,7 +3,7 @@ import {
     NavLink,
   } from "react-router-dom";
 
-import { StatusColor, RenderHistory, ServerIp }  from "./common"
+import { StatusColor, RenderHistory, fetchApi }  from "./common"
 
 
 function ARun (props) {
@@ -11,22 +11,12 @@ function ARun (props) {
     const [aRun, setARun] = useState([]);
     const [filteredRuns, setFilteredRuns] = useState([])
 
-
     useEffect(() => {
-
-        fetch(ServerIp() + '/run', {
-          headers : {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-           },
-           method: 'POST',
-           body: JSON.stringify({'run_id': props.match.params.run_id}),
-          }).then((response) => response.json())
-          .then(data => {
-          setARun(data);
-          setFilteredRuns(data)
-
-        });
+        fetchApi('/run/' + (0 | props.match.params.run_id))
+            .then(data => {
+                setARun(data);
+                setFilteredRuns(data)
+            });
     }, []);
 
     var filterByAll = event => {

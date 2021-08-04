@@ -5,7 +5,7 @@ import {
     HashRouter,
   } from "react-router-dom";
 
-import { ServerIp, GitRepo }  from "./common"
+import { fetchApi, GitRepo }  from "./common"
 import { AuthContext } from "./App";
 
 
@@ -41,23 +41,11 @@ function AllRuns () {
     }
     });
 
-
     useEffect(() => {
-            fetch(ServerIp(), {
-              headers : {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-               }
-              }).then((response) => response.json())
-              .then(data => {
-              setAllRuns(data);
-              console.log(data);
-              setFilteredRuns(data)
-            })
-
-            .catch(function(err) {
-              console.log('Fetch Error :-S', err);
-            });
+        fetchApi('/runs').then(data => {
+            setAllRuns(data);
+            setFilteredRuns(data)
+        });
     }, []);
 
     var filterHandler = event => {
@@ -87,18 +75,9 @@ function AllRuns () {
     };
 
     var cancelRun = id => event => {
-      fetch(ServerIp() + '/cancel_the_run', {
-        headers : {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-         },
-         method: 'POST',
-         body: JSON.stringify({'run_id': id}),
-        }).then((response) => response.json())
-        .then(data => {
-          console.log(data);
-      })
-    }
+        fetchApi('/run/' + (0 | id), true)
+            .then(data => console.log(data));
+    };
 
     return (
         <div className="App">

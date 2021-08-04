@@ -2,7 +2,7 @@ import React , { useState, useEffect  } from "react";
 import {
     NavLink,
   } from "react-router-dom";
-import {RenderHistory, ServerIp, GitRepo} from "./common"
+import {RenderHistory, fetchApi, GitRepo} from "./common"
 
 
 function status_color(status) {
@@ -23,46 +23,19 @@ function TestHistory (props) {
     const [currentBranch, setCurrentBranch] = useState("");;
 
     useEffect(() => {
-
-        fetch(ServerIp() + '/test_history', {
-          headers : {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-           },
-           method: 'POST',
-           body: JSON.stringify({'test_id': props.match.params.test_id}),
-          }).then((response) => response.json())
-          .then(data => {
-          setHistory(data);
-          console.log(data);
-          if (data[0]["branch"]) {
-            setCurrentBranch(data[0]["branch"]);
-            fetch(ServerIp() + '/branch_history', {
-            headers : {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            method: 'POST',
-            body: JSON.stringify({'test_id': props.match.params.test_id, 'branch': data[0]["branch"]}),
-            }).then((response) => response.json())
+        const basePath = '/test/' + (0 | props.match.params.test_id);
+        fetchApi(basePath + '/history')
             .then(data => {
-              setCurrentBranchHistory(data);
-              console.log(data);
-          });
-        }
-        });
-        fetch(ServerIp() + '/branch_history', {
-          headers : {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-           },
-           method: 'POST',
-           body: JSON.stringify({'test_id': props.match.params.test_id, 'branch': baseBranch}),
-          }).then((response) => response.json())
-          .then(data => {
-          setBaseBranchHistory(data);
-          console.log(data);
-        });
+                setHistory(data);
+                const branch = data[0]["branch"];
+                if (branch) {
+                    setCurrentBranch(branch);
+                    fetchApi(basePath + '/history/' + branch)
+                        .then(data => setCurrentBranchHistory(data));
+                }
+            });
+        fetchApi(basePath + '/history/' + baseBranch)
+            .then(data => setBaseBranchHistory(data))
     }, []);
 
     return (

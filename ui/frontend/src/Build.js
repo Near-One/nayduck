@@ -3,29 +3,16 @@ import {
     NavLink,
   } from "react-router-dom";
 
-import { StatusColor, ServerIp , GitRepo}  from "./common"
+import { StatusColor, fetchApi , GitRepo}  from "./common"
 
 
 function Build (props) {
     const [BuildInfo, setBuildInfo] = useState([]);
 
-
     useEffect(() => {
-
-        fetch(ServerIp() + '/build', {
-          headers : {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-           },
-           method: 'POST',
-           body: JSON.stringify({'build_id': props.match.params.build_id}),
-          }).then((response) => response.json())
-          .then(data => {
-          setBuildInfo(data);
-          console.log(data);
-        });
+        fetchApi('/build/' + (0 | props.match.params.build_id))
+            .then(data => setBuildInfo(data));
     }, []);
-
 
     return (
       <div>
