@@ -19,12 +19,12 @@ function AllRuns () {
 
     const [filteredRuns, setFilteredRuns] = useState([])
 
-    const { organizations_url, token } = state.user
-    fetch(organizations_url,  {
-          method: "GET",
-          headers: {
-            'Authorization': `token ${token}`,
-          }
+    fetch('https://api.github.com/user/orgs',  {
+        method: "GET",
+        headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': `token ${state.user.token}`,
+        }
     })
     .then(response => response.json())
     .then(data => {

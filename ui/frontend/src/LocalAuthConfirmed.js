@@ -13,9 +13,7 @@ export default function LocalAuthConfirmed() {
 
     const { user } = state
     useEffect(() => {
-        fetch(
-            user.organizations_url, {
-            })
+        fetch('https://api.github.com/user/orgs', {})
             .then(response => response.json())
             .then(data => {
                 console.log(data);
