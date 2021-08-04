@@ -63,7 +63,10 @@ class UIDB(common_db.DB):
 
     def get_all_runs(self):
         # Get the last 100 runs
-        sql = 'SELECT * FROM runs ORDER BY id DESC LIMIT 100'
+        sql = '''SELECT id, branch, sha, title, requester
+                   FROM runs
+                  ORDER BY id DESC
+                  LIMIT 100'''
         all_runs = dict(
             (int(run['id']), run) for run in self._exec(sql).fetchall())
         run_id_range = min(all_runs), max(all_runs)
@@ -237,7 +240,9 @@ class UIDB(common_db.DB):
         return res
 
     def get_one_test(self, test_id):
-        sql = 'SELECT * FROM tests WHERE test_id = %s'
+        sql = '''SELECT test_id, run_id, build_id, status, name, started,
+                        finished
+                   FROM tests WHERE test_id = %s'''
         res = self._exec(sql, test_id)
         tests = res.fetchall()
         for test in tests:
