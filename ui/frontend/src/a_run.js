@@ -17,46 +17,36 @@ function ARun (props) {
                 setARun(data);
                 setFilteredRuns(data)
             });
-    }, []);
+    }, [props.match.params.run_id]);
 
     var filterByAll = event => {
       var fltr = document.getElementById('build_fltr').value.toLowerCase();
-      var filtered = (
-        aRun.filter(
-          item => (fltr == 'debug' ? item.is_release == 0 :
-                   fltr == 'release' ? item.is_release == 1 : item.is_release > -1 )
-        )
-      );
+      var filtered = fltr === 'debug' || fltr === 'release'
+          ? aRun.filter(item => (fltr === 'debug') === !item.is_release)
+          : aRun;
       fltr = document.getElementById('features_fltr').value.toLowerCase();
-      filtered = (
-        filtered.filter(
-          item => ( fltr == " " ?
-            item['build']['features'] ? "".includes(fltr): true:
-            item['build']['features'] ? item['build']['features'].toLowerCase().includes(fltr): "".includes(fltr))
-        )
-      );
+      filtered = fltr
+        ? filtered.filter(item => fltr === ' '
+                          ? !item.build.features
+                          : item.build.features.toLowerCase().includes(fltr))
+        : filtered;
       fltr = document.getElementById('name_fltr').value.toLowerCase();
-      filtered = (
-        filtered.filter(
-          item => (item['name'].toLowerCase().includes(fltr))
-        )
-      );
+      filtered = fltr
+        ? filtered.filter(item => item.name.toLowerCase().includes(fltr))
+        : filtered;
       fltr = document.getElementById('status_fltr').value.toLowerCase();
-      filtered = (
-        filtered.filter(
-          item => (item['status'].toLowerCase().includes(fltr))
-        )
-      );
+      filtered = fltr
+        ? filtered.filter(item => item.status.toLowerCase().includes(fltr))
+        : filtered;
       setFilteredRuns(filtered);
-
     };
 
     var orderByTestTime = event => {
       var filtered = [...aRun];
       if (orderDescTestTime) {
-        var filtered = filtered.sort((a, b) => a.run_time > b.run_time ? 1 : -1);
+        filtered = filtered.sort((a, b) => a.run_time > b.run_time ? 1 : -1);
       } else {
-        var filtered = filtered.sort((a, b) => a.run_time < b.run_time ? 1 : -1);
+        filtered = filtered.sort((a, b) => a.run_time < b.run_time ? 1 : -1);
       }
       setARun(filtered);
       filtered = [...filteredRuns]
@@ -67,7 +57,6 @@ function ARun (props) {
       }
       setFilteredRuns(filtered);
       setOrderDescTestTime(!orderDescTestTime);
-      console.log(orderDescTestTime);
     }
 
     return (
@@ -96,14 +85,14 @@ function ARun (props) {
             </th>
             <th>Logs
             </th>
-            <th>Run Time <a href="javascript:;" style={{"text-decoration":"none"}} onClick={orderByTestTime}>&#8597;</a></th>
+            <th>Run Time <button style={{"text-decoration":"none"}} onClick={orderByTestTime}>&#8597;</button></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
         {filteredRuns.map((a_run,i) =>
             <tr key={a_run.test_id}>
             <td style={{"font-size": "x-small", "margin":"0"}}>
-              {a_run.build.is_release == 0 ? 'Debug' : 'Release'}
+              {a_run.build.is_release ? 'Release' : 'Debug'}
             </td>
             <td style={{"font-size": "x-small", "margin":"0"}}>
                {a_run.build.features}

@@ -12,7 +12,7 @@ function Build (props) {
     useEffect(() => {
         fetchApi('/build/' + (0 | props.match.params.build_id))
             .then(data => setBuildInfo(data));
-    }, []);
+    }, [props.match.params.build_id]);
 
     return (
       <div>

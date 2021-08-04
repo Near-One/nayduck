@@ -112,16 +112,16 @@ function AllRuns () {
               <td >
                 {a_run.builds.map((build,j) =>
                 <div class="">
-                    <div class="build_status" style={{"background": build.status == "PENDING" ? "FF99FF" :
-                                                            build.status == "BUILDING" ? "#9999FF":
-                                                            build.status == "BUILD DONE" ? "#CCFFCC":
-                                                            build.status == "BUILD FAILED" ? "#FFCCCC":
-                                                            build.status == "SKIPPED" ? "#f0a3aa": "E0E0E0"}}>
+                    <div class="build_status" style={{"background": build.status === "PENDING" ? "FF99FF" :
+                                                            build.status === "BUILDING" ? "#9999FF":
+                                                            build.status === "BUILD DONE" ? "#CCFFCC":
+                                                            build.status === "BUILD FAILED" ? "#FFCCCC":
+                                                            build.status === "SKIPPED" ? "#f0a3aa": "E0E0E0"}}>
                       <NavLink className="build_link" to={"/build/" + build.build_id} >
-                      <b>{build.is_release == 0 ? 'Debug' : 'Release'}
-                        {build.features == "" ? " ": "/"}
-                        {build.features == "--features nightly_protocol --features nightly_protocol_features" || build.features == "--features nightly_protocol,nightly_protocol_features"
-                          ? 'Nightly ' : build.features == "--features sandbbox" ? 'Sandbox ' : build.features.substr(11) + " "}
+                      <b>{build.is_release ? 'Release' : 'Debug'}
+                        {build.features ? "/": " "}
+                        {build.features === "--features nightly_protocol --features nightly_protocol_features" || build.features === "--features nightly_protocol,nightly_protocol_features"
+                          ? 'Nightly ' : build.features === "--features sandbbox" ? 'Sandbox ' : build.features.substr(11) + " "}
                       </b>
                       {build.status}
                       </NavLink>

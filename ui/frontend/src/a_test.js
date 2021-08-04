@@ -16,7 +16,7 @@ function ATest (props) {
             .then(data => setATest(data));
         fetchApi(basePath + '/history/' + baseBranch)
             .then(data => setBaseBranchHistory(data));
-    }, []);
+    }, [props.match.params.test_id]);
 
     return (
     <div>

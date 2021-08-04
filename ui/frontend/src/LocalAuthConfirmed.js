@@ -30,7 +30,7 @@ export default function LocalAuthConfirmed() {
                     }
                 }
             }).catch(error => console.log(error));
-    }, []);
+    }, [user]);
 
     const handleLogout = () => {
         dispatch({
