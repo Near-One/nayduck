@@ -28,11 +28,11 @@ class UIDB(common_db.DB):
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
                   WHERE status = 'PENDING' AND run_id = %s'''
-        self._execute_sql(sql, (status, run_id))
+        self._exec(sql, status, run_id)
 
     def get_auth_code(self, login):
         sql = 'SELECT code FROM users WHERE name = %s LIMIT 1'
-        result = self._execute_sql(sql, (login,))
+        result = self._exec(sql, login)
         user = result.fetchone()
         if user:
             code = user['code']
@@ -44,7 +44,7 @@ class UIDB(common_db.DB):
 
     def get_github_login(self, token):
         sql = 'SELECT name FROM users WHERE code = %s LIMIT 1'
-        result = self._execute_sql(sql, (token,))
+        result = self._exec(sql, token)
         login = result.fetchone()
         if login:
             return login['name']
@@ -65,7 +65,7 @@ class UIDB(common_db.DB):
         # Get the last 100 runs
         sql = 'SELECT * FROM runs ORDER BY id DESC LIMIT 100'
         all_runs = dict(
-            (int(run['id']), run) for run in self._execute_sql(sql).fetchall())
+            (int(run['id']), run) for run in self._exec(sql).fetchall())
         run_id_range = min(all_runs), max(all_runs)
 
         statuses = self.__get_statuses_for_runs(*run_id_range)
@@ -74,7 +74,7 @@ class UIDB(common_db.DB):
         sql = '''SELECT run_id, build_id, status, is_release, features
                    FROM builds
                   WHERE run_id BETWEEN %s AND %s'''
-        for build in self._execute_sql(sql, run_id_range).fetchall():
+        for build in self._exec(sql, *run_id_range).fetchall():
             run_id = int(build.pop('run_id'))
             build_id = int(build['build_id'])
             build['tests'] = statuses.get((run_id, build_id), self._NO_STATUSES)
@@ -102,7 +102,7 @@ class UIDB(common_db.DB):
                    FROM tests
                   WHERE run_id BETWEEN %s AND %s
                   GROUP BY 1, 2, 3'''
-        result = self._execute_sql(sql, (min_run_id, max_run_id))
+        result = self._exec(sql, min_run_id, max_run_id)
         for test in result.fetchall():
             counter = statuses[(int(test['run_id']), int(test['build_id'] or
                                                          0))]
@@ -118,7 +118,7 @@ class UIDB(common_db.DB):
                    FROM tests AS t, runs AS r
                   WHERE t.test_id = %s AND r.id = t.run_id
                   LIMIT 1'''
-        result = self._execute_sql(sql, (test_id,))
+        result = self._exec(sql, test_id)
         res = result.fetchone()
         return self.get_test_history(res['name'],
                                      res['branch'],
@@ -131,7 +131,7 @@ class UIDB(common_db.DB):
                   WHERE name = %s AND t.run_id = r.id AND r.branch = %s
                   ORDER BY t.test_id DESC
                   LIMIT 30'''
-        result = self._execute_sql(sql, (test_name, branch))
+        result = self._exec(sql, test_name, branch)
         tests = result.fetchall()
         for test in tests:
             if test['finished'] is not None and test['started'] is not None:
@@ -141,7 +141,7 @@ class UIDB(common_db.DB):
                            FROM logs
                           WHERE test_id = %s
                           ORDER BY type'''
-                res = self._execute_sql(sql, (test['test_id'],))
+                res = self._exec(sql, test['test_id'])
                 logs = test['logs'] = res.fetchall()
                 for log in logs:
                     log['full_size'] = _prettify_size(log.pop('size'))
@@ -154,7 +154,7 @@ class UIDB(common_db.DB):
         sql = '''SELECT build_id, is_release, features
                    FROM builds
                   WHERE run_id = %s'''
-        res = self._execute_sql(sql, (run_id,))
+        res = self._exec(sql, run_id)
         builds_dict = dict((build['build_id'], build)
                            for build in (res.fetchall() or self._NO_BUILDS))
 
@@ -162,7 +162,7 @@ class UIDB(common_db.DB):
                    FROM tests
                   WHERE run_id = %s
                   ORDER BY status, started'''
-        res = self._execute_sql(sql, (run_id,))
+        res = self._exec(sql, run_id)
         a_run = res.fetchall()
         for test in a_run:
             if test['build_id'] is None:
@@ -177,7 +177,7 @@ class UIDB(common_db.DB):
             columns += ', log'
         sql = f'SELECT {columns} FROM logs WHERE test_id = %s ORDER BY type'
         test['logs'] = {}
-        for log in self._execute_sql(sql, (test['test_id'],)).fetchall():
+        for log in self._exec(sql, test['test_id']).fetchall():
             log['full_size'] = _prettify_size(log.pop('size'))
             if blob:
                 log['log'] = self._str_from_blob(log['log'])
@@ -195,12 +195,12 @@ class UIDB(common_db.DB):
 
     def get_data_about_run(self, run_id):
         sql = 'SELECT * FROM runs WHERE id = %s LIMIT 1'
-        res = self._execute_sql(sql, (run_id,))
+        res = self._exec(sql, run_id)
         return res.fetchone()
 
     def get_build_info(self, build_id):
         sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
-        res = self._execute_sql(sql, (build_id,))
+        res = self._exec(sql, build_id)
         build = res.fetchone()
         if build['finished'] is not None and build['started'] is not None:
             build['build_time'] = str(build['finished'] - build['started'])
@@ -212,7 +212,7 @@ class UIDB(common_db.DB):
 
     def get_histoty_for_base_branch(self, test_id, branch):
         sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
-        res = self._execute_sql(sql, (test_id,))
+        res = self._exec(sql, test_id)
         test = res.fetchone()
         history = self.get_test_history(test['name'], branch)
         if len(history):
@@ -238,7 +238,7 @@ class UIDB(common_db.DB):
 
     def get_one_test(self, test_id):
         sql = 'SELECT * FROM tests WHERE test_id = %s'
-        res = self._execute_sql(sql, (test_id,))
+        res = self._exec(sql, test_id)
         tests = res.fetchall()
         for test in tests:
             run_data = self.get_data_about_run(test['run_id'])
@@ -366,8 +366,8 @@ class UIDB(common_db.DB):
 
     def last_nightly_run(self) -> typing.Dict[str, typing.Any]:
         """Returns the last nightly run."""
-        return self._execute_sql('''SELECT timestamp, sha
-                                      FROM runs
-                                     WHERE is_nightly
-                                     ORDER BY timestamp DESC
-                                     LIMIT 1''').fetchone()
+        return self._exec('''SELECT timestamp, sha
+                               FROM runs
+                              WHERE is_nightly
+                              ORDER BY timestamp DESC
+                              LIMIT 1''').fetchone()

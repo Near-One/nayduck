@@ -48,7 +48,7 @@ class WorkerDB(common_db.DB):
                   LIMIT 1'''.format(
             where='' if mocknet else 'AND category != "mocknet"',
             order_by='category != "mocknet", ' if mocknet else '')
-        res = self._execute_sql(sql, (ipv4, int(time.time())))
+        res = self._exec(sql, ipv4, int(time.time()))
         if res.rowcount == 0:
             return None
         sql = '''SELECT t.test_id, t.run_id, t.build_id, t.name,
@@ -59,19 +59,17 @@ class WorkerDB(common_db.DB):
                     AND t.run_id = r.id
                     AND t.build_id = b.build_id
                   LIMIT 1'''
-        result = self._execute_sql(sql, ())
-        pending_test = result.fetchone()
-        return pending_test
+        return self._exec(sql).fetchone()
 
     def test_started(self, test_id):
         sql = 'UPDATE tests SET started = NOW() WHERE test_id = %s'
-        self._execute_sql(sql, (test_id,))
+        self._exec(sql, test_id)
 
     def update_test_status(self, status, test_id):
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
                   WHERE test_id = %s'''
-        self._execute_sql(sql, (status, test_id))
+        self._exec(sql, status, test_id)
 
     def save_short_logs(self, test_id: int,
                         logs: typing.Collection['worker.LogFile']) -> None:
@@ -92,10 +90,10 @@ class WorkerDB(common_db.DB):
                         status = 'PENDING',
                         select_after = %s
                   WHERE test_id = %s'''
-        self._execute_sql(sql, (int(time.time()) + delay, test_id))
+        self._exec(sql, int(time.time()) + delay, test_id)
 
     def handle_restart(self, ipv4: int) -> None:
         sql = '''UPDATE tests
                     SET started = NULL, status = 'PENDING', worker_ip = 0
                   WHERE status = 'RUNNING' AND worker_ip = %s'''
-        self._execute_sql(sql, (ipv4,))
+        self._exec(sql, ipv4)

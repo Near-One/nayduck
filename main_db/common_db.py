@@ -29,7 +29,7 @@ class DB:
         self.mycursor.close()
         self.mydb.close()
 
-    def _execute_sql(self, sql: str, val: typing.Sequence[typing.Any] = ()):
+    def _exec(self, sql: str, *val: typing.Any):
         """Executes given SQL statement.
 
         Args:
@@ -51,10 +51,10 @@ class DB:
     def _insert(self, table: str, **kw: typing.Any) -> int:
         """Executes an INSERT statement.
 
-        This is a convenience wrapper around _execute_sql which automatically
-        formats an INSERT statement.  With this method, there's no need to
-        manually count the `%s` in the statement template or making sure values
-        are given in the correct order.
+        This is a convenience wrapper around _exec which automatically formats
+        an INSERT statement.  With this method, there's no need to manually
+        count the `%s` in the statement template or making sure values are given
+        in the correct order.
 
         Args:
             table: Table to insert a row into.
@@ -67,7 +67,7 @@ class DB:
             table=table,
             columns=', '.join(columns),
             placeholders=', '.join(['%s'] * len(columns)))
-        cursor = self._execute_sql(sql, values)
+        cursor = self._exec(sql, *values)
         return cursor.lastrowid
 
     def _multi_insert(self,
@@ -97,7 +97,7 @@ class DB:
             table=table,
             columns='`, `'.join(columns),
             placeholders=', '.join([placeholders] * count))
-        self._execute_sql(sql, vals)
+        self._exec(sql, *vals)
 
     def _with_transaction(
         self,

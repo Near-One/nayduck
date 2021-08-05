@@ -36,7 +36,7 @@ class MasterDB(common_db.DB):
                   WHERE status = 'PENDING'
                   ORDER BY priority, build_id
                   LIMIT 1'''
-        result = self._execute_sql(sql, (ipv4,))
+        result = self._exec(sql, ipv4)
         if result.rowcount == 0:
             return None
         # We're executing this query once in a blue moon so it doesn't need to
@@ -53,7 +53,7 @@ class MasterDB(common_db.DB):
                    JOIN tests t USING (build_id)
                   WHERE b.build_id = @build_id
                   LIMIT 1'''
-        row = self._execute_sql(sql).fetchone()
+        row = self._exec(sql).fetchone()
         return row
 
     def update_build_status(self, build_id: int, success: bool, *, out: bytes,
@@ -86,7 +86,7 @@ class MasterDB(common_db.DB):
                         AND tests.status = "PENDING"'''
         out = self._blob_from_data(out)
         err = self._blob_from_data(err)
-        self._execute_sql(sql, (err, out, build_id))
+        self._exec(sql, err, out, build_id)
 
     def handle_restart(self, ipv4: int) -> None:
         sql = '''UPDATE builds
@@ -95,7 +95,7 @@ class MasterDB(common_db.DB):
                         master_ip = 0
                   WHERE status = 'BUILDING'
                     AND master_ip = %s'''
-        self._execute_sql(sql, (ipv4,))
+        self._exec(sql, ipv4)
 
     def with_builds_without_pending_tests(
             self, ipv4: int, callback: typing.Callable[[typing.Iterable[int]],
@@ -115,10 +115,10 @@ class MasterDB(common_db.DB):
                   WHERE master_ip != %s
                   GROUP BY 1
                  HAVING SUM(tests.status IN ('PENDING', 'RUNNING')) = 0'''
-        result = self._execute_sql(sql, (ipv4,))
+        result = self._exec(sql, ipv4)
         builds = tuple(int(build['build_id']) for build in result.fetchall())
         if builds:
             callback(builds)
             sql = 'UPDATE builds SET master_ip = 0 WHERE build_id IN ({})'
             sql = sql.format(', '.join(str(build_id) for build_id in builds))
-            self._execute_sql(sql)
+            self._exec(sql)
