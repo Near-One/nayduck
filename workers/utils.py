@@ -143,8 +143,53 @@ def int_to_ip(addr: int) -> str:
 
 def setup_environ() -> None:
     """Configures environment variables for workers and masters."""
-    os.environ.update(CARGO_PROFILE_RELEASE_LTO='false',
-                      CARGO_PROFILE_DEV_DEBUG='0',
-                      CARGO_PROFILE_TEST_DEBUG='0')
+    home = pathlib.Path.home()
+
+    # Clean up various NayDuck configuration variables and other junk
+    for var in list(os.environb):
+        if (var.startswith(b'REACT_') or var.startswith(b'SSH_') or
+                var.startswith(b'SERVER_') or
+                var in (b'GIT_REPO', b'NAYDUCK_UI', b'OLDPWD', b'MAIL')):
+            os.environb.pop(var)
+
+    # Set up Go and NVM variables
+    script = '''
+        set -eu
+        [ -e ~/.go ] && GOROOT=~/.go
+        [ -e ~/go  ] && GOPATH=~/go
+        if [ -e ~/.nvm ]; then
+            NVM_DIR=~/.nvm
+            . ~/.nvm/nvm.sh
+        fi >&2
+        export GOROOT GOPATH NVM_DIR
+        env -0
+    '''
+    env = dict(
+        item.split(b'=', 1) for item in subprocess.check_output(
+            script, shell=True, cwd=home).rstrip(b'\0').split(b'\0'))
+
+    # Add Cargo and Go to PATH and remove various unnecessary directories
+    pathsep = os.fsencode(os.pathsep)
+    paths = [home / subdir / 'bin' for subdir in ('cargo', 'go', '.go')]
+    env[b'PATH'] = pathsep.join(
+        [bytes(path) for path in paths if path.exists()] + [
+            path
+            for path in env.get(b'PATH', os.fsencode(os.defpath)).split(pathsep)
+            if (path.startswith(b'/') and not path.endswith(b'/sbin') and
+                not path.startswith(b'/snap/') and b'games' not in path)
+        ])
+
+    # Configure Cargo builds
+    env[b'CARGO_PROFILE_RELEASE_LTO'] = b'false'
+    env[b'CARGO_PROFILE_DEV_DEBUG'] = b'0'
+    env[b'CARGO_PROFILE_TEST_DEBUG'] = b'0'
     if shutil.which('lld'):
-        os.environ['RUSTFLAGS'] = '-C link-arg=-fuse-ld=lld'
+        env[b'RUSTFLAGS'] = b'-C link-arg=-fuse-ld=lld'
+
+    # Tell tests this is NayDuck
+    env[b'NAYDUCK'] = b'1'
+    env[b'NIGHTLY_RUNNER'] = b'1'
+
+    # Apply
+    os.environb.clear()
+    os.environb.update(env)

@@ -4,22 +4,18 @@ import typing
 
 import mysql.connector
 
+_CONFIG = {
+    'host': os.environ.pop('DB_HOST', '127.0.0.1'),
+    'user': os.environ.pop('DB_USER', 'nayduck'),
+    'passwd': os.environ.pop('DB_PASSWD'),
+    'database': os.environ.pop('DB', 'nayduck'),
+}
+
 
 class DB:
 
     def __init__(self):
-        self.host = os.environ['DB_HOST']
-        self.user = os.environ['DB_USER']
-        self.passwd = os.environ['DB_PASSWD']
-        self.database = os.environ['DB']
-
-        self.mydb = mysql.connector.connect(
-            host=self.host,
-            user=self.user,
-            passwd=self.passwd,
-            database=self.database,
-            autocommit=True,
-        )
+        self.mydb = mysql.connector.connect(**_CONFIG, autocommit=True)
         self.mycursor = self.mydb.cursor(buffered=True, dictionary=True)
 
     def __enter__(self):

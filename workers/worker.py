@@ -21,7 +21,7 @@ DEFAULT_TIMEOUT = 180
 BACKTRACE_PATTERN = 'stack backtrace:'
 FAIL_PATTERNS = [BACKTRACE_PATTERN]
 INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
-AZURE = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+AZURE = os.environ.pop('AZURE_STORAGE_CONNECTION_STRING')
 
 
 def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
