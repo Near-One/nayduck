@@ -57,13 +57,22 @@ class DB:
         Returns:
             Id of the inserted row.
         """
-        columns, values = zip(*kw.items())
-        sql = 'INSERT INTO {table} ({columns}) VALUES ({placeholders})'.format(
+        return self.__insert_impl('INSERT', table, kw)
+
+    def _replace(self, table: str, **kw: typing.Any) -> int:
+        """Like _insert but executes a REPLACE statement."""
+        return self.__insert_impl('REPLACE', table, kw)
+
+    def __insert_impl(self, verb: str, table: str,
+                      fields: typing.Dict[str, typing.Any]) -> int:
+        """Executes an INSERT or REPLACE statement."""
+        columns, values = zip(*fields.items())
+        sql = '{verb} INTO {table} ({columns}) VALUES ({placeholders})'.format(
+            verb=verb,
             table=table,
             columns=', '.join(columns),
             placeholders=', '.join(['%s'] * len(columns)))
-        cursor = self._exec(sql, *values)
-        return cursor.lastrowid
+        return self._exec(sql, *values).lastrowid
 
     def _multi_insert(self,
                       table: str,

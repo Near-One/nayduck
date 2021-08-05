@@ -8,9 +8,10 @@ import subprocess
 import traceback
 import typing
 
-import requests
-
 from . import ui_db
+
+NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
+              'http://nayduck.eastus.cloudapp.azure.com:3000')
 
 
 class Failure(Exception):
@@ -174,6 +175,72 @@ class Request(typing.NamedTuple):
                    is_nightly=False)
 
     @classmethod
+    def from_json(cls, request_json: typing.Any, requester: str) -> 'Request':
+        branch = request_json.get('branch', _SENTINEL)
+        sha = request_json.get('sha', _SENTINEL)
+        tests = request_json.get('tests')
+
+        if branch is _SENTINEL or sha is _SENTINEL:
+            raise Failure('Invalid request object: missing branch or sha field')
+        if not tests:
+            raise Failure('No tests specified')
+
+        if not (isinstance(requester, str) and isinstance(branch, str) and
+                isinstance(sha, str) and isinstance(tests, (list, tuple))):
+            raise Failure('Invalid request object: '
+                          'one of the fields has wrong type')
+
+        return cls(branch=branch,
+                   sha=sha,
+                   requester=requester,
+                   tests=cls.verify_tests(tests),
+                   is_nightly=False)
+
+    def schedule(self,
+                 server: ui_db.UIDB,
+                 commit: typing.Optional[CommitInfo] = None) -> int:
+        """Saves given run requests to the database.
+
+        Args:
+            server: Database connection to use.
+            commit: Commit to run the tests on.  If not given, will be
+                determined from the repository based on sha given in the
+                request.
+        Returns:
+            Numeric identifier of the scheduled test run.
+        Raises:
+            Failure: on any kind of error.
+        """
+        commit = commit or CommitInfo.for_commit(_update_repo(), self.sha)
+        builds: typing.Dict[typing.Tuple[bool, str], ui_db.UIDB.BuildSpec] = {}
+        tests: typing.List[ui_db.UIDB.TestSpec] = []
+        for test in self.tests:
+            is_release = '--release' in test
+            pos = test.find('--features')
+            features = '' if pos < 0 else test[pos:]
+            build = builds.setdefault(
+                (is_release, features),
+                ui_db.UIDB.BuildSpec(is_release=is_release, features=features))
+            build.add_test(has_non_mocknet=not test.startswith('mocknet '))
+            test = ui_db.UIDB.TestSpec(name=test,
+                                       build=build,
+                                       is_remote='--remote' in test)
+            tests.append(test)
+
+        # Sort builds by number of dependent tests so that when masters choose
+        # what to do they start with builds which unlock the largest number of
+        # tests.
+        return server.schedule_a_run(branch=self.branch,
+                                     sha=commit.sha,
+                                     title=commit.title,
+                                     requester=self.requester,
+                                     is_nightly=self.is_nightly,
+                                     tests=tests,
+                                     builds=sorted(
+                                         builds.values(),
+                                         key=lambda build: -build.test_count))
+
+    @classmethod
     def verify_tests(cls,
                      tests: typing.Iterable[typing.Any]) -> typing.List[str]:
         """Verifies that requested tests are valid.
@@ -309,87 +376,6 @@ class Request(typing.NamedTuple):
             raise Failure(f'Invalid test name "{name}" in: {test}')
 
 
-def _verify_token(server: ui_db.UIDB,
-                  request_json: typing.Dict[str, typing.Any]) -> None:
-    """Verifies if request has correct token; raises Failure if not."""
-    token = request_json.get('token')
-    if token is None:
-        # raise Failure('Your client is too old. NayDuck requires Github auth. '
-        #               'Sync your client to head.')
-        return
-    github_login = isinstance(token, str) and server.get_github_login(token)
-    if not github_login:
-        raise Failure('Invalid NayDuck token.')
-    if github_login == 'NayDuck':
-        return
-    github_req = f'https://api.github.com/users/{github_login}/orgs'
-    response = requests.get(github_req)
-    if not any(
-            org.get('login') in ('nearprotocol', 'near')
-            for org in response.json()):
-        raise Failure(f'{github_login} is not part of '
-                      'NearProtocol or Near organisations.')
-
-
-def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
-    """Starts a test run based on the JSON request.
-
-    Args:
-        request_json: The JSON object describing the request client is making.
-    Returns:
-        Numeric identifier of the scheduled test run.
-    Raises:
-        Failure: on any kind of error.
-    """
-    req = Request.from_json_request(request_json)
-    with ui_db.UIDB() as server:
-        _verify_token(server, request_json)
-        commit = CommitInfo.for_commit(_update_repo(), req.sha)
-        return _do_schedule_a_run(server, req, commit)
-
-
-def _do_schedule_a_run(server: ui_db.UIDB, req: Request,
-                       commit: CommitInfo) -> int:
-    """Saves given run requests to the database.
-
-    Args:
-        server: Database connection to use.
-        req: Description of the run.
-        commit: Commit to run the tests on.  Overrides req.sha.
-    Returns:
-        Numeric identifier of the scheduled test run.
-    Raises:
-        Failure: on any kind of error.
-    """
-    builds = {}
-    tests = []
-    for test in req.tests:
-        is_release = '--release' in test
-        pos = test.find('--features')
-        features = '' if pos < 0 else test[pos:]
-        build = builds.setdefault((is_release, features),
-                                  ui_db.UIDB.BuildSpec(is_release=is_release,
-                                                       features=features))
-        build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-        test = ui_db.UIDB.TestSpec(name=test,
-                                   build=build,
-                                   is_remote='--remote' in test)
-        tests.append(test)
-
-    # Sort builds by number of dependent tests so that when masters choose
-    # what to do they start with builds which unlock the largest number of
-    # tests.
-    return server.schedule_a_run(branch=req.branch,
-                                 sha=commit.sha,
-                                 title=commit.title,
-                                 requester=req.requester,
-                                 is_nightly=req.is_nightly,
-                                 tests=tests,
-                                 builds=sorted(
-                                     builds.values(),
-                                     key=lambda build: -build.test_count))
-
-
 def schedule_nightly_run():
     """Schedules a new nightly run if last one was over 24 hours ago."""
     with ui_db.UIDB() as server:
@@ -468,6 +454,7 @@ def _schedule_nightly_impl(server: ui_db.UIDB) -> datetime.timedelta:
                   requester='NayDuck',
                   tests=tests,
                   is_nightly=True)
-    run_id = _do_schedule_a_run(server, req, commit)
-    print('Scheduled new nightly run: {}'.format(run_id))
+    run_id = req.schedule(server, commit)
+    url = f'Success. {NAYDUCK_UI}/#/run/{run_id}'
+    print(f'Scheduled new nightly run: {url}')
     return datetime.timedelta(hours=24)

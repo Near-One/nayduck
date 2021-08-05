@@ -1,7 +1,5 @@
 import collections
 import itertools
-import random
-import string
 import typing
 
 from lib import common_db
@@ -21,26 +19,6 @@ class UIDB(common_db.DB):
                     SET finished = NOW(), status = %s
                   WHERE status = 'PENDING' AND run_id = %s'''
         self._exec(sql, status, run_id)
-
-    def get_auth_code(self, login):
-        sql = 'SELECT code FROM users WHERE name = %s LIMIT 1'
-        result = self._exec(sql, login)
-        user = result.fetchone()
-        if user:
-            code = user['code']
-        else:
-            alphabet = string.ascii_uppercase + string.digits
-            code = ''.join(random.choices(alphabet, k=20))
-            self._insert('users', name=login, code=code)
-        return code
-
-    def get_github_login(self, token):
-        sql = 'SELECT name FROM users WHERE code = %s LIMIT 1'
-        result = self._exec(sql, token)
-        login = result.fetchone()
-        if login:
-            return login['name']
-        return None
 
     _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
                           'build_failed', 'canceled', 'timeout')
@@ -352,3 +330,32 @@ class UIDB(common_db.DB):
                               WHERE is_nightly
                               ORDER BY timestamp DESC
                               LIMIT 1''').fetchone()
+
+    def add_auth_nonce(self, nonce: bytes, now: int) -> None:
+        """Adds an authentication nonce to the database.
+
+        While at it also deletes all expired nonces.
+
+        Args:
+            nonce: A 12-byte nonce to add to the database.
+            now: Time when the nonce was generated.
+        """
+        self._exec('DELETE FROM auth_codes WHERE timestamp < %s', now - 600)
+        self._insert('auth_codes', nonce=nonce, timestamp=now)
+
+    def verify_auth_nonce(self, nonce: bytes, now: int) -> bool:
+        """Verifies that an authentication nonce exists in the database.
+
+        The nonce (as well as all expired nonces) are removed from the database
+        so subsequent calls to this method will return False for the same nonce.
+
+        Args:
+            nonce: Nonce to verify existence of.
+            now: Current timestamp.
+        Returns:
+            Whether the nonce existed in the database.
+        """
+        sql = 'DELETE FROM auth_codes WHERE nonce = %s'
+        found = bool(self._exec(sql, nonce).rowcount)
+        self._exec('DELETE FROM auth_codes WHERE timestamp < %s', now - 600)
+        return found

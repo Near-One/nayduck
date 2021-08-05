@@ -1,40 +1,12 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, HashRouter } from "react-router-dom";
 
-import * as App from "./App";
 import * as common from "./common";
 
 
 function AllRuns () {
-    const { state } = useContext(App.AuthContext);
-
     const [allRuns, setAllRuns] = useState([]);
-
-    const [member, setMember] = useState([]);
-
     const [filteredRuns, setFilteredRuns] = useState([])
-
-    fetch('https://api.github.com/user/orgs',  {
-        method: "GET",
-        headers: {
-            'Accept': 'application/vnd.github.v3+json',
-            'Authorization': `token ${state.user.token}`,
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-    try {
-     console.log(data);
-     for (var d of data) {
-        if (d["login"] === "nearprotocol" || d["login"] === "near") {
-            console.log("Welcome to Nay!");
-            setMember(true);
-        }
-      }
-    } catch (error) {
-      console.log(error);
-    }
-    });
 
     useEffect(() => {
         common.fetchAPI('/runs').then(data => {
@@ -124,7 +96,7 @@ function AllRuns () {
             </div>
           )}
         </td>
-        { member > 0 ? <td><button style={{borderRadius: "0.25em"}} onClick={cancelRun(a_run.id)}>x</button></td> : null}
+        <td><button style={{borderRadius: "0.25em"}} onClick={cancelRun(a_run.id)}>x</button></td>
       </tr>;
 
     return (
@@ -139,7 +111,7 @@ function AllRuns () {
               <th>User
                   <input style={{width: "100%"}} type="text" name="filters" id="requester" onChange={filterHandler}/></th>
               <th>Status</th>
-              { member > 0 ? <th>x</th> : null }
+              <th>x</th>
             </tr>
           </thead>
           <tbody>{filteredRuns.map(formatRow)}</tbody>
