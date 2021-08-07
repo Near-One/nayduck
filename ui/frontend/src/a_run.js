@@ -1,9 +1,7 @@
-import React , { useState, useEffect  } from "react";
-import {
-    NavLink,
-  } from "react-router-dom";
+import React, { useState, useEffect  } from "react";
+import { NavLink } from "react-router-dom";
 
-import { StatusColor, RenderHistory, fetchApi }  from "./common"
+import * as common from "./common";
 
 
 function ARun (props) {
@@ -12,7 +10,7 @@ function ARun (props) {
     const [filteredRuns, setFilteredRuns] = useState([])
 
     useEffect(() => {
-        fetchApi('/run/' + (0 | props.match.params.run_id))
+        common.fetchAPI('/run/' + (0 | props.match.params.run_id))
             .then(data => {
                 setARun(data);
                 setFilteredRuns(data)
@@ -101,8 +99,8 @@ function ARun (props) {
             <td style={{"width": "30%"}}>
                 <NavLink to={"/test/" + a_run.test_id} >{a_run.name}</NavLink>
             </td>
-            <td style={{"color": StatusColor(a_run.status)}}>{a_run.status}<br/>
-            {RenderHistory(a_run)}
+            <td style={{"color": common.StatusColor(a_run.status)}}>{a_run.status}<br/>
+            {common.RenderHistory(a_run)}
             </td>
             <td>
                    {Object.entries(a_run.logs).map( ([type, value]) =>

@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { Redirect,
     Route,
     HashRouter } from "react-router-dom";
-import { AuthContext } from "./App";
+import * as App from "./App";
 import ARun from "./a_run";
 import AllRuns from "./all_runs";
 import ATest from "./a_test";
@@ -10,7 +10,7 @@ import TestHistory from "./test_history";
 import Build from "./Build";
 
 export default function Home() {
-  const { state, dispatch } = useContext(AuthContext);
+  const { state, dispatch } = useContext(App.AuthContext);
 
   if (!state.isLoggedIn) {
     return <Redirect to="/login" />;

@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useContext } from "react";
+import { NavLink, HashRouter } from "react-router-dom";
 
-import {
-    NavLink,
-    HashRouter,
-  } from "react-router-dom";
-
-import { fetchApi, GitRepo }  from "./common"
-import { AuthContext } from "./App";
-
+import * as App from "./App";
+import * as common from "./common";
 
 
 function AllRuns () {
-    const { state } = useContext(AuthContext);
+    const { state } = useContext(App.AuthContext);
 
     const [allRuns, setAllRuns] = useState([]);
 
@@ -42,7 +37,7 @@ function AllRuns () {
     });
 
     useEffect(() => {
-        fetchApi('/runs').then(data => {
+        common.fetchAPI('/runs').then(data => {
             setAllRuns(data);
             setFilteredRuns(data)
         });
@@ -75,7 +70,7 @@ function AllRuns () {
     };
 
     var cancelRun = id => event => {
-        fetchApi('/run/' + (0 | id), true)
+        common.fetchAPI('/run/' + (0 | id), true)
             .then(data => console.log(data));
     };
 
@@ -100,7 +95,7 @@ function AllRuns () {
           {filteredRuns.map((a_run,i) =>
             <tr key={a_run.id}>
               <td><p style={{"font-size": "x-small", "margin":"0"}}>{a_run.branch}</p>
-                <a href={GitRepo()+"/commit/"+a_run.sha.slice(0,7)}>
+                <a href={common.GitRepo()+"/commit/"+a_run.sha.slice(0,7)}>
                     {a_run.sha.slice(0,7)}
                 </a>
               </td>

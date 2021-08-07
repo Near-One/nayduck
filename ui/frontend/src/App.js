@@ -1,25 +1,20 @@
 import React, { createContext, useReducer }  from 'react';
-import {
-  Route,
-  BrowserRouter as Router,
-  Switch
-} from "react-router-dom";
+import { Route, BrowserRouter as Router, Switch } from "react-router-dom";
+
 import Login from "./Login";
 import LocalAuth from "./LocalAuth";
 import LocalAuthConfirmed from "./LocalAuthConfirmed";
 import Home from "./Home";
-import { initialState, reducer } from "./reducer";
-
+import * as reducer from "./reducer";
 
 import './App.css';
+
 
 export const AuthContext = createContext();
 
 
 function App() {
-  const [state, dispatch] = useReducer(reducer, initialState);
-
-
+  const [state, dispatch] = useReducer(reducer.reducer, reducer.initialState);
 
   return (
 <AuthContext.Provider

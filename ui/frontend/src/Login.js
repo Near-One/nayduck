@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Redirect } from "react-router-dom";
-import { AuthContext } from "./App";
-import { LoginPage }  from "./common"
+
+import * as App from "./App";
+import * as common from "./common";
 
 
 export default function Login() {
-  const { state, dispatch } = useContext(AuthContext);
+  const { state, dispatch } = useContext(App.AuthContext);
   const [data, setData] = useState({ errorMessage: "", isLoading: false });
 
   const { client_id, redirect_uri } = state;
@@ -56,5 +57,5 @@ export default function Login() {
     return <Redirect to="/" />;
   }
 
-  return LoginPage(client_id, redirect_uri, data, setData)
+  return common.LoginPage(client_id, redirect_uri, data, setData)
 }

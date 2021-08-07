@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Redirect } from "react-router-dom";
-import { AuthContext } from "./App";
-import { LoginPage }  from "./common"
+
+import * as App from "./App";
+import * as common from "./common";
 
 
 export default function LocalAuth() {
-  const { state, dispatch } = useContext(AuthContext);
+  const { state, dispatch } = useContext(App.AuthContext);
   const [data, setData] = useState({ errorMessage: "", isLoading: false });
 
   const { client_id_local, redirect_uri_local } = state;
@@ -57,5 +58,5 @@ export default function LocalAuth() {
     return <Redirect to="/local_auth_confirmed" />;
   }
 
-  return LoginPage(client_id_local, redirect_uri_local, data, setData)
+  return common.LoginPage(client_id_local, redirect_uri_local, data, setData)
 }

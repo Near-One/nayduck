@@ -1,16 +1,14 @@
-import React , { useState, useEffect  } from "react";
-import {
-    NavLink,
-  } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { NavLink } from "react-router-dom";
 
-import { StatusColor, fetchApi , GitRepo}  from "./common"
+import * as common from "./common";
 
 
 function Build (props) {
     const [BuildInfo, setBuildInfo] = useState([]);
 
     useEffect(() => {
-        fetchApi('/build/' + (0 | props.match.params.build_id))
+        common.fetchAPI('/build/' + (0 | props.match.params.build_id))
             .then(data => setBuildInfo(data));
     }, [props.match.params.build_id]);
 
@@ -23,11 +21,11 @@ function Build (props) {
 
         <table className="big"><tbody>
             <tr><td style={{"width":"20%"}}>Commit</td><td>
-             {BuildInfo.branch} (<a href={GitRepo()+"/commit/"+BuildInfo.sha}>{BuildInfo.sha ? BuildInfo.sha.slice(0,7) :"" }</a>)<br/>
+             {BuildInfo.branch} (<a href={common.GitRepo()+"/commit/"+BuildInfo.sha}>{BuildInfo.sha}</a>)<br/>
             {BuildInfo.title}<br/>
              requested by {BuildInfo.requester}
             </td></tr>
-            <tr><td>Status</td><td style={{"color": StatusColor(BuildInfo.status)}}>{BuildInfo.status}</td></tr>
+            <tr><td>Status</td><td style={{"color": common.StatusColor(BuildInfo.status)}}>{BuildInfo.status}</td></tr>
             <tr><td>Build Time</td><td>{BuildInfo.build_time}</td></tr>
             <tr><td>Finished</td><td>{BuildInfo.finished}</td></tr>
             <tr><td>Started</td><td>{BuildInfo.started}</td></tr>

@@ -38,7 +38,7 @@ export function RenderHistory(a_run, title) {
         )
 }
 
-export function fetchApi(path, post=false) {
+export function fetchAPI(path, post=false) {
     const url = process.env.REACT_APP_SERVER_IP + '/api' + path;
     const opts = {
         headers: { 'Accept': 'application/json' },
