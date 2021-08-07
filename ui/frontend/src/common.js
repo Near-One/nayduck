@@ -4,7 +4,7 @@ import {
   } from "react-router-dom";
 import GithubIcon from "mdi-react/GithubIcon";
 
-export function StatusColor(status) {
+export function testStatusColour(status) {
     switch (status) {
     case "FAILED" || "BUILD FAILED":   return "red";
     case "PASSED":   return "green";
@@ -15,27 +15,40 @@ export function StatusColor(status) {
 }
 
 
+export function buildStatusColour(status) {
+    switch (status) {
+    case "PENDING": return "FF99FF";
+    case "BUILDING": return "#9999FF";
+    case "BUILD DONE":
+    case "SKIPPED": return "#CCFFCC";
+    case "BUILD FAILED": return "#FFCCCC";
+    default: return "E0E0E0";
+    }
+};
+
+
 export function HistorySwitchText(status, count) {
     switch (status) {
         case "FAILED" :   return "F:"+count;
         case "PASSED":   return "P:"+count;
         case "OTHER":   return "O:"+count;
-        default:      return "";
+        default:      return null;
         }
 }
 
-export function RenderHistory(a_run, title) {
+export function RenderHistory(a_test, title) {
     return (
-        <NavLink to={"/test_history/" + a_run.test_id}>{title}<table style={{"border": "0px"}}><tbody><tr>
-            {Object.entries(a_run.history).map( ([key, value]) =>
-                <td style={{"border": "0px",
-                            "padding": "0px",
-                            "fontSize": "10px",
-                            "color": StatusColor(key)}}>
-                    {HistorySwitchText(key, value)}</td>
-            )}
-            </tr></tbody></table></NavLink>
-        )
+      <NavLink to={"/test_history/" + a_test.test_id}>{title}<table style={{border: 0}}><tbody><tr>
+        {Object.entries(a_test.history).map(([key, value], idx) =>
+          <td key={a_test.test_id + '/' + idx + '/' + (title || '')} style={{
+                  border: 0,
+                  padding: 0,
+                  fontSize: "10px",
+                  color: testStatusColour(key)
+              }}>{HistorySwitchText(key, value)}</td>
+        )}
+      </tr></tbody></table></NavLink>
+    );
 }
 
 export function fetchAPI(path, post=false) {
@@ -52,7 +65,7 @@ export function fetchAPI(path, post=false) {
 
 export function commitLink(object) {
     if (!object.branch || !object.sha) {
-        return '';
+        return null;
     }
     const branch = object.branch;
     const sha = object.sha.substr(0, 7);
@@ -66,7 +79,7 @@ export function LoginPage(client_id, redirect_uri, data, setData) {
     return (
     <section className="section-login">
         <div className="div-login">
-          <img style={{"width": "100%"}} alt="" src="duck.jpg"/>
+          <img style={{width: "100%"}} alt="" src="duck.jpg"/>
           <span>{data.errorMessage}</span>
           <div className="github-login">
              {data.isLoading ? (
@@ -127,6 +140,13 @@ export function allLogLinks(logs, test_id) {
 }
 
 
+export function logBlob(blob) {
+    return blob
+        ? <div className="blob">{blob}</div>
+        : <small style={{fontStyle: 'italic'}}>(empty)</small>;
+}
+
+
 function pad(value) {
     return (value < 10 ? '0' : '') + value;
 }
@@ -134,7 +154,7 @@ function pad(value) {
 
 function formatDateTime(timestampMs) {
     if (!timestampMs) {
-        return '';
+        return null;
     }
     const date = new Date(timestampMs);
     const year = date.getFullYear();
@@ -180,6 +200,6 @@ export function formatTimeStats(object) {
     return {
         started,
         finished,
-        delta: delta === null ? '' : formatTimeDelta(delta)
+        delta: delta === null ? null : formatTimeDelta(delta)
     };
 }

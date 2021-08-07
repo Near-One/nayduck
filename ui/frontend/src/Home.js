@@ -23,7 +23,7 @@ export default function Home() {
   }
   return (
       <div className="container">
-        <button class="logout" onClick={()=> handleLogout()}>Logout</button>
+        <button className="logout" onClick={()=> handleLogout()}>Logout</button>
       <HashRouter>
         <div className="content">
             <Route exact path="/" component={AllRuns}/>

@@ -13,25 +13,16 @@ code {
 }
 
 table {
-  padding: 15px;
-  font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
   border-collapse: collapse;
   width: 100%;
   word-wrap: break-word;
 }
 
-table td, table th {
+td, th {
   border: 1px solid #ddd;
-  padding: 8px;
+  padding: 0.5em;
 }
 
-table.testTable td{
-  width: 20%;
-}
-
-table.testTable td+td{
-  width: auto;
-}
 table.big tr:nth-child(even){background-color: #f2f2f2;}
 
 table.big tr:hover {background-color: #ddd;}
@@ -44,6 +35,14 @@ table th {
   color: white;
 }
 
+.blob {
+  max-height: 20em;
+  overflow: auto;
+  font-variant: lining-nums slashed-zero;
+  font-family: DejaVu Sans Mono, Source Code Pro, Liberation Mono, Courier New, monospace;
+  white-space: pre-wrap;
+}
+
 .status {
   display: inline-block;
   margin: 2px;
@@ -52,6 +51,14 @@ table th {
   border-radius: 10px;
   padding-right: 5px;
 }
+.status-passed       { background: green }
+.status-failed       { background: red }
+.status-timeout      { background: #f0a3aa }
+.status-build_failed { background: #864E4E }
+.status-canceled     { background: #FCF88C }
+.status-ignored      { background: grey }
+.status-pending      { background: #ED8CFC }
+.status-running      { background: #697DCB }
 
 .build_status {
   display: inline-block;
@@ -60,8 +67,7 @@ table th {
   padding-left: 5px;
   border-radius: 10px;
   padding-right: 5px;
-  cursor: pointer;
-
+  color: #000;
 }
 
 .one_build {
@@ -154,13 +160,4 @@ table th {
   100% {
     transform: rotate(360deg);
   }
-}
-
-select{
-  width: 100%;
-  text-overflow: ellipsis;
-}
-
-.build_link {
-  color:black;
 }

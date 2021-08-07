@@ -27,41 +27,46 @@ function TestHistory (props) {
             .then(data => setBaseBranchHistory(data))
     }, [props.match.params.test_id]);
 
+    const formatRow = a_test => {
+        const timeStats = common.formatTimeStats(a_test);
+        return (
+          <tr key={a_test.test_id}>
+            <td>{common.commitLink(a_test)}</td>
+            <td><NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
+            <td style={{color: common.testStatusColour(a_test.status)}}>{a_test.status}</td>
+            <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
+            <td>{timeStats.delta}</td>
+            <td>{timeStats.started}</td>
+            <td>{timeStats.finished}</td>
+          </tr>
+        );
+    }
+
     return (
-      <div>
-        <table style={{"border" : "0px", "width": "40%"}}> <tbody><tr>
+      <>
+        <table style={{border: 0, width: "40%"}}><tbody><tr>
           {currentBranchHistory.map((current_test,j) =>
-          <td style={{"border": "0px", "font-size":"10px"}}>{
+          <td style={{border: 0, fontSize: "10px"}}>{
             common.RenderHistory(current_test, ("This test history for branch " + currentBranch))}</td>)}
           {baseBranch === currentBranch ? (null) :
             baseBranchHistory.map((base_test,j) =>
-            <td style={{"border": "0px", "font-size":"10px"}}>{common.RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
+            <td style={{border: 0, fontSize: "10px"}}>{common.RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
           }
         </tr></tbody></table>
-        <table  className="big"><tbody>
+        <table className="big"><thead>
           <tr>
             <th>Commit</th>
-            <th style={{"width": "40%"}}>Title</th>
+            <th>Title</th>
             <th>Status</th>
             <th>Logs</th>
             <th>Run Time</th>
             <th>Started</th>
             <th>Finished</th>
-        </tr>
-        {history.map((a_test,i) => {
-            const timeStats = common.formatTimeStats(a_test);
-            return (<tr key={a_test.test_id}>
-                <td>{common.commitLink(a_test)}</td>
-                <td><NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
-                <td style={{"color": common.StatusColor(a_test.status)}}>{a_test.status}</td>
-                <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
-                <td>{timeStats.delta}</td>
-                <td>{timeStats.started}</td>
-                <td>{timeStats.finished}</td>
-            </tr>);
-        })}
+          </tr>
+        </thead><tbody>
+         {history.map(formatRow)}
         </tbody></table>
-      </div>
+      </>
     );
 }
 

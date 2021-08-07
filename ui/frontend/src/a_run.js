@@ -19,8 +19,8 @@ function ARun (props) {
 
     var filterByAll = event => {
       var fltr = document.getElementById('build_fltr').value.toLowerCase();
-      var filtered = fltr === 'debug' || fltr === 'release'
-          ? aRun.filter(item => (fltr === 'debug') === !item.is_release)
+      var filtered = fltr === 'dev' || fltr === 'rel'
+          ? aRun.filter(item => (fltr === 'dev') === !item.is_release)
           : aRun;
       fltr = document.getElementById('features_fltr').value.toLowerCase();
       filtered = fltr
@@ -62,58 +62,58 @@ function ARun (props) {
     };
 
     return (
-      <div>
-        <table style={{"border" : "0px", "width": "40%"}}> <tbody>
-          <tr><td style={{"border": "0px"}}><NavLink to={"/"}> Back To All Runs</NavLink></td></tr>
+      <>
+        <table style={{border: 0, width: "40%"}}><tbody>
+          <tr><td style={{border: 0}}><NavLink to={"/"}> Back To All Runs</NavLink></td></tr>
         </tbody></table>
 
-        <table  className="big"><tbody>
+        <table className="big"><tbody>
           <tr>
             <th>Build
-            <select class="dropdown" onChange={filterByAll} id="build_fltr" name="filters">
+            <select onChange={filterByAll} id="build_fltr" name="filters">
               <option value=" "> </option>
-              <option value="debug">Debug</option>
-              <option value="release">Release</option>
+              <option value="dev">Dev</option>
+              <option value="rel">Release</option>
             </select>
             </th>
             <th>Features
-            <input style={{"width":"100%"}} type="text"  name="filters" id="features_fltr" onChange={filterByAll} />
+            <input style={{width: "100%"}} type="text"  name="filters" id="features_fltr" onChange={filterByAll} />
             </th>
-            <th style={{"width": "40%"}}>Test
-            <input style={{"width":"100%"}} type="text"  name="filters" id="name_fltr" onChange={filterByAll} />
+            <th>Test
+            <input style={{width: "100%"}} type="text"  name="filters" id="name_fltr" onChange={filterByAll} />
             </th>
             <th>Status
-            <input style={{"width":"100%"}} type="text"  name="filters" id="status_fltr" onChange={filterByAll} />
+            <input style={{width: "100%"}} type="text"  name="filters" id="status_fltr" onChange={filterByAll} />
             </th>
             <th>Logs
             </th>
-            <th>Run Time <button style={{"text-decoration":"none"}} onClick={orderByTestTime}>&#8597;</button></th>
+            <th>Run Time <button style={{textDecoration: "none"}} onClick={orderByTestTime}>&#8597;</button></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>
-        {filteredRuns.map((a_run,i) => {
-            const timeStats = common.formatTimeStats(a_run);
-            return (<tr key={a_run.test_id}>
-                <td style={{"font-size": "x-small", "margin":"0"}}>
-                  {a_run.build.is_release ? 'Release' : 'Debug'}
+        {filteredRuns.map(a_test => {
+            const timeStats = common.formatTimeStats(a_test);
+            return (
+              <tr key={a_test.test_id}>
+                <td>{a_test.build.is_release ? 'Release' : 'Dev'}</td>
+                <td style={{fontSize: "x-small", "margin": 0}}>
+                    {(a_test.build.features || '').replace('--features ', '').replace(/,/, ',​')}
                 </td>
-                <td style={{"font-size": "x-small", "margin":"0"}}>
-                   {a_run.build.features}
+                <td>
+                    <NavLink to={"/test/" + a_test.test_id} >{a_test.name}</NavLink>
                 </td>
-                <td style={{"width": "30%"}}>
-                    <NavLink to={"/test/" + a_run.test_id} >{a_run.name}</NavLink>
+                <td style={{color: common.testStatusColour(a_test.status)}}>{a_test.status}<br/>
+                {common.RenderHistory(a_test)}
                 </td>
-                <td style={{"color": common.StatusColor(a_run.status)}}>{a_run.status}<br/>
-                {common.RenderHistory(a_run)}
-                </td>
-                <td>{common.allLogLinks(a_run.logs, a_run.test_id)}</td>
+                <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
                 <td>{timeStats.delta}</td>
                 <td>{timeStats.started}</td>
                 <td>{timeStats.finished}</td>
-            </tr>);
+              </tr>
+            );
         })}
         </tbody></table>
-      </div>
+      </>
     );
 }
 

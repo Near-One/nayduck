@@ -20,7 +20,6 @@ export default function LocalAuthConfirmed() {
                 for (var d of data) {
                     if (d["login"] === "nearprotocol" ||
                         d["login"] === "near") {
-                        console.log("Welcome to Nay!");
                         setMember(true);
                         common.fetchAPI('/get_auth_code/' + user.login)
                             .then(data => setCode(data["code"]));
@@ -42,8 +41,8 @@ export default function LocalAuthConfirmed() {
 
     return (
         <div className="container">
-          <button class="logout" onClick={()=> handleLogout()}>Logout</button>
-          <div style={{"height": "20vh"}} className="section-login">
+          <button className="logout" onClick={()=> handleLogout()}>Logout</button>
+          <div style={{height: "20vh"}} className="section-login">
             {member ? "The code: " + code : user.login + " are not a member of NearProtocol Org."}
           </div>
         </div>

@@ -218,17 +218,13 @@ class UIDB(common_db.DB):
     def get_one_test(self, test_id):
         sql = '''SELECT test_id, run_id, build_id, status, name, started,
                         finished
-                   FROM tests WHERE test_id = %s'''
-        res = self._exec(sql, test_id)
-        tests = res.fetchall()
-        for test in tests:
-            run_data = self.get_data_about_run(test['run_id'])
-            new_data = self.get_data_about_test(test,
-                                                run_data['branch'],
-                                                blob=True)
-            test.update(new_data)
-            test.update(run_data)
-        return tests
+                   FROM tests WHERE test_id = %s
+                  LIMIT 1'''
+        test = self._exec(sql, test_id).fetchone()
+        if not test:
+            return None
+        test.update(self.get_data_about_run(test['run_id']))
+        return self.get_data_about_test(test, test['branch'], blob=True)
 
     class BuildSpec:
         """Specification for a build.
