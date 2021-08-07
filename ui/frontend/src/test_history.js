@@ -50,8 +50,7 @@ function TestHistory (props) {
         </tr>
         {history.map((a_test,i) =>
             <tr key={a_test.test_id}>
-            <td>{a_test.branch} (<a href={common.GitRepo()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
-            </td>
+            <td>{common.commitLink(a_test)}</td>
             <td> <NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
             <td style={{"color": common.StatusColor(a_test.status)}}>{a_test.status}</td>
             <td>

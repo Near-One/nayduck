@@ -30,28 +30,26 @@ function ATest (props) {
           </tr>
         </tbody></table>
         <br/><br/>
-        <table className="big"><tbody>
-            <tr><td style={{"width":"20%"}}>Commit</td><td>
-            {a_test.branch} (<a href={common.GitRepo()+"/commit/"+a_test.sha}>{a_test.sha.slice(0,7)}</a>)<br/>
-            {a_test.title}<br/>
-             requested by {a_test.requester}
-            </td></tr>
+        <table className="big">
+            <tr>
+                <td>Commit</td>
+                <td>{common.commitLink(a_test)} {a_test.title}</td>
+             </tr>
+            <tr><td>Requested by</td><td>{a_test.requester}</td></tr>
             <tr><td>Test</td><td>{a_test.cmd}</td></tr>
             <tr><td>Run Time</td><td>{a_test.run_time}</td></tr>
             <tr><td>Finished</td><td>{a_test.finished}</td></tr>
             <tr><td>Started</td><td>{a_test.started}</td></tr>
             <tr><td>Status</td><td style={{"color": common.StatusColor(a_test.status)}}>{a_test.status}</td></tr>
-        </tbody></table>
-        <table><tbody>
         {Object.entries(a_test.logs).map( ([key, value]) =>
 
-        <tr><td style={{"width":"20%"}}>
+        <tr><td>
             <a style={{"color": value.stack_trace ? "red" :
                   String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}} href={value.storage}>{key}</a></td>
             <td><textarea style={{"width":"100%", "height": "300px"}}>{value.log}</textarea></td></tr>
 
         )}
-        </tbody></table>
+        </table>
         </div>
         )}
     </div>

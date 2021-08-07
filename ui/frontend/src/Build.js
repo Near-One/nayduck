@@ -20,17 +20,17 @@ function Build (props) {
         <br/><br/>
 
         <table className="big"><tbody>
-            <tr><td style={{"width":"20%"}}>Commit</td><td>
-             {BuildInfo.branch} (<a href={common.GitRepo()+"/commit/"+BuildInfo.sha}>{BuildInfo.sha}</a>)<br/>
-            {BuildInfo.title}<br/>
-             requested by {BuildInfo.requester}
-            </td></tr>
+            <tr>
+                <td>Commit</td>
+                <td>{common.commitLink(BuildInfo)} {BuildInfo.title}</td>
+             </tr>
+            <tr><td>Requested by</td><td>{BuildInfo.requester}</td></tr>
             <tr><td>Status</td><td style={{"color": common.StatusColor(BuildInfo.status)}}>{BuildInfo.status}</td></tr>
             <tr><td>Build Time</td><td>{BuildInfo.build_time}</td></tr>
             <tr><td>Finished</td><td>{BuildInfo.finished}</td></tr>
             <tr><td>Started</td><td>{BuildInfo.started}</td></tr>
-            <tr><td style={{"width":"20%"}}>stderr</td><td><textarea style={{"width":"100%", "height": "300px"}} value={BuildInfo.stderr}>{BuildInfo.stderr}</textarea></td></tr>
-            <tr><td style={{"width":"20%"}}>stdout</td><td><textarea style={{"width":"100%", "height": "300px"}} value={BuildInfo.stdout}>{BuildInfo.stdout}</textarea></td></tr>
+            <tr><td>stderr</td><td><textarea style={{"width":"100%", "height": "300px"}} value={BuildInfo.stderr}>{BuildInfo.stderr}</textarea></td></tr>
+            <tr><td>stdout</td><td><textarea style={{"width":"100%", "height": "300px"}} value={BuildInfo.stdout}>{BuildInfo.stdout}</textarea></td></tr>
 
         </tbody></table>
 

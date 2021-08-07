@@ -94,11 +94,7 @@ function AllRuns () {
           </tr>
           {filteredRuns.map((a_run,i) =>
             <tr key={a_run.id}>
-              <td><p style={{"font-size": "x-small", "margin":"0"}}>{a_run.branch}</p>
-                <a href={common.GitRepo()+"/commit/"+a_run.sha.slice(0,7)}>
-                    {a_run.sha.slice(0,7)}
-                </a>
-              </td>
+              <td>{common.commitLink(a_run)}</td>
               <td>
                 <NavLink to={"/run/" + a_run.id} name="title">{a_run.title}</NavLink>
               </td>

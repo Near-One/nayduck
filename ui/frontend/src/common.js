@@ -49,9 +49,17 @@ export function fetchAPI(path, post=false) {
         .catch(err => console.log('Fetch Error :-S', err));
 }
 
-export function GitRepo() {
-    return process.env.REACT_APP_GIT_REPO
+
+export function commitLink(object) {
+    if (!object.branch || !object.sha) {
+        return '';
+    }
+    const branch = object.branch;
+    const sha = object.sha.substr(0, 7);
+    const url = process.env.REACT_APP_GIT_REPO + '/commit/' + sha;
+    return (<>{branch} <small>(<a href={url}>{sha}</a>)</small></>);
 }
+
 
 export function LoginPage(client_id, redirect_uri, data, setData) {
     console.log(redirect_uri);
