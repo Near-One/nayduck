@@ -109,18 +109,19 @@ function formatSize(size) {
 }
 
 
-export function logLink(log, type, bullet=false) {
+export function logLink(log, test_id=null) {
     const colour = !log.stack_trace
           ? String(log.patterns).includes("LONG DELAY") ? 'orange' : 'blue'
           : 'red';
-    const link = (
-        <><a style={{'color': colour}}
-              href={log.storage}>{type}</a> <small>({formatSize(log.size)})</small></>
-    );
-    return bullet ? (<>• {link} </>) : link;
+    const size = <small>({formatSize(log.size)})</small>;
+    const link = <><a style={{color: colour}}
+                      href={log.storage}>{log.type}</a> {size}</>;
+    return test_id !== null
+        ? <React.Fragment key={'log/' + test_id + '/' + log.type}>• {link} </React.Fragment>
+        : link;
 }
 
 
-export function allLogLinks(logs) {
-    return logs ? logs.map(log => logLink(log, log.type, true)) : null;
+export function allLogLinks(logs, test_id) {
+    return logs ? logs.map(log => logLink(log, test_id)) : null;
 }

@@ -102,7 +102,7 @@ function ARun (props) {
             <td style={{"color": common.StatusColor(a_run.status)}}>{a_run.status}<br/>
             {common.RenderHistory(a_run)}
             </td>
-            <td>{Object.entries(a_run.logs).map(([type, value]) => common.logLink(value, type, true))}</td>
+            <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
             <td>{a_run.run_time} </td>
             <td>{a_run.started}</td>
             <td>{a_run.finished}</td>

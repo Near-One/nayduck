@@ -131,8 +131,7 @@ class UIDB(common_db.DB):
                            FROM logs
                           WHERE test_id = %s
                           ORDER BY type'''
-                res = self._exec(sql, test['test_id'])
-                test['logs'] = res.fetchall()
+                test['logs'] = self._exec(sql, test['test_id']).fetchall()
         return tests
 
     def get_one_run(self, run_id):
@@ -164,11 +163,10 @@ class UIDB(common_db.DB):
         if blob:
             columns += ', log'
         sql = f'SELECT {columns} FROM logs WHERE test_id = %s ORDER BY type'
-        test['logs'] = {}
-        for log in self._exec(sql, test['test_id']).fetchall():
-            if blob:
+        test['logs'] = logs = self._exec(sql, test['test_id']).fetchall()
+        if blob:
+            for log in logs:
                 log['log'] = self._str_from_blob(log['log'])
-            test['logs'][log['type']] = log
         test['cmd'] = test['name']
         if '--features' in test['name']:
             test['name'] = test['name'][:test['name'].find('--features')]
