@@ -39,23 +39,27 @@ function ARun (props) {
       setFilteredRuns(filtered);
     };
 
+    var compareDelta = function(a, b) {
+        let aDelta = common.getTimeDelta(a, -1);
+        let bDelta = common.getTimeDelta(b, -1);
+        if (aDelta === bDelta) {
+            return 0;
+        } else {
+            return aDelta < bDelta ? -1 : 1;
+        }
+    };
+
     var orderByTestTime = event => {
-      var filtered = [...aRun];
-      if (orderDescTestTime) {
-        filtered = filtered.sort((a, b) => a.run_time > b.run_time ? 1 : -1);
-      } else {
-        filtered = filtered.sort((a, b) => a.run_time < b.run_time ? 1 : -1);
-      }
-      setARun(filtered);
-      filtered = [...filteredRuns]
-      if (orderDescTestTime) {
-        filtered = filtered.sort((a, b) => a.run_time > b.run_time ? 1 : -1);
-      } else {
-        filtered = filtered.sort((a, b) => a.run_time < b.run_time ? 1 : -1);
-      }
-      setFilteredRuns(filtered);
-      setOrderDescTestTime(!orderDescTestTime);
-    }
+        const cmp =
+              orderDescTestTime ? compareDelta : (a, b) => -compareDelta(a, b);
+        var filtered = [...aRun];
+        filtered = filtered.sort(cmp);
+        setARun(filtered);
+        filtered = [...filteredRuns]
+        filtered = filtered.sort(cmp);
+        setFilteredRuns(filtered);
+        setOrderDescTestTime(!orderDescTestTime);
+    };
 
     return (
       <div>
@@ -87,27 +91,27 @@ function ARun (props) {
             <th>Started</th>
             <th>Finished</th>
         </tr>
-        {filteredRuns.map((a_run,i) =>
-            <tr key={a_run.test_id}>
-            <td style={{"font-size": "x-small", "margin":"0"}}>
-              {a_run.build.is_release ? 'Release' : 'Debug'}
-            </td>
-            <td style={{"font-size": "x-small", "margin":"0"}}>
-               {a_run.build.features}
-
-            </td>
-            <td style={{"width": "30%"}}>
-                <NavLink to={"/test/" + a_run.test_id} >{a_run.name}</NavLink>
-            </td>
-            <td style={{"color": common.StatusColor(a_run.status)}}>{a_run.status}<br/>
-            {common.RenderHistory(a_run)}
-            </td>
-            <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
-            <td>{a_run.run_time} </td>
-            <td>{a_run.started}</td>
-            <td>{a_run.finished}</td>
-            </tr>
-        )}
+        {filteredRuns.map((a_run,i) => {
+            const timeStats = common.formatTimeStats(a_run);
+            return (<tr key={a_run.test_id}>
+                <td style={{"font-size": "x-small", "margin":"0"}}>
+                  {a_run.build.is_release ? 'Release' : 'Debug'}
+                </td>
+                <td style={{"font-size": "x-small", "margin":"0"}}>
+                   {a_run.build.features}
+                </td>
+                <td style={{"width": "30%"}}>
+                    <NavLink to={"/test/" + a_run.test_id} >{a_run.name}</NavLink>
+                </td>
+                <td style={{"color": common.StatusColor(a_run.status)}}>{a_run.status}<br/>
+                {common.RenderHistory(a_run)}
+                </td>
+                <td>{common.allLogLinks(a_run.logs, a_run.test_id)}</td>
+                <td>{timeStats.delta}</td>
+                <td>{timeStats.started}</td>
+                <td>{timeStats.finished}</td>
+            </tr>);
+        })}
         </tbody></table>
       </div>
     );

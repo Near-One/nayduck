@@ -3,6 +3,7 @@ import os
 import traceback
 
 import flask
+import flask.json
 import flask_apscheduler
 import flask_cors
 
@@ -18,6 +19,20 @@ flask_cors.CORS(app, origins=NAYDUCK_UI)
 sched = flask_apscheduler.APScheduler()
 sched.init_app(app)
 sched.start()
+
+
+class JSONEncoder(flask.json.JSONEncoder):
+    """Custom JSON encoder which encodes datetime as millisecond timestamp."""
+
+    def default(self, o):
+        if isinstance(o, datetime.datetime):
+            if o.utcoffset() is None:
+                o = o.replace(tzinfo=datetime.timezone.utc)
+            return int(o.timestamp() * 1000)
+        return super().default(o)
+
+
+app.json_encoder = JSONEncoder
 
 
 @app.route('/api/runs', methods=['GET'])

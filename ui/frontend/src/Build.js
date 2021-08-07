@@ -12,6 +12,8 @@ function Build (props) {
             .then(data => setBuildInfo(data));
     }, [props.match.params.build_id]);
 
+    const timeStats = common.formatTimeStats(BuildInfo);
+
     return (
       <div>
         <table style={{"border" : "0px", "width": "40%"}}> <tbody>
@@ -26,12 +28,11 @@ function Build (props) {
              </tr>
             <tr><td>Requested by</td><td>{BuildInfo.requester}</td></tr>
             <tr><td>Status</td><td style={{"color": common.StatusColor(BuildInfo.status)}}>{BuildInfo.status}</td></tr>
-            <tr><td>Build Time</td><td>{BuildInfo.build_time}</td></tr>
-            <tr><td>Finished</td><td>{BuildInfo.finished}</td></tr>
-            <tr><td>Started</td><td>{BuildInfo.started}</td></tr>
+            <tr><td>Build Time</td><td>{timeStats.delta}</td></tr>
+            <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
+            <tr><td>Started</td><td>{timeStats.started}</td></tr>
             <tr><td>stderr</td><td><textarea style={{"width":"100%", "height": "300px"}} value={BuildInfo.stderr}>{BuildInfo.stderr}</textarea></td></tr>
             <tr><td>stdout</td><td><textarea style={{"width":"100%", "height": "300px"}} value={BuildInfo.stdout}>{BuildInfo.stdout}</textarea></td></tr>
-
         </tbody></table>
 
       </div>

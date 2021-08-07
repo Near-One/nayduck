@@ -125,3 +125,61 @@ export function logLink(log, test_id=null) {
 export function allLogLinks(logs, test_id) {
     return logs ? logs.map(log => logLink(log, test_id)) : null;
 }
+
+
+function pad(value) {
+    return (value < 10 ? '0' : '') + value;
+}
+
+
+function formatDateTime(timestampMs) {
+    if (!timestampMs) {
+        return '';
+    }
+    const date = new Date(timestampMs);
+    const year = date.getFullYear();
+    const month = pad(date.getMonth());
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+
+function formatTimeDelta(milliseconds) {
+    milliseconds = 0 | milliseconds;
+    const sign = milliseconds < 0 ? '-' : '';
+    if (milliseconds < 0) {
+        milliseconds = -milliseconds;
+    }
+    let h = 0 | (milliseconds / 1000);
+    const s = h % 60;
+    h = 0 | (h / 60);
+    const m = h % 60;
+    h = 0 | (h / 60);
+
+    return `${sign}${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+
+export function getTimeDelta(object, missingValue=null) {
+    if (object.started) {
+        const finished = object.finished || (0 | (new Date()).getTime());
+        return finished - object.started;
+    } else {
+        return missingValue;
+    }
+}
+
+
+export function formatTimeStats(object) {
+    const started = formatDateTime(object.started);
+    const finished = formatDateTime(object.finished);
+    const delta = getTimeDelta(object);
+    return {
+        started,
+        finished,
+        delta: delta === null ? '' : formatTimeDelta(delta)
+    };
+}

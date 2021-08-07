@@ -48,17 +48,18 @@ function TestHistory (props) {
             <th>Started</th>
             <th>Finished</th>
         </tr>
-        {history.map((a_test,i) =>
-            <tr key={a_test.test_id}>
-            <td>{common.commitLink(a_test)}</td>
-            <td> <NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
-            <td style={{"color": common.StatusColor(a_test.status)}}>{a_test.status}</td>
-            <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
-            <td>{a_test.run_time}</td>
-            <td>{a_test.started}</td>
-            <td>{a_test.finished}</td>
-            </tr>
-        )}
+        {history.map((a_test,i) => {
+            const timeStats = common.formatTimeStats(a_test);
+            return (<tr key={a_test.test_id}>
+                <td>{common.commitLink(a_test)}</td>
+                <td><NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
+                <td style={{"color": common.StatusColor(a_test.status)}}>{a_test.status}</td>
+                <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
+                <td>{timeStats.delta}</td>
+                <td>{timeStats.started}</td>
+                <td>{timeStats.finished}</td>
+            </tr>);
+        })}
         </tbody></table>
       </div>
     );

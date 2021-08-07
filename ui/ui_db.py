@@ -124,8 +124,6 @@ class UIDB(common_db.DB):
         result = self._exec(sql, test_name, branch)
         tests = result.fetchall()
         for test in tests:
-            if test['finished'] is not None and test['started'] is not None:
-                test['run_time'] = str(test['finished'] - test['started'])
             if interested_in_logs:
                 sql = '''SELECT type, size, storage, stack_trace, patterns
                            FROM logs
@@ -172,8 +170,6 @@ class UIDB(common_db.DB):
             test['name'] = test['name'][:test['name'].find('--features')]
         test['name'] = ' '.join(
             word for word in test['name'].split() if not word.startswith('--'))
-        if test['finished'] is not None and test['started'] is not None:
-            test['run_time'] = str(test['finished'] - test['started'])
         history = self.get_test_history(test['cmd'], branch)
         test['history'] = self.history_stats(history)
         return test
@@ -187,8 +183,6 @@ class UIDB(common_db.DB):
         sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
         res = self._exec(sql, build_id)
         build = res.fetchone()
-        if build['finished'] is not None and build['started'] is not None:
-            build['build_time'] = str(build['finished'] - build['started'])
         build['stdout'] = self._str_from_blob(build['stdout'])
         build['stderr'] = self._str_from_blob(build['stderr'])
         run = self.get_data_about_run(build['run_id'])
