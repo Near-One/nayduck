@@ -102,15 +102,7 @@ function ARun (props) {
             <td style={{"color": common.StatusColor(a_run.status)}}>{a_run.status}<br/>
             {common.RenderHistory(a_run)}
             </td>
-            <td>
-                   {Object.entries(a_run.logs).map( ([type, value]) =>
-                 <a style={{"color": value.stack_trace ? "red" :
-                                    String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}}
-                  href={value.storage}> {type + "(" + value.full_size + ")" }
-
-                 </a>
-              )}
-            </td>
+            <td>{Object.entries(a_run.logs).map(([type, value]) => common.logLink(value, type, true))}</td>
             <td>{a_run.run_time} </td>
             <td>{a_run.started}</td>
             <td>{a_run.finished}</td>

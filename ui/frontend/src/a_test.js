@@ -42,12 +42,8 @@ function ATest (props) {
             <tr><td>Started</td><td>{a_test.started}</td></tr>
             <tr><td>Status</td><td style={{"color": common.StatusColor(a_test.status)}}>{a_test.status}</td></tr>
         {Object.entries(a_test.logs).map( ([key, value]) =>
-
-        <tr><td>
-            <a style={{"color": value.stack_trace ? "red" :
-                  String(value.patterns).includes("LONG DELAY") ? "orange" : "blue"}} href={value.storage}>{key}</a></td>
+            <tr><td>{common.logLink(value, key)}</td>
             <td><textarea style={{"width":"100%", "height": "300px"}}>{value.log}</textarea></td></tr>
-
         )}
         </table>
         </div>

@@ -90,3 +90,37 @@ export function LoginPage(client_id, redirect_uri, data, setData) {
       </section>
   );
 }
+
+
+function formatSize(size) {
+    if (size < 1000) {
+        return '' + size;
+    }
+    for (const suffix of 'kMGTPEZ') {
+        if (size < 10000) {
+            return '' + (Math.round(size / 100) / 10) + ' ' + suffix;
+        }
+        size /= 1000;
+        if (size < 1000) {
+            return '' + Math.round(size) + suffix;
+        }
+    }
+    return '' + Math.round(size) + ' Y';
+}
+
+
+export function logLink(log, type, bullet=false) {
+    const colour = !log.stack_trace
+          ? String(log.patterns).includes("LONG DELAY") ? 'orange' : 'blue'
+          : 'red';
+    const link = (
+        <><a style={{'color': colour}}
+              href={log.storage}>{type}</a> <small>({formatSize(log.size)})</small></>
+    );
+    return bullet ? (<>• {link} </>) : link;
+}
+
+
+export function allLogLinks(logs) {
+    return logs ? logs.map(log => logLink(log, log.type, true)) : null;
+}

@@ -9,19 +9,6 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db  # pylint: disable=wrong-import-position
 
 
-def _prettify_size(size: int) -> str:
-    """Returns file size in human-readable format, e.g. 10k i/o 10000."""
-    if size < 1000:
-        return str(size)
-    for suffix in 'kMGTPEZ':
-        if size < 10000:
-            return '%.1f%s' % (size / 1000, suffix)
-        size //= 1000
-        if size < 1000:
-            return str(size) + suffix
-    return str(size) + 'Y'
-
-
 class UIDB(common_db.DB):
 
     def cancel_the_run(self, run_id, status='CANCELED'):
@@ -145,9 +132,7 @@ class UIDB(common_db.DB):
                           WHERE test_id = %s
                           ORDER BY type'''
                 res = self._exec(sql, test['test_id'])
-                logs = test['logs'] = res.fetchall()
-                for log in logs:
-                    log['full_size'] = _prettify_size(log.pop('size'))
+                test['logs'] = res.fetchall()
         return tests
 
     def get_one_run(self, run_id):
@@ -181,7 +166,6 @@ class UIDB(common_db.DB):
         sql = f'SELECT {columns} FROM logs WHERE test_id = %s ORDER BY type'
         test['logs'] = {}
         for log in self._exec(sql, test['test_id']).fetchall():
-            log['full_size'] = _prettify_size(log.pop('size'))
             if blob:
                 log['log'] = self._str_from_blob(log['log'])
             test['logs'][log['type']] = log
