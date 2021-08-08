@@ -142,16 +142,16 @@ class UIDB(common_db.DB):
         return tests
 
     def get_one_run(self, run_id):
-        run_data = self.get_data_about_run(run_id)
-        run_data['id'] = int(run_id)
-        branch = run_data['branch']
-
-        sql = '''SELECT test_id, status, name, started, finished
-                   FROM tests
+        sql = '''SELECT test_id, status, name, started, finished, branch
+                   FROM tests JOIN runs ON (runs.id = tests.run_id)
                   WHERE run_id = %s
                   ORDER BY status, started'''
         tests = self._exec(sql, run_id).fetchall()
-        self._populate_data_about_tests(tests, branch, blob=False)
+        if tests:
+            branch = tests[0]['branch']
+            for test in tests:
+                test.pop('branch')
+            self._populate_data_about_tests(tests, branch, blob=False)
         return tests
 
     def _populate_test_logs(self, tests, blob=False):
@@ -182,25 +182,17 @@ class UIDB(common_db.DB):
             history = self.get_test_history(test['name'], branch)
             test['history'] = self.history_stats(history)
 
-    def get_data_about_run(self, run_id):
-        sql = '''SELECT branch, sha, title, requester
-                   FROM runs
-                  WHERE id = %s
-                  LIMIT 1'''
-        return self._exec(sql, run_id).fetchone()
-
     def get_build_info(self, build_id):
         sql = '''SELECT run_id, status, started, finished, stderr, stdout,
-                        features, is_release
-                   FROM builds
+                        features, is_release, branch, sha, title, requester
+                   FROM builds JOIN runs ON (runs.id = builds.run_id)
                   WHERE build_id = %s
                   LIMIT 1'''
         res = self._exec(sql, build_id)
         build = res.fetchone()
-        build['stdout'] = self._str_from_blob(build['stdout'])
-        build['stderr'] = self._str_from_blob(build['stderr'])
-        run = self.get_data_about_run(build['run_id'])
-        build.update(run)
+        if build:
+            build['stdout'] = self._str_from_blob(build['stdout'])
+            build['stderr'] = self._str_from_blob(build['stderr'])
         return build
 
     def get_histoty_for_base_branch(self, test_id, branch):
@@ -232,13 +224,13 @@ class UIDB(common_db.DB):
 
     def get_one_test(self, test_id):
         sql = '''SELECT test_id, run_id, build_id, status, name, started,
-                        finished
-                   FROM tests WHERE test_id = %s
+                        finished, branch, sha, title, requester
+                   FROM tests JOIN runs ON (runs.id = tests.run_id)
+                  WHERE test_id = %s
                   LIMIT 1'''
         test = self._exec(sql, test_id).fetchone()
         if not test:
             return None
-        test.update(self.get_data_about_run(test['run_id']))
         self._populate_data_about_tests([test], test['branch'], blob=True)
         return test
 
