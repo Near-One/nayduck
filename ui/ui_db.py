@@ -1,4 +1,5 @@
 import collections
+import itertools
 import os
 import random
 import string
@@ -135,15 +136,9 @@ class UIDB(common_db.DB):
                   WHERE name = %s AND t.run_id = r.id AND r.branch = %s
                   ORDER BY t.test_id DESC
                   LIMIT 30'''
-        result = self._exec(sql, test_name, branch)
-        tests = result.fetchall()
-        for test in tests:
-            if interested_in_logs:
-                sql = '''SELECT type, size, storage, stack_trace, patterns
-                           FROM logs
-                          WHERE test_id = %s
-                          ORDER BY type'''
-                test['logs'] = self._exec(sql, test['test_id']).fetchall()
+        tests = self._exec(sql, test_name, branch).fetchall()
+        if interested_in_logs:
+            self._populate_test_logs(tests, blob=False)
         return tests
 
     def get_one_run(self, run_id):
@@ -156,22 +151,36 @@ class UIDB(common_db.DB):
                   WHERE run_id = %s
                   ORDER BY status, started'''
         tests = self._exec(sql, run_id).fetchall()
-        for test in tests:
-            test.update(self.get_data_about_test(test, branch, blob=False))
+        self._populate_data_about_tests(tests, branch, blob=False)
         return tests
 
-    def get_data_about_test(self, test, branch, blob=False):
-        columns = 'type, size, storage, stack_trace, patterns'
-        if blob:
-            columns += ', log'
-        sql = f'SELECT {columns} FROM logs WHERE test_id = %s ORDER BY type'
-        test['logs'] = logs = self._exec(sql, test['test_id']).fetchall()
-        if blob:
-            for log in logs:
+    def _populate_test_logs(self, tests, blob=False):
+        if not tests:
+            return
+
+        def process_log(log):
+            log.pop('test_id')
+            if blob:
                 log['log'] = self._str_from_blob(log['log'])
-        history = self.get_test_history(test['name'], branch)
-        test['history'] = self.history_stats(history)
-        return test
+            return log
+
+        tests_by_id = {int(test['test_id']): test for test in tests}
+        sql = '''SELECT test_id, type, size, storage, stack_trace, patterns
+                        {log_column}
+                   FROM logs
+                  WHERE test_id IN ({ids})
+                  ORDER BY test_id, type'''.format(
+            log_column=', log' if blob else '',
+            ids=','.join(str(test_id) for test_id in tests_by_id))
+        for test_id, rows in itertools.groupby(
+                self._exec(sql).fetchall(), lambda row: row['test_id']):
+            tests_by_id[test_id]['logs'] = [process_log(row) for row in rows]
+
+    def _populate_data_about_tests(self, tests, branch, blob=False):
+        self._populate_test_logs(tests, blob=blob)
+        for test in tests:
+            history = self.get_test_history(test['name'], branch)
+            test['history'] = self.history_stats(history)
 
     def get_data_about_run(self, run_id):
         sql = '''SELECT branch, sha, title, requester
@@ -230,7 +239,8 @@ class UIDB(common_db.DB):
         if not test:
             return None
         test.update(self.get_data_about_run(test['run_id']))
-        return self.get_data_about_test(test, test['branch'], blob=True)
+        self._populate_data_about_tests([test], test['branch'], blob=True)
+        return test
 
     class BuildSpec:
         """Specification for a build.
