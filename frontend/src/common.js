@@ -57,8 +57,13 @@ export function renderHistoryCell(history, branch) {
 }
 
 
+function apiBaseHref() {
+    return process.env.REACT_APP_SERVER_IP;
+}
+
+
 export function fetchAPI(path, post=false) {
-    const url = process.env.REACT_APP_SERVER_IP + '/api' + path;
+    const url = apiBaseHref() + '/api' + path;
     const opts = {
         headers: { 'Accept': 'application/json' },
         method: post ? 'POST' : 'GET',
@@ -133,8 +138,12 @@ export function logLink(log, test_id=null) {
           ? String(log.patterns).includes("LONG DELAY") ? 'orange' : 'blue'
           : 'red';
     const size = <small>({formatSize(log.size)})</small>;
+    let href = log.storage;
+    if (href.startsWith('/')) {
+        href = apiBaseHref() + href;
+    }
     const link = <><a style={{color: colour}}
-                      href={log.storage}>{log.type}</a> {size}</>;
+                      href={href}>{log.type}</a> {size}</>;
     return test_id !== null
         ? <React.Fragment key={'log/' + test_id + '/' + log.type}>• {link} </React.Fragment>
         : link;

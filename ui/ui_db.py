@@ -1,4 +1,5 @@
 import collections
+import gzip
 import itertools
 import typing
 
@@ -137,6 +138,7 @@ class UIDB(common_db.DB):
             log.pop('test_id')
             if blob:
                 log['log'] = self._str_from_blob(log['log'])
+                _pop_falsy(log, 'log')
             return log
 
         tests_by_id = {int(test['test_id']): test for test in tests}
@@ -168,6 +170,7 @@ class UIDB(common_db.DB):
         if build:
             build['stdout'] = self._str_from_blob(build['stdout'])
             build['stderr'] = self._str_from_blob(build['stderr'])
+            _pop_falsy(build, 'stdout', 'stderr')
         return build
 
     def get_histoty_for_base_branch(self, test_id, branch):
@@ -359,3 +362,80 @@ class UIDB(common_db.DB):
         found = bool(self._exec(sql, nonce).rowcount)
         self._exec('DELETE FROM auth_codes WHERE timestamp < %s', now - 600)
         return found
+
+    def get_test_log(self, test_id: int, log_type: str,
+                     gzip_ok: bool) -> typing.Tuple[bytes, bool]:
+        """Returns given test log.
+
+        Args:
+            test_id: Test id to return log for.
+            log_type: Name of the log to return.
+            gzip_ok: If True and the log is stored compressed in the database
+                returns the log as such.  If False will always return
+                decompressed log.
+        Returns:
+            A (contents, is_compressed) tuple where the first element is
+            contents of the log and second says whether the contents is
+            compressed or not.  Second element is always False if gzip_ok
+            argument is False.
+        Raises:
+            KeyError: if given log does not exist.
+        """
+        sql = 'SELECT log FROM logs WHERE test_id = %s AND type = %s LIMIT 1'
+        return self._get_log_impl(sql, test_id, log_type, gzip_ok=gzip_ok)
+
+    def get_build_log(self, build_id: int, log_type: str,
+                      gzip_ok: bool) -> typing.Tuple[bytes, bool]:
+        """Returns given build log.
+
+        Args:
+            build_id: Build id to return log for.
+            log_type: Name of the log to return.  Can be either 'stderr' or
+                'stdout'.
+            gzip_ok: If True and the log is stored compressed in the database
+                returns the log as such.  If False will always return
+                decompressed log.
+        Returns:
+            A (contents, is_compressed) tuple where the first element is
+            contents of the log and second says whether the contents is
+            compressed or not.  Second element is always False if gzip_ok
+            argument is False.
+        Raises:
+            KeyError: if given log does not exist.
+            AssertionError: if log_type is not 'stderr' or 'stdout'.
+        """
+        assert log_type in ('stderr', 'stdout')
+        sql = f'SELECT {log_type} FROM builds WHERE build_id = %s LIMIT 1'
+        return self._get_log_impl(sql, build_id, gzip_ok=gzip_ok)
+
+    def _get_log_impl(self, sql: str, *args: typing.Any,
+                      gzip_ok: bool) -> typing.Tuple[bytes, bool]:
+        """Returns a log from the database.
+
+        Args:
+            sql: The SQL query to execute to fetch the log.  The query should
+                return one row with a single column whose value is the log
+                contents.
+            args: Arguments to use in placeholders of the query.
+            gzip_ok: If True and the log is stored compressed in the database
+                returns the log as such.  If False will always return
+                decompressed log.
+        Returns:
+            A (contents, is_compressed) tuple where the first element is
+            contents of the log and second says whether the contents is
+            compressed or not.  Second element is always False if gzip_ok
+            argument is False.
+        Raises:
+            KeyError: if given SQL query returned no rows.
+        """
+        row = self._exec(sql, *args).fetchone()
+        if not row:
+            raise KeyError()
+        blob = row.popitem()[1]
+        if blob is None:
+            raise KeyError()
+        is_compressed = blob.startswith(b'\x1f\x8b')
+        if is_compressed and not gzip_ok:
+            blob = gzip.decompress(blob)
+            is_compressed = False
+        return blob, is_compressed

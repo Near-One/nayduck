@@ -143,6 +143,30 @@ def schedule_nightly_run_check(delta: datetime.timedelta):
                   run_date=(datetime.datetime.now() + delta))
 
 
+@app.route('/logs/<any("test","build"):kind>/<int:obj_id>/<log_type>')
+def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
+    gzip_ok = 'gzip' in flask.request.headers.get('accept-encoding', '')
+    if kind == 'test':
+        getter = lambda db, gzip_ok: db.get_test_log(obj_id, log_type, gzip_ok)
+    elif log_type in ('stderr', 'stdout'):
+        getter = lambda db, gzip_ok: db.get_build_log(obj_id, log_type, gzip_ok)
+    else:
+        flask.abort(404)
+    with ui_db.UIDB() as server:
+        try:
+            blob, compressed = getter(server, gzip_ok)
+        except KeyError:
+            flask.abort(404)
+    response = flask.make_response(blob, 200)
+    response.headers['vary'] = 'Accept-Encoding'
+    response.headers['cache-control'] = (
+        f'public, max-age={365 * 24 * 3600}, immutable')
+    response.headers['content-type'] = 'text/plain; charset=utf-8'
+    if compressed:
+        response.headers['content-encoding'] = 'gzip'
+    return response
+
+
 @app.route('/login/<any("cli","web"):mode>', methods=['GET'])
 def login_redirect(mode: str) -> flask.Response:
     try:
