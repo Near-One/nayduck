@@ -5,26 +5,36 @@ import * as common from "./common";
 
 
 function TestHistory (props) {
-    const [history, setHistory] = useState([]);
-    const [baseBranchHistory, setBaseBranchHistory] = useState([]);
-    const [currentBranchHistory, setCurrentBranchHistory] = useState([]);
+    const [history, setHistory] = useState(null);
+    const [baseBranchHistory, setBaseBranchHistory] = useState(null);
+    const [currentBranchHistory, setCurrentBranchHistory] = useState(null);
     const baseBranch = "master";
-    const [currentBranch, setCurrentBranch] = useState("");;
+    const [currentBranch, setCurrentBranch] = useState("");
 
     useEffect(() => {
         const basePath = '/test/' + (0 | props.match.params.test_id);
-        common.fetchAPI(basePath + '/history')
-            .then(data => {
-                setHistory(data);
-                const branch = data[0]["branch"];
-                if (branch) {
-                    setCurrentBranch(branch);
-                    common.fetchAPI(basePath + '/history/' + branch)
-                        .then(data => setCurrentBranchHistory(data));
-                }
-            });
-        common.fetchAPI(basePath + '/history/' + baseBranch)
-            .then(data => setBaseBranchHistory(data))
+        common.fetchAPI(basePath + '/history').then(data => {
+            if (!data) {
+                setHistory(null);
+                setCurrentBranch('');
+                setCurrentBranchHistory(null);
+                setBaseBranchHistory(null);
+                return;
+            }
+            data.test_id = (0 | props.match.params.test_id);
+            setHistory(data.tests);
+            setCurrentBranch(data.branch);
+            setCurrentBranchHistory(data);
+            if (data.branch !== baseBranch) {
+                common.fetchAPI(basePath + '/history/' + baseBranch)
+                    .then(data => {
+                        data.test_id = (0 | props.match.params.test_id);
+                        setBaseBranchHistory(data)
+                    });
+            } else {
+                setBaseBranchHistory(null);
+            }
+        });
     }, [props.match.params.test_id]);
 
     const formatRow = a_test => {
@@ -42,16 +52,11 @@ function TestHistory (props) {
         );
     }
 
-    return (
+    return history ? (
       <>
         <table style={{border: 0, width: "40%"}}><tbody><tr>
-          {currentBranchHistory.map((current_test,j) =>
-          <td style={{border: 0, fontSize: "10px"}}>{
-            common.RenderHistory(current_test, ("This test history for branch " + currentBranch))}</td>)}
-          {baseBranch === currentBranch ? (null) :
-            baseBranchHistory.map((base_test,j) =>
-            <td style={{border: 0, fontSize: "10px"}}>{common.RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
-          }
+          {common.renderHistoryCell(currentBranchHistory, currentBranch)}
+          {common.renderHistoryCell(baseBranchHistory, baseBranch)}
         </tr></tbody></table>
         <table className="big"><thead>
           <tr>
@@ -67,7 +72,7 @@ function TestHistory (props) {
          {history.map(formatRow)}
         </tbody></table>
       </>
-    );
+    ) : null;
 }
 
 export default TestHistory;

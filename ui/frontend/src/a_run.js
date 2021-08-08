@@ -9,9 +9,18 @@ function ARun (props) {
     const [aRun, setARun] = useState([]);
     const [filteredRuns, setFilteredRuns] = useState([])
 
+    const processTest = test => {
+        const words = test.name.split(/ +/);
+        const pos = words.indexOf('--features');
+        test.features = pos === -1 ? '' : words.splice(pos).join(' ');
+        test.is_release = words.indexOf('--release') !== -1;
+        test.name = words.filter(word => !word.startsWith('--')).join(' ');
+    }
+
     useEffect(() => {
         common.fetchAPI('/run/' + (0 | props.match.params.run_id))
             .then(data => {
+                data.forEach(processTest);
                 setARun(data);
                 setFilteredRuns(data)
             });
@@ -25,8 +34,8 @@ function ARun (props) {
       fltr = document.getElementById('features_fltr').value.toLowerCase();
       filtered = fltr
         ? filtered.filter(item => fltr === ' '
-                          ? !item.build.features
-                          : item.build.features.toLowerCase().includes(fltr))
+                          ? !item.features
+                          : item.features.toLowerCase().includes(fltr))
         : filtered;
       fltr = document.getElementById('name_fltr').value.toLowerCase();
       filtered = fltr
@@ -95,15 +104,17 @@ function ARun (props) {
             const timeStats = common.formatTimeStats(a_test);
             return (
               <tr key={a_test.test_id}>
-                <td>{a_test.build.is_release ? 'Release' : 'Dev'}</td>
+                <td>
+                  {a_test.is_release ? 'Release' : 'Dev'}
+                </td>
                 <td style={{fontSize: "x-small", "margin": 0}}>
-                    {(a_test.build.features || '').replace('--features ', '').replace(/,/, ',​')}
+                    {(a_test.features || '').replace('--features ', '').replace(/,/, ',​')}
                 </td>
                 <td>
                     <NavLink to={"/test/" + a_test.test_id} >{a_test.name}</NavLink>
                 </td>
                 <td style={{color: common.testStatusColour(a_test.status)}}>{a_test.status}<br/>
-                {common.RenderHistory(a_test)}
+                {common.renderHistory(a_test)}
                 </td>
                 <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
                 <td>{timeStats.delta}</td>

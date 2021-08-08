@@ -6,14 +6,20 @@ import * as common from "./common"
 
 function ATest (props) {
     const [aTest, setATest] = useState(null);
-    const [baseBranchHistory, setBaseBranchHistory] = useState([]);
+    const [baseBranchHistory, setBaseBranchHistory] = useState(null);
     const baseBranch = "master";
 
     useEffect(() => {
         const basePath = '/test/' + (0 | props.match.params.test_id);
-        common.fetchAPI(basePath).then(setATest);
-        common.fetchAPI(basePath + '/history/' + baseBranch)
-            .then(setBaseBranchHistory);
+        common.fetchAPI(basePath).then(data => {
+            setATest(data);
+            if (data && data.branch !== baseBranch) {
+                common.fetchAPI(basePath + '/history/' + baseBranch)
+                    .then(data => setBaseBranchHistory(data));
+            } else {
+                setBaseBranchHistory(null);
+            }
+        });
     }, [props.match.params.test_id]);
 
     if (!aTest) {
@@ -25,19 +31,17 @@ function ATest (props) {
       <>
         <table style={{border: 0, width: "40%"}}><tbody>
           <tr><td style={{border: 0}}><NavLink to={"/run/" + aTest.run_id}> Back To A Run</NavLink></td>
-          <td style={{border: 0, fontSize: "10px"}}>{common.RenderHistory(aTest, ("This test history for branch " + aTest.branch))}</td>
-          {baseBranch === aTest.branch ? (null) :
-          baseBranchHistory.map((base_test,j) => <td style={{border: 0, fontSize: "10px"}}>{common.RenderHistory(base_test, ("This test history for branch " + baseBranch))}</td>)
-          }
+          {common.renderHistoryCell(aTest, aTest.branch)}
+          {common.renderHistoryCell(baseBranchHistory, baseBranch)}
           </tr>
         </tbody></table>
         <table className="big"><tbody>
           <tr>
-              <td>Commit</td>
-              <td>{common.commitLink(aTest)} {aTest.title}</td>
-           </tr>
+            <td>Commit</td>
+            <td>{common.commitLink(aTest)} {aTest.title}</td>
+          </tr>
           <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
-          <tr><td>Test</td><td>{aTest.cmd}</td></tr>
+          <tr><td>Test</td><td>{aTest.name}</td></tr>
           <tr><td>Run Time</td><td>{timeStats.delta}</td></tr>
           <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
           <tr><td>Started</td><td>{timeStats.started}</td></tr>

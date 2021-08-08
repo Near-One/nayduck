@@ -73,7 +73,7 @@ def test_history(test_id: int):
 @app.route('/api/test/<int:test_id>/history/<path:branch>', methods=['GET'])
 def branch_history(test_id: int, branch: str):
     with UIDB() as server:
-        history = [server.get_histoty_for_base_branch(test_id, branch)]
+        history = server.get_histoty_for_base_branch(test_id, branch)
     return flask.jsonify(history)
 
 

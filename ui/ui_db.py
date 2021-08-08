@@ -9,6 +9,13 @@ sys.path.append(os.path.abspath('../main_db'))
 import common_db  # pylint: disable=wrong-import-position
 
 
+def _pop_falsy(dictionary, *keys):
+    """Remove keys from a dictionary if their values are falsy."""
+    for key in keys:
+        if not dictionary.get(key, True):
+            dictionary.pop(key)
+
+
 class UIDB(common_db.DB):
 
     def cancel_the_run(self, run_id, status='CANCELED'):
@@ -68,6 +75,7 @@ class UIDB(common_db.DB):
             run_id = int(build.pop('run_id'))
             build_id = int(build['build_id'])
             build['tests'] = statuses.get((run_id, build_id), self._NO_STATUSES)
+            _pop_falsy(build, 'is_release', 'features')
             all_runs[run_id].setdefault('builds', []).append(build)
 
         # Fill out fake builds for any old runs which don't have corresponding
@@ -108,11 +116,17 @@ class UIDB(common_db.DB):
                    FROM tests AS t, runs AS r
                   WHERE t.test_id = %s AND r.id = t.run_id
                   LIMIT 1'''
-        result = self._exec(sql, test_id)
-        res = result.fetchone()
-        return self.get_test_history(res['name'],
-                                     res['branch'],
-                                     interested_in_logs=True)
+        row = self._exec(sql, test_id).fetchone()
+        if not row:
+            return None
+        tests = self.get_test_history(row['name'],
+                                      row['branch'],
+                                      interested_in_logs=True)
+        return {
+            'branch': row['branch'],
+            'tests': tests,
+            'history': self.history_stats(tests),
+        }
 
     def get_test_history(self, test_name, branch, interested_in_logs=False):
         sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
@@ -134,27 +148,17 @@ class UIDB(common_db.DB):
 
     def get_one_run(self, run_id):
         run_data = self.get_data_about_run(run_id)
+        run_data['id'] = int(run_id)
         branch = run_data['branch']
 
-        sql = '''SELECT build_id, is_release, features
-                   FROM builds
-                  WHERE run_id = %s'''
-        res = self._exec(sql, run_id)
-        builds_dict = dict((build['build_id'], build)
-                           for build in (res.fetchall() or self._NO_BUILDS))
-
-        sql = '''SELECT *
+        sql = '''SELECT test_id, status, name, started, finished
                    FROM tests
                   WHERE run_id = %s
                   ORDER BY status, started'''
-        res = self._exec(sql, run_id)
-        a_run = res.fetchall()
-        for test in a_run:
-            if test['build_id'] is None:
-                test['build_id'] = 0
-            test['build'] = builds_dict[test['build_id']]
+        tests = self._exec(sql, run_id).fetchall()
+        for test in tests:
             test.update(self.get_data_about_test(test, branch, blob=False))
-        return a_run
+        return tests
 
     def get_data_about_test(self, test, branch, blob=False):
         columns = 'type, size, storage, stack_trace, patterns'
@@ -165,22 +169,23 @@ class UIDB(common_db.DB):
         if blob:
             for log in logs:
                 log['log'] = self._str_from_blob(log['log'])
-        test['cmd'] = test['name']
-        if '--features' in test['name']:
-            test['name'] = test['name'][:test['name'].find('--features')]
-        test['name'] = ' '.join(
-            word for word in test['name'].split() if not word.startswith('--'))
-        history = self.get_test_history(test['cmd'], branch)
+        history = self.get_test_history(test['name'], branch)
         test['history'] = self.history_stats(history)
         return test
 
     def get_data_about_run(self, run_id):
-        sql = 'SELECT * FROM runs WHERE id = %s LIMIT 1'
-        res = self._exec(sql, run_id)
-        return res.fetchone()
+        sql = '''SELECT branch, sha, title, requester
+                   FROM runs
+                  WHERE id = %s
+                  LIMIT 1'''
+        return self._exec(sql, run_id).fetchone()
 
     def get_build_info(self, build_id):
-        sql = 'SELECT * FROM builds WHERE build_id = %s LIMIT 1'
+        sql = '''SELECT run_id, status, started, finished, stderr, stdout,
+                        features, is_release
+                   FROM builds
+                  WHERE build_id = %s
+                  LIMIT 1'''
         res = self._exec(sql, build_id)
         build = res.fetchone()
         build['stdout'] = self._str_from_blob(build['stdout'])
@@ -205,14 +210,15 @@ class UIDB(common_db.DB):
 
     @classmethod
     def history_stats(cls, history):
-        res = {'PASSED': 0, 'FAILED': 0, 'OTHER': 0}
+        # passed, other, failed
+        res = [0, 0, 0]
         for hist in history:
             if hist['status'] == 'PASSED':
-                res['PASSED'] += 1
+                res[0] += 1
             elif hist['status'] in ('FAILED', 'BUILD FAILED', 'TIMEOUT'):
-                res['FAILED'] += 1
+                res[2] += 1
             else:
-                res['OTHER'] += 1
+                res[1] += 1
         return res
 
     def get_one_test(self, test_id):

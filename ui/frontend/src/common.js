@@ -4,6 +4,7 @@ import {
   } from "react-router-dom";
 import GithubIcon from "mdi-react/GithubIcon";
 
+
 export function testStatusColour(status) {
     switch (status) {
     case "FAILED" || "BUILD FAILED":   return "red";
@@ -27,29 +28,34 @@ export function buildStatusColour(status) {
 };
 
 
-export function HistorySwitchText(status, count) {
-    switch (status) {
-        case "FAILED" :   return "F:"+count;
-        case "PASSED":   return "P:"+count;
-        case "OTHER":   return "O:"+count;
-        default:      return null;
-        }
-}
-
-export function RenderHistory(a_test, title) {
+export function renderHistory(a_test, branch = null) {
+    const statuses = ['PASSED', 'OTHER', 'FAILED'];
     return (
-      <NavLink to={"/test_history/" + a_test.test_id}>{title}<table style={{border: 0}}><tbody><tr>
-        {Object.entries(a_test.history).map(([key, value], idx) =>
-          <td key={a_test.test_id + '/' + idx + '/' + (title || '')} style={{
-                  border: 0,
-                  padding: 0,
-                  fontSize: "10px",
-                  color: testStatusColour(key)
-              }}>{HistorySwitchText(key, value)}</td>
-        )}
-      </tr></tbody></table></NavLink>
+      <NavLink to={"/test_history/" + a_test.test_id}
+               style={{border: 0, fontSize: '0.625em'}}>{
+                   branch ? 'This test history for branch ' + branch : null
+               }<table style={{border: 0}}><tbody><tr>{
+                   a_test.history.map((count, index) => {
+                       const status = statuses[index];
+                       return status
+                           ? <td key={branch + '/history/' + index} style={{
+                                     border: 0,
+                                     padding: 0,
+                                     color: testStatusColour(status)
+                                 }}>{status.substr(0, 1)}:{count}</td>
+                           : null;
+                   })
+               }</tr></tbody></table></NavLink>
     );
 }
+
+
+export function renderHistoryCell(history, branch) {
+    return history
+        ? <td style={{border: 0}}>{renderHistory(history, branch)}</td>
+        :  null;
+}
+
 
 export function fetchAPI(path, post=false) {
     const url = process.env.REACT_APP_SERVER_IP + '/api' + path;
