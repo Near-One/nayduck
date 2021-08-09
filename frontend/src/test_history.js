@@ -54,7 +54,8 @@ function TestHistory (props) {
 
     return history ? (
       <>
-        <table style={{border: 0, width: "40%"}}><tbody><tr>
+        <table className="nav"><tbody><tr>
+          <td><NavLink to={"/test/" + (0 | props.match.params.test_id)}>« Back to the test</NavLink></td>
           {common.renderHistoryCell(currentBranchHistory, currentBranch)}
           {common.renderHistoryCell(baseBranchHistory, baseBranch)}
         </tr></tbody></table>

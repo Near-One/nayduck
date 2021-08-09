@@ -29,12 +29,11 @@ function ATest (props) {
     const timeStats = common.formatTimeStats(aTest);
     return (
       <>
-        <table style={{border: 0, width: "40%"}}><tbody>
-          <tr><td style={{border: 0}}><NavLink to={"/run/" + aTest.run_id}> Back To A Run</NavLink></td>
+        <table claass="nav"><tbody><tr>
+          <td><NavLink to={"/run/" + aTest.run_id}>« Back to the run</NavLink></td>
           {common.renderHistoryCell(aTest, aTest.branch)}
           {common.renderHistoryCell(baseBranchHistory, baseBranch)}
-          </tr>
-        </tbody></table>
+        </tr></tbody></table>
         <table className="big"><tbody>
           <tr>
             <td>Commit</td>

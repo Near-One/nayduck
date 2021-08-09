@@ -30,29 +30,25 @@ export function buildStatusColour(status) {
 
 export function renderHistory(a_test, branch = null) {
     const statuses = ['PASSED', 'OTHER', 'FAILED'];
-    return (
-      <NavLink to={"/test_history/" + a_test.test_id}
-               style={{border: 0, fontSize: '0.625em'}}>{
-                   branch ? 'This test history for branch ' + branch : null
-               }<table style={{border: 0}}><tbody><tr>{
-                   a_test.history.map((count, index) => {
-                       const status = statuses[index];
-                       return status
-                           ? <td key={branch + '/history/' + index} style={{
-                                     border: 0,
-                                     padding: 0,
-                                     color: testStatusColour(status)
-                                 }}>{status.substr(0, 1)}:{count}</td>
-                           : null;
-                   })
-               }</tr></tbody></table></NavLink>
-    );
+    const history = <ul>{a_test.history.map((count, index) => {
+        const status = statuses[index];
+        return status
+            ? <li key={branch + '/history/' + index} style={{
+                      color: testStatusColour(status)
+                  }}>{branch ? status : status.substr(0, 1)}:{count}</li>
+        : null;
+    })}</ul>;
+    const inner = branch
+          ? <>This test history for branch <b>{branch}</b>: {history}</>
+          : <small>{history}</small>;
+    return <NavLink to={"/test_history/" + a_test.test_id}
+                    className="history">{inner}</NavLink>
 }
 
 
 export function renderHistoryCell(history, branch) {
     return history
-        ? <td style={{border: 0}}>{renderHistory(history, branch)}</td>
+        ? <td>{renderHistory(history, branch)}</td>
         :  null;
 }
 
@@ -126,7 +122,7 @@ function formatSize(size) {
         }
         size /= 1000;
         if (size < 1000) {
-            return '' + Math.round(size) + suffix;
+            return '' + Math.round(size) + ' ' + suffix;
         }
     }
     return '' + Math.round(size) + ' Y';

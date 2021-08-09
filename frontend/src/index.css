@@ -14,22 +14,22 @@ code {
 
 table {
   border-collapse: collapse;
-  width: 100%;
   word-wrap: break-word;
 }
-
+.big {
+  width: 100%;
+}
 td, th {
-  border: 1px solid #ddd;
   padding: 0.5em;
+}
+.big td, .big th {
+  border: 1px solid #ddd;
 }
 
 table.big tr:nth-child(even){background-color: #f2f2f2;}
-
 table.big tr:hover {background-color: #ddd;}
 
 table th {
-  padding-top: 12px;
-  padding-bottom: 12px;
   text-align: center;
   background-color: #4CAF50;
   color: white;
@@ -160,4 +160,19 @@ table th {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.history {
+  font-size: 0.75em;
+}
+.history small {
+  font-size: 0.833em;
+}
+.history ul, .history li {
+  padding: 0;
+  display: inline;
+}
+.history li {
+  margin: 0 0.25em;
+  font-variant: small-caps;
 }

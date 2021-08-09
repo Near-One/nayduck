@@ -33,8 +33,8 @@ function Build (props) {
 
     return (
       <div>
-        <table style={{border: 0, width: "40%"}}><tbody>
-          <tr><td style={{border: 0}}><NavLink to={"/"}> Back To All Runs</NavLink></td></tr>
+        <table className="nav"><tbody>
+          <tr><td><NavLink to="/">« Back to all runs</NavLink></td></tr>
         </tbody></table>
         <table className="big"><tbody>
             <tr>
