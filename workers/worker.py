@@ -11,9 +11,9 @@ import time
 import traceback
 import typing
 
-import azure.storage.blob
 import psutil
 
+from . import blobs
 from . import worker_db
 from . import utils
 
@@ -21,7 +21,6 @@ DEFAULT_TIMEOUT = 180
 BACKTRACE_PATTERN = 'stack backtrace:'
 FAIL_PATTERNS = [BACKTRACE_PATTERN]
 INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
-AZURE = os.environ.pop('AZURE_STORAGE_CONNECTION_STRING')
 
 
 def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
@@ -351,42 +350,13 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> None:
     return data + b'\n...\n' + ending
 
 
-_BLOB_CONTENT_SETTINGS = azure.storage.blob.ContentSettings(
-    content_type='text/plain')
-
-
-def upload_log(service_client: azure.storage.blob.BlobServiceClient,
-               blob_name: str, rd: typing.BinaryIO) -> typing.Optional[str]:
-    """Uploads file to Azure BLOB store.
-
-    Args:
-        service_client: The BlobServiceClient to send the file to.
-        blob_name: Blob name to save the file under.  The function uses `logs`
-            container.
-        rd: The file opened for reading.
-    Returns:
-        URL of blob or None if error occurred.
-    """
-    try:
-        blob_client = service_client.get_blob_client(container='logs',
-                                                     blob=blob_name)
-        blob_client.upload_blob(rd,
-                                content_settings=_BLOB_CONTENT_SETTINGS,
-                                overwrite=True)
-        return blob_client.url
-    except Exception:
-        traceback.print_exc()
-        return None
-
-
 def save_logs(server: worker_db.WorkerDB, test_id: int,
               directory: Path) -> None:
     logs = list_logs(directory)
     if not logs:
         return
 
-    service_client = \
-        azure.storage.blob.BlobServiceClient.from_connection_string(AZURE)
+    blob_client = blobs.get_client()
 
     for log in logs:
         with open(log.path, 'rb') as rd:
@@ -402,7 +372,7 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
             log.data = read_short_log(log.size, rd)
 
             rd.seek(0)
-            log.url = upload_log(service_client, f'{test_id}_{log.name}', rd)
+            log.url = blob_client.upload_test_log(test_id, log.name, rd)
 
     server.save_short_logs(test_id, logs)
 
