@@ -1,3 +1,4 @@
+import re
 import traceback
 import typing
 
@@ -11,6 +12,26 @@ _CACHE_CONTROL = f'public, max-age={365 * 24 * 3600}, immutable'
 
 class BlobClient:
     """A base class for a client for uploading blobs to the cloud."""
+
+    @classmethod
+    def get_test_log_href(cls, test_id: int, name: str) -> str:
+        """Returns a path for downloading given test log file.
+
+        The UI back end server provides endpoints for downloading the short logs
+        from the database.  For cases where the log is not too long, those short
+        logs are in fact the full logs in which case the back end endpoints can
+        be used to get the log rather than having to bother uploading the blob
+        to the cloud.
+
+        Args:
+            test_id: ID of the test the log is for.
+            name: Name (a.k.a. type) of the log.
+        Returns:
+            Returns a path which can be used to download the short log from the
+            UI back end.  The path is in '/logs/<test_id>/<name>' format.
+        """
+        assert re.search('^[-a-zA-Z0-9_]+$', name)
+        return f'/logs/test/{int(test_id)}/{name}'
 
     def upload_test_log(self, test_id: int, name: str,
                         rd: typing.BinaryIO) -> typing.Optional[str]:

@@ -312,7 +312,7 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
 _MAX_SHORT_LOG_SIZE = 10 * 1024
 
 
-def read_short_log(size: int, rd: typing.BinaryIO) -> None:
+def read_short_log(size: int, rd: typing.BinaryIO) -> typing.Tuple[bytes, bool]:
     """Reads a short log from given file.
 
     A short log it at most _MAX_SHORT_LOG_SIZE bytes long.  If the file is
@@ -324,12 +324,14 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> None:
         size: Actual size of the file.
         rd: The file opened for reading.
     Returns:
-        A short contents of the file.
+        A (short_log, is_full) tuple where first element is the short contents
+        of the file and the second is whether the short content is the same is
+        actually the full content.
     """
     if size < _MAX_SHORT_LOG_SIZE:
         data = rd.read()
         if len(data) < _MAX_SHORT_LOG_SIZE:  # Sanity check
-            return data
+            return data, True
         rd.seek(0)
 
     data = rd.read(_MAX_SHORT_LOG_SIZE // 2 - 3)
@@ -354,7 +356,7 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> None:
         if pos < limit:  # If we went too far it doesn't look like UTF-8.
             ending = ending[pos:]
 
-    return data + b'\n...\n' + ending
+    return data + b'\n...\n' + ending, False
 
 
 def save_logs(server: worker_db.WorkerDB, test_id: int,
@@ -376,10 +378,12 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
             log.patterns = ','.join(sorted(patterns))
 
             rd.seek(0)
-            log.data = read_short_log(log.size, rd)
-
-            rd.seek(0)
-            log.url = blob_client.upload_test_log(test_id, log.name, rd)
+            log.data, is_full = read_short_log(log.size, rd)
+            if is_full:
+                log.url = blob_client.get_test_log_href(test_id, log.name)
+            else:
+                rd.seek(0)
+                log.url = blob_client.upload_test_log(test_id, log.name, rd)
 
     server.save_short_logs(test_id, logs)
 
