@@ -1,13 +1,16 @@
+import gzip
+import os
 import re
+import shutil
+import tempfile
+import time
 import traceback
 import typing
-
-import azure.storage.blob
 
 from lib import config
 
 _CONTENT_TYPE = 'text/plain; charset=utf-8'
-_CACHE_CONTROL = f'public, max-age={365 * 24 * 3600}, immutable'
+_CACHE_CONTROL = f'max-age={365 * 24 * 3600}, immutable'
 
 
 class BlobClient:
@@ -69,31 +72,64 @@ class AzureBlobClient(BlobClient):
     """Interface for uploading blobs to Azure."""
 
     def __init__(self, **kw: typing.Any) -> None:
+        import azure.storage.blob  # pylint: disable=import-outside-toplevel
+
         self.__container = kw.pop('container_name')
-        self.__server = azure.storage.blob.BlobServiceClient(**kw)
+        self.__service = azure.storage.blob.BlobServiceClient(**kw)
+        self.__settings = azure.storage.blob.ContentSettings(
+            content_type=_CONTENT_TYPE, cache_control=_CACHE_CONTROL)
 
     def _upload(self, name: str, rd: typing.BinaryIO) -> str:
-        settings = azure.storage.blob.ContentSettings(
-            content_type=_CONTENT_TYPE, cache_control=_CACHE_CONTROL)
-        client = self.__server.get_blob_client(container=self.__container,
-                                               blob=name)
-        client.upload_blob(rd, content_settings=settings, overwrite=True)
+        client = self.__service.get_blob_client(container=self.__container,
+                                                blob=name)
+        client.upload_blob(rd, content_settings=self.__settings, overwrite=True)
         return client.url
 
 
-def _initialise_factory(
-) -> typing.Callable[[], typing.Callable[[], BlobClient]]:
-    """Initialises blob store client factory.
+class GoogleBlobClient(BlobClient):
+    """Interface for uploading blobs to Google Cloud Storage."""
+
+    def __init__(self, **kw: typing.Any) -> None:
+        import google.cloud.storage  # pylint: disable=import-outside-toplevel
+
+        self.__service = google.cloud.storage.Client.from_service_account_json(
+            config.CONFIG_DIR / kw.get('credentials_file', 'credentials.json'))
+        self.__bucket = self.__service.bucket(kw.get('bucket_name', 'nayduck'))
+
+    def _upload(self, name: str, rd: typing.BinaryIO) -> str:
+        try:
+            mtime = os.fstat(rd.fileno()).st_mtime
+        except Exception:
+            mtime = time.time()
+
+        with tempfile.TemporaryFile() as tmp:
+            with gzip.GzipFile(filename=name,
+                               mode='wb',
+                               fileobj=tmp,
+                               mtime=mtime) as wr:
+                shutil.copyfileobj(rd, wr)
+            tmp.seek(0)
+
+            blob = self.__bucket.blob(name)
+            blob.cache_control = _CACHE_CONTROL
+            blob.content_encoding = 'gzip'
+            blob.content_language = 'en'
+            blob.content_type = _CONTENT_TYPE
+            blob.upload_from_file(tmp)
+            return blob.public_url
+
+
+def __get_blob_client() -> BlobClient:
+    """Initialises and returns a new blob store client.
 
     Reads configuration from `~/.nayduck/blob-store.json` file which must
     include a JSON dictionary with at least a "service" key.  The "service" key
-    specifies which service to use (currently the only possible value is
-    "Azure").  The rest of the dictionary specifies keyword arguments passed to
-    the constructor of the "<service>BlobStore" class.
+    specifies which service to use (either "Azure" or "Google").  The rest of
+    the dictionary specifies keyword arguments passed to the constructor of the
+    "<service>BlobStore" class.
 
     Returns:
-        A factory function which, when called, returns new instances of
-        BlobClient for talking to the blob store service.
+        A new instances of BlobClient for talking to the blob store service.
     Raises:
         SystemExit: if no configuration for exist or it's not properly formatted
             in some way.
@@ -103,7 +139,12 @@ def _initialise_factory(
     cls = globals().get(f'{service}BlobClient', None)
     if not cls or not issubclass(cls, BlobClient):
         raise SystemExit(f'{cfg.path}: {service}: unknown service')
-    return lambda: cls(**cfg)  # pylint: disable=unnecessary-lambda
+    return typing.cast(BlobClient, cls(**cfg))
 
 
-get_client = _initialise_factory()
+__CLIENT = __get_blob_client()
+
+
+def get_client() -> BlobClient:
+    """Returns a Blobclient singleton for talking to blob service."""
+    return __CLIENT

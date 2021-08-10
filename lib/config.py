@@ -2,9 +2,10 @@ import json
 import pathlib
 import typing
 
-_CFG_DIR = pathlib.Path.home() / '.nayduck'
 _SENTINEL = object()
 _T = typing.TypeVar('_T')
+
+CONFIG_DIR = pathlib.Path.home() / '.nayduck'
 
 
 def _identity(obj: _T) -> _T:
@@ -82,7 +83,7 @@ def load(name: str) -> Config:
         SystemExit: if file could not be opened, contains malformed JSON or
             contains value which is not a dictionary.
     """
-    path = _CFG_DIR / f'{name}.json'
+    path = CONFIG_DIR / f'{name}.json'
     try:
         with open(path) as rd:
             value = json.load(rd)
