@@ -134,9 +134,11 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
 def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
-    If there's less than 20% of free space on /datadrive file system, delete
+    If there's less than 50GB of free space on /datadrive file system, delete
     finished builds and wait until enough tests finish that enough free space
-    becomes available.
+    becomes available.  50GB threshold has been chosen to be able to finish any
+    build even in the worst circumstances.  Considering that even the largest
+    build does not exceed 15GB this should be a safe bet.
 
     Args:
         server: Database to query for finished tests.
@@ -145,7 +147,7 @@ def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
     """
 
     def enough_space() -> bool:
-        return psutil.disk_usage(str(utils.WORKDIR)).percent < 80.0
+        return psutil.disk_usage(str(utils.WORKDIR)).free >= 50_000_000_000
 
     def clean_finished() -> bool:
         server.with_builds_without_pending_tests(
