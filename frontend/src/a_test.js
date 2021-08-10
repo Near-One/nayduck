@@ -45,12 +45,14 @@ function ATest (props) {
           <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
           <tr><td>Started</td><td>{timeStats.started}</td></tr>
           <tr><td>Status</td><td style={{color: common.testStatusColour(aTest.status)}}>{aTest.status}</td></tr>
-          <tr><th colSpan="2">Logs</th></tr>
-          {aTest.logs.map(log =>
-            <tr key={aTest.test_id + '/' + log.type}>
-              <td>{common.logLink(log)}</td>
-              <td>{common.logBlob(log.log)}</td></tr>
-          )}
+          {aTest.logs ? <>
+             <tr><th colSpan="2">Logs</th></tr>
+             {aTest.logs.map(log =>
+               <tr key={aTest.test_id + '/' + log.type}>
+                 <td>{common.logLink(log)}</td>
+                 <td>{common.logBlob(log.log)}</td></tr>
+             )}
+           </> : null}
         </tbody></table>
       </>
     );
