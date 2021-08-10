@@ -29,16 +29,13 @@ def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
     try:
         if test[0] in ('pytest', 'mocknet'):
             return ['python', 'tests/' + test[1]] + test[2:]
-        if test[0] in ('expensive', 'lib'):
+        if test[0] == 'expensive':
             path = cwd / 'target_expensive' / build_type / 'deps'
-            idx = 1 + (test[0] == 'expensive')
-            name_prefix = test[idx].replace('-', '_') + '-'
+            name_prefix = test[2].replace('-', '_') + '-'
             files = os.listdir(path)
             for filename in files:
                 if filename.startswith(name_prefix):
-                    return [
-                        path / filename, test[idx + 1], '--exact', '--nocapture'
-                    ]
+                    return (path / filename, test[3], '--exact', '--nocapture')
     except Exception:
         print(test)
         raise
@@ -173,7 +170,7 @@ def analyse_test_outcome(test: typing.Sequence[str], ret: int,
             return 'PASSED'
         return 'FAILED'
 
-    if test[0] == 'expensive' or test[0] == 'lib':
+    if test[0] == 'expensive':
         return analyze_rust_test()
 
     return 'PASSED'
@@ -444,9 +441,8 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
         scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
         _LAST_COPIED_BUILD_ID = build_id
 
-    if test[0] in ('expensive', 'lib'):
-        idx = 1 + (test[0] == 'expensive') + test[1].startswith('--')
-        test_name = test[idx].replace('-', '_')
+    if test[0] == 'expensive':
+        test_name = test[2 + test[1].startswith('--')].replace('-', '_')
         if test_name not in _COPIED_EXPENSIVE_DEPS:
             scp(f'expensive/{test_name}-*',
                 f'target_expensive/{build_type}/deps')

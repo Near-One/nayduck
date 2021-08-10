@@ -284,8 +284,8 @@ class Request(typing.NamedTuple):
             idx = 1 + words[1].startswith('--timeout')
             if words[0] in ('pytest', 'mocknet'):
                 pattern = r'^[-_a-zA-Z0-9/]+\.py$'
-            elif words[0] in ('expensive', 'lib'):
-                idx += words[0] == 'expensive'
+            elif words[0] == 'expensive':
+                idx += 1
                 pattern = '^[-_a-zA-Z0-9]+$'
             else:
                 raise Failure(f'Invalid test category "{words[0]}" in: {test}')
