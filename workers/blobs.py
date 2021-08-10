@@ -1,8 +1,9 @@
-import os
 import traceback
 import typing
 
 import azure.storage.blob
+
+from lib import config
 
 _CONTENT_TYPE = 'text/plain; charset=utf-8'
 _CACHE_CONTROL = f'public, max-age={365 * 24 * 3600}, immutable'
@@ -46,22 +47,45 @@ class BlobClient:
 class AzureBlobClient(BlobClient):
     """Interface for uploading blobs to Azure."""
 
-    def __init__(self, conn_str: str) -> None:
-        self.__server = \
-            azure.storage.blob.BlobServiceClient.from_connection_string(
-                conn_str)
+    def __init__(self, **kw: typing.Any) -> None:
+        self.__container = kw.pop('container_name')
+        self.__server = azure.storage.blob.BlobServiceClient(**kw)
 
     def _upload(self, name: str, rd: typing.BinaryIO) -> str:
         settings = azure.storage.blob.ContentSettings(
             content_type=_CONTENT_TYPE, cache_control=_CACHE_CONTROL)
-        client = self.__server.get_blob_client(container='logs', blob=name)
+        client = self.__server.get_blob_client(container=self.__container,
+                                               blob=name)
         client.upload_blob(rd, content_settings=settings, overwrite=True)
         return client.url
 
 
-_AZURE_CONNECTION_STR = os.environ.pop('AZURE_STORAGE_CONNECTION_STRING')
+def _initialise_factory(
+) -> typing.Callable[[], typing.Callable[[], BlobClient]]:
+    """Initialises blob store client factory.
+
+    Reads configuration from `~/.nayduck/blob-store.json` file which must
+    include a JSON dictionary with at least a "service" key.  The "service" key
+    specifies which service to use (currently the only possible value is
+    "Azure").  The rest of the dictionary specifies keyword arguments passed to
+    the constructor of the "<service>BlobStore" class.
+
+    Returns:
+        A factory function which, when called, returns new instances of
+        BlobClient for talking to the blob store service.
+    Raises:
+        SystemExit: if no configuration for exist or it's not properly formatted
+            in some way.
+    """
+    cfg, cfg_file = config.get_config('blob-store')
+    service = cfg.pop('service', None)
+    if not service:
+        raise SystemExit(f'{cfg_file}: missing or empty "service" key')
+    cls = globals().get(f'{service}BlobClient', None)
+    if not cls or not issubclass(cls, BlobClient):
+        raise SystemExit(f'{cfg_file}: {service}: unknown service')
+
+    return lambda: cls(**cfg)  # pylint: disable=unnecessary-lambda
 
 
-def get_client() -> BlobClient:
-    """Returns a new client for uploading blobs to the cloud."""
-    return AzureBlobClient(_AZURE_CONNECTION_STR)
+get_client = _initialise_factory()
