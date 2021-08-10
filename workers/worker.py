@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 import os
 from pathlib import Path, PurePath
@@ -367,7 +368,7 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
 
     blob_client = blobs.get_client()
 
-    for log in logs:
+    def process_log(log: LogFile) -> LogFile:
         with open(log.path, 'rb') as rd:
             patterns = find_patterns(rd, INTERESTING_PATTERNS)
             try:
@@ -384,6 +385,12 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
             else:
                 rd.seek(0)
                 log.url = blob_client.upload_test_log(test_id, log.name, rd)
+
+        return log
+
+    max_workers = len(os.sched_getaffinity(0))
+    with concurrent.futures.ThreadPoolExecutor(max_workers) as executor:
+        executor.map(process_log, logs)
 
     server.save_short_logs(test_id, logs)
 
