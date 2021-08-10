@@ -103,7 +103,7 @@ def checkout(sha: str, runner: typing.Optional[Runner] = None) -> bool:
             stdin=subprocess.DEVNULL,
             check=False,
             cwd=REPO_DIR)
-        if ((result.returncode or runner(
+        if ((result.returncode == 0 or runner(
             ('git', 'remote', 'update', '-p'), cwd=REPO_DIR)) and runner(
                 ('git', 'checkout', sha), cwd=REPO_DIR)):
             return True
