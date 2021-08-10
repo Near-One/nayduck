@@ -175,8 +175,9 @@ class UIDB(common_db.DB):
 
     def get_histoty_for_base_branch(self, test_id, branch):
         sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
-        res = self._exec(sql, test_id)
-        test = res.fetchone()
+        test = self._exec(sql, test_id).fetchone()
+        if not test:
+            return None
         history = self.get_test_history(test['name'], branch)
         if len(history):
             test_id_base_branch = history[0]['test_id']

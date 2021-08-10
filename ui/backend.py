@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import traceback
 import typing
@@ -24,67 +25,86 @@ sched.init_app(app)
 sched.start()
 
 
-class JSONEncoder(flask.json.JSONEncoder):
-    """Custom JSON encoder which encodes datetime as millisecond timestamp."""
+def jsonify(data: typing.Any) -> flask.Response:
+    """Converts data to a Response holding JSON data.
 
-    def default(self, o):
-        if isinstance(o, datetime.datetime):
-            if o.utcoffset() is None:
-                o = o.replace(tzinfo=datetime.timezone.utc)
-            return int(o.timestamp() * 1000)
-        return super().default(o)
+    If the data is not None, the response will have 200 OK status code;
+    otherwise, None data results in a 404 Not Found response.  In either case,
+    the content will be JSON data and content-type will be set to
+    application/json.
 
+    Args:
+        data: Data to include in response.  Anything that can be serialised to
+            JSON works.
+    Returns:
+        A Response object.
+    """
 
-app.json_encoder = JSONEncoder
+    def default(obj):
+        if isinstance(obj, datetime.datetime):
+            if obj.utcoffset() is None:
+                obj = obj.replace(tzinfo=datetime.timezone.utc)
+            return int(obj.timestamp() * 1000)
+        raise TypeError(
+            f'Object of type {type(obj).__name__} is not JSON serialisable')
+
+    response = json.dumps(data,
+                          ensure_ascii=False,
+                          check_circular=False,
+                          separators=(',', ':'),
+                          default=default)
+    return flask.Response(response=response,
+                          status=404 if data is None else 200,
+                          mimetype='application/json')
 
 
 @app.route('/api/runs', methods=['GET'])
 def get_runs():
     with ui_db.UIDB() as server:
         all_runs = server.get_all_runs()
-    return flask.jsonify(all_runs)
+    return jsonify(all_runs)
 
 
 @app.route('/api/run/<int:run_id>', methods=['GET'])
 def get_a_run(run_id: int):
     with ui_db.UIDB() as server:
         a_run = server.get_one_run(run_id)
-    return flask.jsonify(a_run)
+    return jsonify(a_run)
 
 
 @app.route('/api/test/<int:test_id>', methods=['GET'])
 def get_a_test(test_id: int):
     with ui_db.UIDB() as server:
         a_test = server.get_one_test(test_id)
-    return flask.jsonify(a_test)
+    return jsonify(a_test)
 
 
 @app.route('/api/build/<int:build_id>', methods=['GET'])
 def get_build_info(build_id: int):
     with ui_db.UIDB() as server:
         a_test = server.get_build_info(build_id)
-    return flask.jsonify(a_test)
+    return jsonify(a_test)
 
 
 @app.route('/api/test/<int:test_id>/history', methods=['GET'])
 def test_history(test_id: int):
     with ui_db.UIDB() as server:
         history = server.get_test_history_by_id(test_id)
-    return flask.jsonify(history)
+    return jsonify(history)
 
 
 @app.route('/api/test/<int:test_id>/history/<path:branch>', methods=['GET'])
 def branch_history(test_id: int, branch: str):
     with ui_db.UIDB() as server:
         history = server.get_histoty_for_base_branch(test_id, branch)
-    return flask.jsonify(history)
+    return jsonify(history)
 
 
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
 def cancel_the_run(run_id: int):
     with ui_db.UIDB() as server:
         server.cancel_the_run(run_id)
-    return flask.jsonify({})
+    return jsonify({})
 
 
 # TODO(#17): Deprecated in favour of /api/run/new.
@@ -103,7 +123,7 @@ def request_a_run():
     except Exception as ex:
         traceback.print_exc()
         response = scheduler.Failure(ex).to_response()
-    return flask.jsonify(response)
+    return jsonify(response)
 
 
 @app.route('/api/run/new', methods=['POST'])
@@ -125,7 +145,7 @@ def new_run(login: str) -> flask.Response:
         except Exception as ex:
             traceback.print_exc()
             response = scheduler.Failure(ex).to_response()
-        return flask.jsonify(response)
+        return jsonify(response)
 
 
 def schedule_nightly_run_check(delta: datetime.timedelta):
