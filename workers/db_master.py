@@ -112,7 +112,7 @@ class MasterDB(common_db.DB):
         """
         sql = '''SELECT build_id
                    FROM builds LEFT JOIN tests USING (build_id)
-                  WHERE master_ip != %s
+                  WHERE master_ip = %s
                   GROUP BY 1
                  HAVING SUM(tests.status IN ('PENDING', 'RUNNING')) = 0'''
         result = self._exec(sql, ipv4)
