@@ -6,3 +6,4 @@ google-cloud-storage
 mysql-connector-python
 psutil
 requests
+types-flask

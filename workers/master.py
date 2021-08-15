@@ -54,8 +54,9 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     """
     print('Building {}target'.format('expensive ' if spec.is_expensive else ''))
 
-    def cargo(*cmd, add_features=True):
-        cmd = ['cargo', *cmd]
+    def cargo(*args: typing.Union[str, Path],
+              add_features: bool = True) -> None:
+        cmd = ['cargo', *args]
         if add_features:
             cmd.extend(spec.features)
         if spec.is_release:
@@ -63,7 +64,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         if runner(cmd, cwd=utils.REPO_DIR) != 0:
             raise BuildFailure()
 
-    def copy(src_dir, files: typing.Iterable[str], dst_dir: Path):
+    def copy(src_dir: Path, files: typing.Iterable[str], dst_dir: Path) -> None:
         utils.mkdirs(dst_dir)
         for filename in files:
             os.link(src_dir / filename, dst_dir / filename)
@@ -75,7 +76,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
             attrs = path.stat()
         except OSError:
             return False
-        return stat.S_ISREG(attrs.st_mode) and attrs.st_mode & 0o100
+        return bool(stat.S_ISREG(attrs.st_mode) and attrs.st_mode & 0o100)
 
     utils.rmdirs(spec.build_dir)
 
@@ -130,7 +131,7 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
         return False
 
 
-def wait_for_free_space(server: master_db.MasterDB, ipv4: str) -> None:
+def wait_for_free_space(server: master_db.MasterDB, ipv4: int) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
     If there's less than 50GB of free space on /datadrive file system, delete
@@ -169,7 +170,7 @@ def wait_for_free_space(server: master_db.MasterDB, ipv4: str) -> None:
     print('Got enough free space; continuing')
 
 
-def keep_pulling():
+def keep_pulling() -> None:
     ipv4 = utils.get_ip()
     print('Starting master at {} ({})'.format(socket.gethostname(),
                                               utils.int_to_ip(ipv4)))

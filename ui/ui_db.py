@@ -5,8 +5,11 @@ import typing
 
 from lib import common_db
 
+_Row = typing.Dict[str, typing.Any]
+_T = typing.TypeVar('_T')
 
-def _pop_falsy(dictionary, *keys):
+
+def _pop_falsy(dictionary: typing.Dict[_T, typing.Any], *keys: _T) -> None:
     """Remove keys from a dictionary if their values are falsy."""
     for key in keys:
         if not dictionary.get(key, True):
@@ -15,7 +18,7 @@ def _pop_falsy(dictionary, *keys):
 
 class UIDB(common_db.DB):
 
-    def cancel_the_run(self, run_id, status='CANCELED'):
+    def cancel_the_run(self, run_id: int, status: str = 'CANCELED') -> None:
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
                   WHERE status = 'PENDING' AND run_id = %s'''
@@ -32,7 +35,7 @@ class UIDB(common_db.DB):
         'tests': _NO_STATUSES,
     },)
 
-    def get_all_runs(self):
+    def get_all_runs(self) -> typing.Iterable[_Row]:
         # Get the last 100 runs
         sql = '''SELECT id, branch, sha, title, requester
                    FROM runs
@@ -61,9 +64,12 @@ class UIDB(common_db.DB):
         for run in all_runs.values():
             run.setdefault('builds', self._NO_BUILDS)
 
-        return sorted(all_runs.values(), key=lambda run: -run['id'])
+        return sorted(all_runs.values(),
+                      key=lambda run: -typing.cast(int, run['id']))
 
-    def __get_statuses_for_runs(self, min_run_id: int, max_run_id: int):
+    def __get_statuses_for_runs(
+        self, min_run_id: int, max_run_id: int
+    ) -> typing.Dict[typing.Tuple[int, int], typing.Counter[str]]:
         """Return test statuses for runs with ids in given range.
 
         Args:
@@ -72,7 +78,9 @@ class UIDB(common_db.DB):
         Returns:
             A {(run_id, build_id): {status: count}} dictionary.
         """
-        statuses = collections.defaultdict(collections.Counter)
+        statuses: typing.Dict[typing.Tuple[int, int],
+                              typing.Counter[str]] = collections.defaultdict(
+                                  collections.Counter)
         sql = '''SELECT run_id, build_id, status, COUNT(status) AS cnt
                    FROM tests
                   WHERE run_id BETWEEN %s AND %s
@@ -88,7 +96,7 @@ class UIDB(common_db.DB):
                 counter['failed'] += int(test['cnt'])
         return statuses
 
-    def get_test_history_by_id(self, test_id):
+    def get_test_history_by_id(self, test_id: int) -> typing.Optional[_Row]:
         sql = '''SELECT t.name, r.branch
                    FROM tests AS t, runs AS r
                   WHERE t.test_id = %s AND r.id = t.run_id
@@ -105,7 +113,11 @@ class UIDB(common_db.DB):
             'history': self.history_stats(tests),
         }
 
-    def get_test_history(self, test_name, branch, interested_in_logs=False):
+    def get_test_history(
+            self,
+            test_name: str,
+            branch: str,
+            interested_in_logs: bool = False) -> typing.Sequence[_Row]:
         sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
                         t.finished, r.branch, r.sha
                    FROM tests AS t, runs AS r
@@ -117,7 +129,7 @@ class UIDB(common_db.DB):
             self._populate_test_logs(tests, blob=False)
         return tests
 
-    def get_one_run(self, run_id):
+    def get_one_run(self, run_id: int) -> typing.Sequence[_Row]:
         sql = '''SELECT test_id, status, name, started, finished, branch
                    FROM tests JOIN runs ON (runs.id = tests.run_id)
                   WHERE run_id = %s
@@ -130,11 +142,13 @@ class UIDB(common_db.DB):
             self._populate_data_about_tests(tests, branch, blob=False)
         return tests
 
-    def _populate_test_logs(self, tests, blob=False):
+    def _populate_test_logs(self,
+                            tests: typing.Collection[_Row],
+                            blob: bool = False) -> None:
         if not tests:
             return
 
-        def process_log(log):
+        def process_log(log: _Row) -> _Row:
             log.pop('test_id')
             if blob:
                 log['log'] = self._str_from_blob(log['log'])
@@ -150,16 +164,20 @@ class UIDB(common_db.DB):
             log_column=', log' if blob else '',
             ids=','.join(str(test_id) for test_id in tests_by_id))
         for test_id, rows in itertools.groupby(
-                self._exec(sql).fetchall(), lambda row: row['test_id']):
+                self._exec(sql).fetchall(),
+                lambda row: typing.cast(int, row['test_id'])):
             tests_by_id[test_id]['logs'] = [process_log(row) for row in rows]
 
-    def _populate_data_about_tests(self, tests, branch, blob=False):
+    def _populate_data_about_tests(self,
+                                   tests: typing.Collection[_Row],
+                                   branch: str,
+                                   blob: bool = False) -> None:
         self._populate_test_logs(tests, blob=blob)
         for test in tests:
             history = self.get_test_history(test['name'], branch)
             test['history'] = self.history_stats(history)
 
-    def get_build_info(self, build_id):
+    def get_build_info(self, build_id: int) -> typing.Optional[_Row]:
         sql = '''SELECT run_id, status, started, finished, stderr, stdout,
                         features, is_release, branch, sha, title, requester
                    FROM builds JOIN runs ON (runs.id = builds.run_id)
@@ -173,7 +191,8 @@ class UIDB(common_db.DB):
             _pop_falsy(build, 'stdout', 'stderr')
         return build
 
-    def get_histoty_for_base_branch(self, test_id, branch):
+    def get_histoty_for_base_branch(self, test_id: int,
+                                    branch: str) -> typing.Optional[_Row]:
         sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
         test = self._exec(sql, test_id).fetchone()
         if not test:
@@ -189,7 +208,8 @@ class UIDB(common_db.DB):
         }
 
     @classmethod
-    def history_stats(cls, history):
+    def history_stats(cls,
+                      history: typing.Sequence[_Row]) -> typing.Sequence[int]:
         # passed, other, failed
         res = [0, 0, 0]
         for hist in history:
@@ -201,7 +221,7 @@ class UIDB(common_db.DB):
                 res[1] += 1
         return res
 
-    def get_one_test(self, test_id):
+    def get_one_test(self, test_id: int) -> typing.Optional[_Row]:
         sql = '''SELECT test_id, run_id, build_id, status, name, started,
                         finished, branch, sha, title, requester
                    FROM tests JOIN runs ON (runs.id = tests.run_id)

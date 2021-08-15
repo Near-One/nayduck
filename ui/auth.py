@@ -10,6 +10,7 @@ import flask
 import requests
 import werkzeug.datastructures
 import werkzeug.exceptions
+import werkzeug.wrappers
 
 from lib import config
 from . import ui_db
@@ -22,8 +23,8 @@ _KIND_CODE = b'code'
 __CONFIG = config.load('auth')
 __CHACHA = cryptography.hazmat.primitives.ciphers.aead.ChaCha20Poly1305(
     __CONFIG.take('key', base64.urlsafe_b64decode))
-__CLIENT_ID = __CONFIG.take('github-client-id')
-__CLIENT_SECRET = __CONFIG.take('github-client-secret')
+__CLIENT_ID = __CONFIG.take('github-client-id', str)
+__CLIENT_SECRET = __CONFIG.take('github-client-secret', str)
 
 
 def _github(token: str, path: str) -> typing.Any:
@@ -369,7 +370,7 @@ def get_code(state: typing.Optional[str],
     return AuthCode.for_user(login=login, token=token), mode == b'w'
 
 
-def add_cookie(response: flask.Response, code: str) -> None:
+def add_cookie(response: werkzeug.wrappers.Response, code: str) -> None:
     """Adds a nay-code cookie to the response."""
     response.set_cookie(CODE_KEY,
                         code,

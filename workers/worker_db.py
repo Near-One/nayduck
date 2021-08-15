@@ -58,18 +58,18 @@ class WorkerDB(common_db.DB):
                   LIMIT 1'''
         return self._exec(sql).fetchone()
 
-    def test_started(self, test_id):
+    def test_started(self, test_id: int) -> None:
         sql = 'UPDATE tests SET started = NOW() WHERE test_id = %s'
         self._exec(sql, test_id)
 
-    def update_test_status(self, status, test_id):
+    def update_test_status(self, status: str, test_id: int) -> None:
         sql = '''UPDATE tests
                     SET finished = NOW(), status = %s
                   WHERE test_id = %s'''
         self._exec(sql, status, test_id)
 
     def save_short_logs(self, test_id: int,
-                        logs: typing.Collection['worker.LogFile']) -> None:
+                        logs: typing.Collection[typing.Any]) -> None:
         columns = ('test_id', 'type', 'size', 'log', 'storage', 'stack_trace',
                    'patterns')
         self._multi_insert(

@@ -10,21 +10,26 @@ _CONFIG.setdefault('host', '127.0.0.1')
 _CONFIG.setdefault('user', 'nayduck')
 _CONFIG.setdefault('database', 'nayduck')
 
+_T = typing.TypeVar('_T')
+_D = typing.TypeVar('_D', bound='DB')
+
 
 class DB:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.mydb = mysql.connector.connect(**_CONFIG, autocommit=True)
         self.mycursor = self.mydb.cursor(buffered=True, dictionary=True)
 
-    def __enter__(self):
+    def __enter__(self: _D) -> _D:
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, *_: typing.Any) -> None:
         self.mycursor.close()
         self.mydb.close()
 
-    def _exec(self, sql: str, *val: typing.Any):
+    def _exec(
+            self, sql: str,
+            *val: typing.Any) -> mysql.connector.abstracts.MySQLCursorAbstract:
         """Executes given SQL statement.
 
         Args:
@@ -72,7 +77,7 @@ class DB:
             table=table,
             columns=', '.join(columns),
             placeholders=', '.join(['%s'] * len(columns)))
-        return self._exec(sql, *values).lastrowid
+        return typing.cast(int, self._exec(sql, *values).lastrowid)
 
     def _multi_insert(self,
                       table: str,
@@ -90,7 +95,7 @@ class DB:
                 each element correspond to columns at the same index.
             replace: Whether to uses REPLACE statement rather than INSERT.
         """
-        vals = []
+        vals: typing.List[typing.Any] = []
         for row in rows:
             assert len(row) == len(columns), row
             vals.extend(row)
@@ -103,10 +108,7 @@ class DB:
             placeholders=', '.join([placeholders] * count))
         self._exec(sql, *vals)
 
-    def _with_transaction(
-        self,
-        callback: typing.Callable[[],
-                                  typing.TypeVar('T')]) -> typing.TypeVar('T'):
+    def _with_transaction(self, callback: typing.Callable[[], _T]) -> _T:
         """Executes callback inside of a SQL transaction.
 
         Starts a transaction before calling the callback and ends it once the
@@ -134,7 +136,7 @@ class DB:
                 self.mydb.rollback()
 
     @classmethod
-    def _blob_from_data(cls, data: typing.AnyStr) -> bytes:
+    def _blob_from_data(cls, data: typing.Union[str, bytes]) -> bytes:
         """Converts string or bytes to BLOB form for storage in database.
 
         If an argument is a string, encodes it into bytes using UTF-8 encoding.

@@ -104,7 +104,7 @@ class Runner:
                  cwd: pathlib.Path,
                  check: bool = False,
                  timeout: int = 3 * 3600,
-                 **kw: typing.Any) -> bool:
+                 **kw: typing.Any) -> int:
         """Calls given command after printing it to standard error.
 
         If directory the command is run in is different than one previous
@@ -237,7 +237,9 @@ def get_ip() -> int:
         for addr in iface:
             if addr.family != socket.AF_INET:
                 continue
-            ip_addr = struct.unpack('!I', socket.inet_aton(addr.address))[0]
+            ip_addr = typing.cast(
+                int,
+                struct.unpack('!I', socket.inet_aton(addr.address))[0])
             # Check if it's a private address.  We don't want to return any kind
             # of public addresses or localhost.
             if ((ip_addr & 0xFF000000) == 0x0A000000 or  # 10.0.0.0/8
@@ -275,8 +277,9 @@ def setup_environ() -> None:
         export GOROOT GOPATH NVM_DIR
         env -0
     '''
-    env = dict(
-        item.split(b'=', 1) for item in subprocess.check_output(
+    env: typing.Dict[bytes, bytes] = dict(
+        typing.cast(typing.Tuple[bytes, bytes], item.split(b'=', 1))
+        for item in subprocess.check_output(
             script, shell=True, cwd=home).rstrip(b'\0').split(b'\0'))
 
     # Add Cargo and Go to PATH and remove various unnecessary directories

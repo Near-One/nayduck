@@ -97,7 +97,7 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
                 last_line = line
         return last_line
 
-    def analyze_rust_test():
+    def analyse_rust_test() -> str:
         """Analyses outcome of an expensive or lib tests."""
         for line in stdout:
             line = line.strip()
@@ -125,7 +125,7 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
         return 'FAILED'
 
     if test[0] == 'expensive':
-        return analyze_rust_test()
+        return analyse_rust_test()
 
     return 'PASSED'
 
@@ -206,8 +206,8 @@ def find_patterns(rd: typing.BinaryIO,
     """
     found = [False] * len(patterns)
     count = len(found)
-    for line in rd:
-        line = line.decode('utf-8', 'replace')
+    for raw_line in rd:
+        line = raw_line.decode('utf-8', 'replace')
         for idx, pattern in enumerate(patterns):
             if not found[idx] and pattern in line:
                 found[idx] = True
@@ -364,8 +364,8 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
     server.save_short_logs(test_id, logs)
 
 
-_LAST_COPIED_BUILD_ID = None
-_COPIED_EXPENSIVE_DEPS = []
+_LAST_COPIED_BUILD_ID: typing.Optional[int] = None
+_COPIED_EXPENSIVE_DEPS: typing.List[str] = []
 
 
 def scp_build(build_id: int, master_ip: int, test: _Test, build_type: str,
@@ -402,7 +402,7 @@ def scp_build(build_id: int, master_ip: int, test: _Test, build_type: str,
 
 
 @contextlib.contextmanager
-def temp_dir():
+def temp_dir() -> typing.Generator[Path, None, None]:
     """A context manager setting a new temporary directory.
 
     Create a new temporary directory and sets it as tempfile.tempdir as well as
@@ -466,9 +466,9 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
 
     if config_override:
         fd, path = tempfile.mkstemp(prefix=b'config-', suffix=b'.json')
-        with os.fdopen(fd, 'wb') as wr:
+        with os.fdopen(fd, 'w') as wr:
             json.dump(config_override, wr)
-        envb = envb.copy()
+        envb = dict(envb)
         envb[b'NEAR_PYTEST_CONFIG'] = path
 
     status = None
@@ -492,7 +492,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
         save_logs(server, test['test_id'], outdir)
 
 
-def main():
+def main() -> None:
     ipv4 = utils.get_ip()
     hostname = socket.gethostname()
     print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)))

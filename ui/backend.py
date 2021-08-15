@@ -9,6 +9,7 @@ import flask.json
 import flask_apscheduler
 import flask_cors
 import werkzeug.exceptions
+import werkzeug.wrappers
 
 from . import auth
 from . import scheduler
@@ -18,7 +19,7 @@ NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
 
 app = flask.Flask(__name__)
-flask_cors.CORS(app, origins=NAYDUCK_UI)
+flask_cors.CORS(app, resources={'/api/.*': {'origins': [NAYDUCK_UI]}})
 
 sched = flask_apscheduler.APScheduler()
 sched.init_app(app)
@@ -40,7 +41,7 @@ def jsonify(data: typing.Any) -> flask.Response:
         A Response object.
     """
 
-    def default(obj):
+    def default(obj: typing.Any) -> typing.Any:
         if isinstance(obj, datetime.datetime):
             if obj.utcoffset() is None:
                 obj = obj.replace(tzinfo=datetime.timezone.utc)
@@ -59,49 +60,49 @@ def jsonify(data: typing.Any) -> flask.Response:
 
 
 @app.route('/api/runs', methods=['GET'])
-def get_runs():
+def get_runs() -> flask.Response:
     with ui_db.UIDB() as server:
         all_runs = server.get_all_runs()
     return jsonify(all_runs)
 
 
 @app.route('/api/run/<int:run_id>', methods=['GET'])
-def get_a_run(run_id: int):
+def get_a_run(run_id: int) -> flask.Response:
     with ui_db.UIDB() as server:
         a_run = server.get_one_run(run_id)
     return jsonify(a_run)
 
 
 @app.route('/api/test/<int:test_id>', methods=['GET'])
-def get_a_test(test_id: int):
+def get_a_test(test_id: int) -> flask.Response:
     with ui_db.UIDB() as server:
         a_test = server.get_one_test(test_id)
     return jsonify(a_test)
 
 
 @app.route('/api/build/<int:build_id>', methods=['GET'])
-def get_build_info(build_id: int):
+def get_build_info(build_id: int) -> flask.Response:
     with ui_db.UIDB() as server:
         a_test = server.get_build_info(build_id)
     return jsonify(a_test)
 
 
 @app.route('/api/test/<int:test_id>/history', methods=['GET'])
-def test_history(test_id: int):
+def test_history(test_id: int) -> flask.Response:
     with ui_db.UIDB() as server:
         history = server.get_test_history_by_id(test_id)
     return jsonify(history)
 
 
 @app.route('/api/test/<int:test_id>/history/<path:branch>', methods=['GET'])
-def branch_history(test_id: int, branch: str):
+def branch_history(test_id: int, branch: str) -> flask.Response:
     with ui_db.UIDB() as server:
         history = server.get_histoty_for_base_branch(test_id, branch)
     return jsonify(history)
 
 
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
-def cancel_the_run(run_id: int):
+def cancel_the_run(run_id: int) -> flask.Response:
     with ui_db.UIDB() as server:
         server.cancel_the_run(run_id)
     return jsonify({})
@@ -129,9 +130,9 @@ def new_run(login: str) -> flask.Response:
         return jsonify(response)
 
 
-def schedule_nightly_run_check(delta: datetime.timedelta):
+def schedule_nightly_run_check(delta: datetime.timedelta) -> None:
 
-    def check():
+    def check() -> None:
         schedule_nightly_run_check(
             max(scheduler.schedule_nightly_run(),
                 datetime.timedelta(minutes=3)))
@@ -155,7 +156,7 @@ def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
         flask.abort(404)
     with ui_db.UIDB() as server:
         try:
-            blob, compressed = getter(server, gzip_ok)
+            blob, compressed = getter(server, gzip_ok)  # type: ignore
         except KeyError:
             flask.abort(404)
     response = flask.make_response(blob, 200)
@@ -169,7 +170,7 @@ def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
 
 
 @app.route('/login/<any("cli","web"):mode>', methods=['GET'])
-def login_redirect(mode: str) -> flask.Response:
+def login_redirect(mode: str) -> werkzeug.wrappers.Response:
     try:
         code = auth.AuthCode.from_request(flask.request)
         if code.verify():
@@ -180,7 +181,7 @@ def login_redirect(mode: str) -> flask.Response:
 
 
 @app.route('/login/code', methods=['GET'])
-def login_code() -> flask.Response:
+def login_code() -> werkzeug.wrappers.Response:
     try:
         code, is_web = auth.get_code(state=flask.request.args.get('state'),
                                      code=flask.request.args.get('code'))
@@ -189,7 +190,7 @@ def login_code() -> flask.Response:
     return _login_response(code.code, is_web)
 
 
-def _login_response(code: str, is_web: bool) -> flask.Response:
+def _login_response(code: str, is_web: bool) -> werkzeug.wrappers.Response:
     if is_web:
         response = flask.redirect(f'{NAYDUCK_UI}/#{auth.CODE_KEY}={code}')
     else:
@@ -209,14 +210,16 @@ span {{ display: block; margin: 1em 0; font-size: 0.8em;\
   Copy it (including the user name at the front) and paste into the nayduck tool
   prompt.
 </div>'''
-        response = flask.Response(text, 200, mimetype='text/html',
+        response = flask.Response(text,
+                                  200,
+                                  mimetype='text/html',
                                   headers=(('Content-Language', 'en'),))
     auth.add_cookie(response, code)
     return response
 
 
 @app.route('/logout', methods=['GET'])
-def logout() -> flask.Response:
+def logout() -> werkzeug.wrappers.Response:
     response = flask.redirect(flask.request.referrer or NAYDUCK_UI)
     response.headers['clear-site-data'] = '*'
     response.delete_cookie(auth.CODE_KEY)

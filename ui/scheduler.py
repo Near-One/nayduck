@@ -39,10 +39,7 @@ def _run(*cmd: str, cwd: typing.Optional[pathlib.Path] = None) -> bytes:
             returns non-zero exit status.
     """
     try:
-        return subprocess.check_output(cmd,
-                                       cwd=cwd,
-                                       input=None,
-                                       stderr=subprocess.PIPE)
+        return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as ex:
         command = ' '.join(shlex.quote(arg) for arg in cmd)
         stderr = ex.stderr.decode('utf-8', 'replace')
@@ -181,10 +178,10 @@ class Request(typing.NamedTuple):
                 (is_release, features),
                 ui_db.UIDB.BuildSpec(is_release=is_release, features=features))
             build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-            test = ui_db.UIDB.TestSpec(name=test,
-                                       build=build,
-                                       is_remote='--remote' in test)
-            tests.append(test)
+            tests.append(
+                ui_db.UIDB.TestSpec(name=test,
+                                    build=build,
+                                    is_remote='--remote' in test))
 
         # Sort builds by number of dependent tests so that when masters choose
         # what to do they start with builds which unlock the largest number of
@@ -218,7 +215,7 @@ class Request(typing.NamedTuple):
             Failure: if any of the test is not valid, there are no tests given
                 or there are too many tests given.
         """
-        result = []
+        result: typing.List[str] = []
         for test in tests:
             count, test = cls._verify_single_test(test)
             if count + len(result) > _TEST_COUNT_LIMIT:
@@ -266,8 +263,7 @@ class Request(typing.NamedTuple):
 
     @classmethod
     def _extract_features(
-        cls, test: str
-    ) -> typing.Tuple[typing.Sequence[str], typing.Optional[typing.Set[str]]]:
+            cls, test: str) -> typing.Tuple[typing.List[str], typing.Set[str]]:
         """Extracts feature names from test.
 
         A test can specify features it requires the binaries to be built with.
@@ -294,7 +290,7 @@ class Request(typing.NamedTuple):
         """
         pos = test.find('--features')
         if pos == -1:
-            return test.split(), None
+            return test.split(), set()
 
         features = set()
         want_features = False
@@ -317,7 +313,7 @@ class Request(typing.NamedTuple):
         return test[:pos].split(), features
 
     @classmethod
-    def _check_test_name(cls, test: str, words: typing.Sequence[str]) -> None:
+    def _check_test_name(cls, test: str, words: typing.List[str]) -> None:
         """Checks whether the test name is valid; raises Failure if not."""
         try:
             idx = 1 + words[1].startswith('--timeout')
@@ -335,7 +331,7 @@ class Request(typing.NamedTuple):
             raise Failure(f'Invalid test name "{name}" in: {test}')
 
 
-def schedule_nightly_run():
+def schedule_nightly_run() -> datetime.timedelta:
     """Schedules a new nightly run if last one was over 24 hours ago."""
     with ui_db.UIDB() as server:
         try:
@@ -383,16 +379,18 @@ def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
 
     mod = {'__file__': 'scripts/nayduck.py'}
     exec(get_repo_file(mod['__file__']), mod)  # pylint: disable=exec-used
-    lines = mod['read_tests_from_file'](pathlib.Path(mod['DEFAULT_TEST_FILE']),
-                                        reader=reader)
-    return Request.verify_tests(lines)
+    read_tests_from_file = typing.cast(typing.Any, mod['read_tests_from_file'])
+    lines = read_tests_from_file(pathlib.Path(mod['DEFAULT_TEST_FILE']),
+                                 reader=reader)
+    return Request.verify_tests(typing.cast(typing.Iterable[str], lines))
 
 
 def _schedule_nightly_impl(server: ui_db.UIDB) -> datetime.timedelta:
     """Implementation of schedule_nightly_run."""
     last = server.last_nightly_run()
     if last:
-        delta = datetime.datetime.utcnow() - last['timestamp']
+        delta = datetime.datetime.utcnow() - typing.cast(datetime.datetime,
+                                                         last['timestamp'])
         need_new_run = delta >= datetime.timedelta(hours=24)
         print('Last nightly at {}; {} ago; sha={}{}'.format(
             last['timestamp'], delta, last['sha'],
