@@ -3,6 +3,7 @@ import {
     NavLink,
   } from "react-router-dom";
 import GithubIcon from "mdi-react/GithubIcon";
+import * as ansicolor from "ansicolor";
 
 
 export function testStatusColour(status) {
@@ -151,10 +152,20 @@ export function allLogLinks(logs, test_id) {
 }
 
 
+function makeSpan(span, idx) {
+    const style = {};
+    for (const prop of span.css.split(';').filter(prop => prop)) {
+        const [name, val] = prop.split(':', 2);
+        style[name.replace(/-([a-z])/g, String.prototype.toUpperCase())] = val;
+    }
+    return <span style={style} key={idx}>{span.text}</span>;
+}
+
+
 export function logBlob(blob) {
-    return blob
-        ? <div className="blob">{blob}</div>
-        : <small style={{fontStyle: 'italic'}}>(empty)</small>;
+    return blob ? <div className="blob">{
+        ansicolor.parse(blob).spans.filter(span => span.text).map(makeSpan)
+    }</div> : <small style={{fontStyle: 'italic'}}>(empty)</small>;
 }
 
 
