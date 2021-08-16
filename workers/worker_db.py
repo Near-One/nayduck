@@ -1,10 +1,7 @@
-import os
-import sys
 import time
 import typing
 
-sys.path.append(os.path.abspath('../main_db'))
-import common_db  # pylint: disable=wrong-import-position
+from lib import common_db
 
 
 class WorkerDB(common_db.DB):

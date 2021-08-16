@@ -1,6 +1,6 @@
 [MASTER]
 ignore = .git
-init-hook = 'import sys, os; sys.path.append(os.getcwd() + "/main_db")'
+init-hook = 'import sys, os; sys.path.append(os.getcwd())'
 load-plugins = pylint_quotes
 
 [MESSAGES CONTROL]

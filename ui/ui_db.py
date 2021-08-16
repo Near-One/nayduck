@@ -1,13 +1,10 @@
 import collections
 import itertools
-import os
 import random
 import string
-import sys
 import typing
 
-sys.path.append(os.path.abspath('../main_db'))
-import common_db  # pylint: disable=wrong-import-position
+from lib import common_db
 
 
 def _pop_falsy(dictionary, *keys):

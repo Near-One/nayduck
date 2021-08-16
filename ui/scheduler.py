@@ -10,7 +10,7 @@ import typing
 
 import requests
 
-from ui_db import UIDB
+from . import ui_db
 
 
 class Failure(Exception):
@@ -296,8 +296,8 @@ class Request(typing.NamedTuple):
             raise Failure(f'Invalid test name "{name}" in: {test}')
 
 
-def _verify_token(server: UIDB, request_json: typing.Dict[str,
-                                                          typing.Any]) -> None:
+def _verify_token(server: ui_db.UIDB,
+                  request_json: typing.Dict[str, typing.Any]) -> None:
     """Verifies if request has correct token; raises Failure if not."""
     token = request_json.get('token')
     if token is None:
@@ -329,13 +329,14 @@ def request_a_run_impl(request_json: typing.Dict[str, typing.Any]) -> int:
         Failure: on any kind of error.
     """
     req = Request.from_json_request(request_json)
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         _verify_token(server, request_json)
         commit = CommitInfo.for_commit(_update_repo(), req.sha)
         return _do_schedule_a_run(server, req, commit)
 
 
-def _do_schedule_a_run(server: UIDB, req: Request, commit: CommitInfo) -> int:
+def _do_schedule_a_run(server: ui_db.UIDB, req: Request,
+                       commit: CommitInfo) -> int:
     """Saves given run requests to the database.
 
     Args:
@@ -354,12 +355,12 @@ def _do_schedule_a_run(server: UIDB, req: Request, commit: CommitInfo) -> int:
         pos = test.find('--features')
         features = '' if pos < 0 else test[pos:]
         build = builds.setdefault((is_release, features),
-                                  UIDB.BuildSpec(is_release=is_release,
-                                                 features=features))
+                                  ui_db.UIDB.BuildSpec(is_release=is_release,
+                                                       features=features))
         build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-        test = UIDB.TestSpec(name=test,
-                             build=build,
-                             is_remote='--remote' in test)
+        test = ui_db.UIDB.TestSpec(name=test,
+                                   build=build,
+                                   is_remote='--remote' in test)
         tests.append(test)
 
     # Sort builds by number of dependent tests so that when masters choose
@@ -378,7 +379,7 @@ def _do_schedule_a_run(server: UIDB, req: Request, commit: CommitInfo) -> int:
 
 def schedule_nightly_run():
     """Schedules a new nightly run if last one was over 24 hours ago."""
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         try:
             return _schedule_nightly_impl(server)
         except Exception:
@@ -429,7 +430,7 @@ def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
     return Request.verify_tests(lines)
 
 
-def _schedule_nightly_impl(server: UIDB) -> datetime.timedelta:
+def _schedule_nightly_impl(server: ui_db.UIDB) -> datetime.timedelta:
     """Implementation of schedule_nightly_run."""
     last = server.last_nightly_run()
     delta = datetime.datetime.utcnow() - last['timestamp']

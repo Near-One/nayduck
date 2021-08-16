@@ -7,8 +7,8 @@ import flask.json
 import flask_apscheduler
 import flask_cors
 
-from ui_db import UIDB
-import scheduler
+from . import scheduler
+from . import ui_db
 
 NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
@@ -37,56 +37,56 @@ app.json_encoder = JSONEncoder
 
 @app.route('/api/runs', methods=['GET'])
 def get_runs():
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         all_runs = server.get_all_runs()
     return flask.jsonify(all_runs)
 
 
 @app.route('/api/run/<int:run_id>', methods=['GET'])
 def get_a_run(run_id: int):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         a_run = server.get_one_run(run_id)
     return flask.jsonify(a_run)
 
 
 @app.route('/api/test/<int:test_id>', methods=['GET'])
 def get_a_test(test_id: int):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         a_test = server.get_one_test(test_id)
     return flask.jsonify(a_test)
 
 
 @app.route('/api/build/<int:build_id>', methods=['GET'])
 def get_build_info(build_id: int):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         a_test = server.get_build_info(build_id)
     return flask.jsonify(a_test)
 
 
 @app.route('/api/test/<int:test_id>/history', methods=['GET'])
 def test_history(test_id: int):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         history = server.get_test_history_by_id(test_id)
     return flask.jsonify(history)
 
 
 @app.route('/api/test/<int:test_id>/history/<path:branch>', methods=['GET'])
 def branch_history(test_id: int, branch: str):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         history = server.get_histoty_for_base_branch(test_id, branch)
     return flask.jsonify(history)
 
 
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
 def cancel_the_run(run_id: int):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         server.cancel_the_run(run_id)
     return flask.jsonify({})
 
 
 @app.route('/api/get_auth_code/<string:login>', methods=['GET'])
 def get_auth_code(login: str):
-    with UIDB() as server:
+    with ui_db.UIDB() as server:
         code = server.get_auth_code(login)
     return flask.jsonify({'code': code})
 

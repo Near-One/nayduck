@@ -8,8 +8,8 @@ import typing
 
 import psutil
 
-from db_master import MasterDB
-import utils
+from . import master_db
+from . import utils
 
 
 class BuildSpec(typing.NamedTuple):
@@ -131,7 +131,7 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
         return False
 
 
-def wait_for_free_space(server: MasterDB, ipv4: str) -> None:
+def wait_for_free_space(server: master_db.MasterDB, ipv4: str) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
     If there's less than 50GB of free space on /datadrive file system, delete
@@ -175,7 +175,7 @@ def keep_pulling():
     print('Starting master at {} ({})'.format(socket.gethostname(),
                                               utils.int_to_ip(ipv4)))
 
-    with MasterDB() as server:
+    with master_db.MasterDB() as server:
         server.handle_restart(ipv4)
 
         while True:

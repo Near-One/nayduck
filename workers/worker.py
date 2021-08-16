@@ -14,8 +14,8 @@ import typing
 import azure.storage.blob
 import psutil
 
-from db_worker import WorkerDB
-import utils
+from . import worker_db
+from . import utils
 
 DEFAULT_TIMEOUT = 180
 BACKTRACE_PATTERN = 'stack backtrace:'
@@ -379,7 +379,8 @@ def upload_log(service_client: azure.storage.blob.BlobServiceClient,
         return None
 
 
-def save_logs(server: WorkerDB, test_id: int, directory: Path) -> None:
+def save_logs(server: worker_db.WorkerDB, test_id: int,
+              directory: Path) -> None:
     logs = list_logs(directory)
     if not logs:
         return
@@ -449,7 +450,8 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
             _COPIED_EXPENSIVE_DEPS.append(test_name)
 
 
-def handle_test(server: WorkerDB, test: typing.Dict[str, typing.Any]) -> None:
+def handle_test(server: worker_db.WorkerDB,
+                test: typing.Dict[str, typing.Any]) -> None:
     print(test)
     if not utils.checkout(test['sha']):
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
@@ -502,7 +504,7 @@ def main():
     print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)))
 
     mocknet = 'mocknet' in hostname
-    with WorkerDB() as server:
+    with worker_db.WorkerDB() as server:
         server.handle_restart(ipv4)
         while True:
             try:

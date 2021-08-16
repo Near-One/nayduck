@@ -1,9 +1,6 @@
-import os
-import sys
 import typing
 
-sys.path.append(os.path.abspath('../main_db'))
-import common_db  # pylint: disable=wrong-import-position
+from lib import common_db
 
 
 class MasterDB(common_db.DB):
