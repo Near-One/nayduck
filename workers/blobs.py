@@ -77,14 +77,11 @@ def _initialise_factory(
         SystemExit: if no configuration for exist or it's not properly formatted
             in some way.
     """
-    cfg, cfg_file = config.get_config('blob-store')
-    service = cfg.pop('service', None)
-    if not service:
-        raise SystemExit(f'{cfg_file}: missing or empty "service" key')
+    cfg = config.load('blob-store')
+    service = cfg.take('service', str)
     cls = globals().get(f'{service}BlobClient', None)
     if not cls or not issubclass(cls, BlobClient):
-        raise SystemExit(f'{cfg_file}: {service}: unknown service')
-
+        raise SystemExit(f'{cfg.path}: {service}: unknown service')
     return lambda: cls(**cfg)  # pylint: disable=unnecessary-lambda
 
 

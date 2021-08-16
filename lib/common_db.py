@@ -1,15 +1,14 @@
 import gzip
-import os
 import typing
 
 import mysql.connector
 
-_CONFIG = {
-    'host': os.environ.pop('DB_HOST', '127.0.0.1'),
-    'user': os.environ.pop('DB_USER', 'nayduck'),
-    'passwd': os.environ.pop('DB_PASSWD'),
-    'database': os.environ.pop('DB', 'nayduck'),
-}
+from lib import config
+
+_CONFIG = config.load('database')
+_CONFIG.setdefault('host', '127.0.0.1')
+_CONFIG.setdefault('user', 'nayduck')
+_CONFIG.setdefault('database', 'nayduck')
 
 
 class DB:
