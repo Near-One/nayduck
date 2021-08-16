@@ -103,7 +103,20 @@ class CommitInfo(typing.NamedTuple):
         cmd = ('git', 'log', '--format=%H\n%s', '-n1', sha, '--')
         sha, title = _run(*cmd, cwd=repo_dir).decode('utf-8',
                                                      'replace').splitlines()
-        return cls(sha=sha, title=title)
+        return cls(sha=sha, title=cls._shorten_title(title))
+
+    @classmethod
+    def _shorten_title(cls, title: str) -> str:
+        """Shortens the title if it's longer than 150 characters."""
+        if len(title) <= 150:
+            return title
+        suffix = '…'
+        # If title ends with '(#1235)' keep that number at the end
+        match = re.search(r'\s*(\(#\d+\))\s*$', title)
+        if match:
+            suffix = '… ' + match.group(1)
+            title = title[:match.start(0)]
+        return title[:150 - len(suffix)] + suffix
 
 
 _VALID_FEATURE = re.compile(r'^[a-zA-Z0-9_][-a-zA-Z0-9_]*$')

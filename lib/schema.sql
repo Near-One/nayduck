@@ -17,7 +17,7 @@ CREATE TABLE `runs` (
   `branch` varchar(100) NOT NULL,
   `sha` char(40) NOT NULL,
   `timestamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `title` varchar(200) NOT NULL,
+  `title` varchar(150) CHARACTER SET utf8mb4 NOT NULL,
   `requester` varchar(50) NOT NULL,
   `is_nightly` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
