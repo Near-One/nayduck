@@ -25,19 +25,13 @@ INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 
 def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
                             build_type: str) -> typing.Sequence[str]:
-    try:
-        if test[0] in ('pytest', 'mocknet'):
-            return ['python', 'tests/' + test[1]] + test[2:]
-        if test[0] == 'expensive':
-            path = cwd / 'target_expensive' / build_type / 'deps'
-            name_prefix = test[2].replace('-', '_') + '-'
-            files = os.listdir(path)
-            for filename in files:
-                if filename.startswith(name_prefix):
-                    return (path / filename, test[3], '--exact', '--nocapture')
-    except Exception:
-        print(test)
-        raise
+    if len(test) >= 2 and test[0] in ('pytest', 'mocknet'):
+        return ['python', 'tests/' + test[1]] + test[2:]
+    if len(test) >= 4 and test[0] == 'expensive':
+        path = cwd / 'target_expensive' / build_type / 'deps'
+        for filename in os.listdir(path):
+            if filename.startswith(test[2] + '-'):
+                return (path / filename, test[3], '--exact', '--nocapture')
     raise ValueError('Invalid test command: ' + ' '.join(test))
 
 
@@ -413,7 +407,7 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
         _LAST_COPIED_BUILD_ID = build_id
 
     if test[0] == 'expensive':
-        test_name = test[2 + test[1].startswith('--')].replace('-', '_')
+        test_name = test[2 + test[1].startswith('--')]
         if test_name not in _COPIED_EXPENSIVE_DEPS:
             scp(f'expensive/{test_name}-*',
                 f'target_expensive/{build_type}/deps')
