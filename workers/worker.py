@@ -35,11 +35,24 @@ def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
     raise ValueError('Invalid test command: ' + ' '.join(test))
 
 
-def install_new_packages():
-    """Makes sure all Python requirements for the pytests are satisfied."""
-    requirements = utils.REPO_DIR / 'pytest/requirements.txt'
-    subprocess.check_call(
-        ('python', '-m', 'pip', 'install', '--user', '-q', '-r', requirements))
+_LAST_PIP_INSTALL: typing.Optional[str] = None
+
+
+def install_new_packages(sha: str) -> None:
+    """Makes sure all Python requirements for the pytests are satisfied.
+
+    Args:
+        sha: Hash of the commit we are on.  This is used to compare to hash the
+            last time this function was called.  If they match, the function
+            won’t bother calling pip.
+    """
+    global _LAST_PIP_INSTALL
+
+    if _LAST_PIP_INSTALL != sha:
+        subprocess.check_call(
+            ('python', '-m', 'pip', 'install', '--user', '-q', '-r',
+             utils.REPO_DIR / 'pytest/requirements.txt'))
+        _LAST_PIP_INSTALL = sha
 
 
 def kill_process_tree(pid: int) -> None:
@@ -376,7 +389,7 @@ _COPIED_EXPENSIVE_DEPS = []
 
 
 def scp_build(build_id, master_ip, test, build_type='debug'):
-    global _LAST_COPIED_BUILD_ID, _COPIED_EXPENSIVE_DEPS  # pylint: disable=global-statement
+    global _LAST_COPIED_BUILD_ID, _COPIED_EXPENSIVE_DEPS
 
     if test[0] == 'mocknet':
         return
@@ -452,7 +465,7 @@ def handle_test(server: worker_db.WorkerDB,
         raise
 
     if tokens[0] in ('pytest', 'mocknet'):
-        install_new_packages()
+        install_new_packages(test['sha'])
     server.test_started(test['test_id'])
     code = run_test(outdir, tokens, remote, 'release' if release else 'debug')
     if code == 'POSTPONE':

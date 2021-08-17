@@ -11,7 +11,8 @@ disable = missing-module-docstring,
           too-few-public-methods,
           locally-disabled,
           suppressed-message,
-          broad-except
+          broad-except,
+          global-statement
 
 [BASIC]
 good-names = i, j, k, ex, fd, rd, wr, ok, _
