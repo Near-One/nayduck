@@ -55,7 +55,6 @@ CREATE TABLE `tests` (
   `finished` timestamp NULL DEFAULT NULL,
   `select_after` int(11) NOT NULL DEFAULT '0',
   `priority` tinyint(4) NOT NULL,
-  `is_release` tinyint(1) NOT NULL,
   `remote` tinyint(1) NOT NULL,
   `worker_ip` int(10) unsigned NOT NULL DEFAULT '0',
   `category` enum('pytest','mocknet','expensive') NOT NULL,

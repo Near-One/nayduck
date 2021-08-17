@@ -337,12 +337,11 @@ class UIDB(common_db.DB):
 
         # Into Tests
         columns = ('run_id', 'build_id', 'name', 'category', 'priority',
-                   'is_release', 'remote')
-        self._multi_insert(
-            'tests', columns,
-            ((run_id, test.build.build_id, test.name, test.category,
-              int(is_nightly), test.is_release, test.is_remote)
-             for test in tests))
+                   'remote')
+        self._multi_insert('tests', columns,
+                           ((run_id, test.build.build_id, test.name,
+                             test.category, int(is_nightly), test.is_remote)
+                            for test in tests))
 
         return run_id
 
