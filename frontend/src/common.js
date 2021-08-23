@@ -164,7 +164,7 @@ function formatDateTime(timestampMs) {
     }
     const date = new Date(timestampMs);
     const year = date.getFullYear();
-    const month = pad(date.getMonth());
+    const month = pad(date.getMonth() + 1);
     const day = pad(date.getDate());
     const hours = pad(date.getHours());
     const minutes = pad(date.getMinutes());
