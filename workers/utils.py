@@ -170,9 +170,9 @@ def setup_environ() -> None:
 
     # Add Cargo and Go to PATH and remove various unnecessary directories
     pathsep = os.fsencode(os.pathsep)
-    paths = [home / subdir / 'bin' for subdir in ('cargo', 'go', '.go')]
+    paths = [home / subdir / 'bin' for subdir in ('.cargo', 'go', '.go')]
     env[b'PATH'] = pathsep.join(
-        [bytes(path) for path in paths if path.exists()] + [
+        [os.fsencode(path) for path in paths if path.exists()] + [
             path
             for path in env.get(b'PATH', os.fsencode(os.defpath)).split(pathsep)
             if (path.startswith(b'/') and not path.endswith(b'/sbin') and
