@@ -26,14 +26,28 @@ _Cmd = typing.Sequence[typing.Union[str, Path]]
 _EnvB = typing.MutableMapping[bytes, bytes]
 
 
-def get_sequential_test_cmd(cwd: Path, test: _Test) -> _Cmd:
+def get_test_command(test: _Test) -> typing.Tuple[Path, _Cmd]:
+    """Returns working directory and command to execute for given test.
+
+    Assumes that the repository from which the test should be run is located in
+    utils.REPO_DIR directory.
+
+    Args:
+        test: Test to return the command for.
+    Returns:
+        A (cwd, cmd) tuple where first element is working directory in which to
+        execute the command given by the second element.
+    Raises:
+        ValueError: If test specification is malformed.
+    """
     if len(test) >= 2 and test[0] in ('pytest', 'mocknet'):
-        return ['python', 'tests/' + test[1]] + test[2:]
+        cmd = [sys.executable, 'tests/' + test[1]] + test[2:]
+        return utils.REPO_DIR / 'pytest', cmd
     if len(test) >= 4 and test[0] == 'expensive':
-        path = cwd / 'target/expensive'
-        for filename in os.listdir(path):
-            if filename.startswith(test[2] + '-'):
-                return (path / filename, test[3], '--exact', '--nocapture')
+        for name in os.listdir(utils.REPO_DIR / 'target/expensive'):
+            if name.startswith(test[2] + '-'):
+                name = f'target/expensive/{name}'
+                return utils.REPO_DIR, (name, test[3], '--exact', '--nocapture')
     raise ValueError('Invalid test command: ' + ' '.join(test))
 
 
@@ -53,7 +67,7 @@ def install_new_packages(sha: str, runner: utils.Runner) -> None:
     global _LAST_PIP_INSTALL
 
     if _LAST_PIP_INSTALL != sha:
-        runner(('python', '-m', 'pip', 'install', '--user', '-q',
+        runner((sys.executable, '-m', 'pip', 'install', '--user', '-q',
                 '--disable-pip-version-check', '--no-warn-script-location',
                 '-r', 'requirements.txt'),
                cwd=utils.REPO_DIR / 'pytest',
@@ -116,14 +130,13 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
     return 'PASSED'
 
 
-def execute_test_command(test: _Test, cwd: Path, envb: _EnvB, timeout: int,
+def execute_test_command(test: _Test, envb: _EnvB, timeout: int,
                          runner: utils.Runner) -> str:
     """Executes a test command and returns test's outcome.
 
     Args:
         test: The test to execute.  Test command is constructed based on that
-            list by calling get_sequential_test_cmd()
-        cwd: Working directory to execute the test in.
+            list by calling get_test_command()
         envb: Environment variables to pass to the process.
         timeout: Time in seconds to allow the test to run.  After that time
             passes, the test process will be killed and function will return
@@ -139,7 +152,7 @@ def execute_test_command(test: _Test, cwd: Path, envb: _EnvB, timeout: int,
     stderr_start = runner.stderr.tell()
     envb[b'RUST_BACKTRACE'] = b'1'
     try:
-        cmd = get_sequential_test_cmd(cwd, test)
+        cwd, cmd = get_test_command(test)
         ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
     except subprocess.TimeoutExpired:
         return 'TIMEOUT'
@@ -154,10 +167,6 @@ def execute_test_command(test: _Test, cwd: Path, envb: _EnvB, timeout: int,
 
 def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
              runner: utils.Runner) -> str:
-    cwd = utils.REPO_DIR
-    if test[0] in ('pytest', 'mocknet'):
-        cwd = cwd / 'pytest'
-
     outcome = 'FAILED'
     try:
         timeout = DEFAULT_TIMEOUT
@@ -171,7 +180,7 @@ def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
             utils.rmdirs(*utils.list_test_node_dirs())
             utils.mkdirs(Path.home() / '.near')
 
-        outcome = execute_test_command(test, cwd, envb, timeout, runner)
+        outcome = execute_test_command(test, envb, timeout, runner)
         print('[{:<7}] {}'.format(outcome, ' '.join(test)))
 
         if outcome != 'POSTPONE' and test[0] == 'pytest':
