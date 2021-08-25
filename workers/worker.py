@@ -388,10 +388,13 @@ def scp_build(build_id: int, master_ip: int, test: _Test, build_type: str,
     if _LAST_COPIED_BUILD_ID != build_id:
         _LAST_COPIED_BUILD_ID = None
         _COPIED_EXPENSIVE_DEPS[:] = ()
-        utils.rmdirs(utils.REPO_DIR / 'target',
-                     utils.REPO_DIR / 'runtime/near-test-contracts/res')
+        repo_dir = utils.REPO_DIR
+        utils.rmdirs(repo_dir / 'target')
+        for path in (repo_dir / 'runtime/near-test-contracts/res').iterdir():
+            if path.suffix == '.wasm':
+                path.unlink()
         scp('target/*', f'target/{build_type}')
-        scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
+        scp('near-test-contracts/*.wasm', 'runtime/near-test-contracts/res')
         _LAST_COPIED_BUILD_ID = build_id
 
     if test[0] == 'expensive':

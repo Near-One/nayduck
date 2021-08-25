@@ -94,7 +94,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     src_dir = utils.REPO_DIR / 'runtime' / 'near-test-contracts' / 'res'
     copy(src_dir=src_dir,
          dst_dir=spec.build_dir / 'near-test-contracts',
-         files=os.listdir(src_dir))
+         files=[name for name in os.listdir(src_dir) if name.endswith('.wasm')])
 
     if not spec.is_expensive:
         return
