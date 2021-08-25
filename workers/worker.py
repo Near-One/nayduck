@@ -23,13 +23,15 @@ BACKTRACE_PATTERN = 'stack backtrace:'
 FAIL_PATTERNS = [BACKTRACE_PATTERN]
 INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 
+_Test = typing.Sequence[str]
+_Cmd = typing.Sequence[typing.Union[str, Path]]
 
-def get_sequential_test_cmd(cwd: Path, test: typing.Sequence[str],
-                            build_type: str) -> typing.Sequence[str]:
+
+def get_sequential_test_cmd(cwd: Path, test: _Test) -> _Cmd:
     if len(test) >= 2 and test[0] in ('pytest', 'mocknet'):
         return ['python', 'tests/' + test[1]] + test[2:]
     if len(test) >= 4 and test[0] == 'expensive':
-        path = cwd / 'target_expensive' / build_type / 'deps'
+        path = cwd / 'target/expensive'
         for filename in os.listdir(path):
             if filename.startswith(test[2] + '-'):
                 return (path / filename, test[3], '--exact', '--nocapture')
@@ -183,17 +185,14 @@ def analyse_test_outcome(test: typing.Sequence[str], ret: int,
     return 'PASSED'
 
 
-def execute_test_command(dir_name: Path, test: typing.Sequence[str],
-                         build_type: str, cwd: Path, timeout: int) -> str:
+def execute_test_command(dir_name: Path, test: _Test, cwd: Path,
+                         timeout: int) -> str:
     """Executes a test command and returns test's outcome.
 
     Args:
         dir_name: Directory where to save 'stdout' and 'stderr' files.
         test: The test to execute.  Test command is constructed based on that
             list by calling get_sequential_test_cmd()
-        build_type: A build type ('debug' or 'release') used in some
-            circumstances to locate a built test binary inside of the taregt
-            directory.
         cwd: Working directory to execute the test in.
         timeout: Time in seconds to allow the test to run.  After that time
             passes, the test process will be killed and function will return
@@ -202,7 +201,7 @@ def execute_test_command(dir_name: Path, test: typing.Sequence[str],
         Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE', 'IGNORED' or
         'TIMEOUT'.
     """
-    cmd = get_sequential_test_cmd(cwd, test, build_type)
+    cmd = get_sequential_test_cmd(cwd, test)
     print('[RUNNING] {}\n+ {}'.format(
         ' '.join(test), ' '.join(shlex.quote(str(arg)) for arg in cmd)))
     with open(dir_name / 'stdout', 'wb+') as stdout, \
@@ -214,7 +213,7 @@ def execute_test_command(dir_name: Path, test: typing.Sequence[str],
         return analyse_test_outcome(test, ret, stdout, stderr)
 
 
-def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
+def run_test(dir_name: Path, test, remote=False) -> str:
     cwd = utils.REPO_DIR
     if test[0] in ('pytest', 'mocknet'):
         cwd = cwd / 'pytest'
@@ -232,7 +231,7 @@ def run_test(dir_name: Path, test, remote=False, build_type='debug') -> str:
             utils.rmdirs(*utils.list_test_node_dirs())
             utils.mkdirs(Path.home() / '.near')
 
-        outcome = execute_test_command(dir_name, test, build_type, cwd, timeout)
+        outcome = execute_test_command(dir_name, test, cwd, timeout)
         print('[{:<7}] {}'.format(outcome, ' '.join(test)))
 
         if outcome != 'POSTPONE' and test[0] == 'pytest':
@@ -418,7 +417,6 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
         _LAST_COPIED_BUILD_ID = None
         _COPIED_EXPENSIVE_DEPS = []
         utils.rmdirs(utils.REPO_DIR / 'target',
-                     utils.REPO_DIR / 'target_expensive',
                      utils.REPO_DIR / 'runtime/near-test-contracts/res')
         scp('target/*', f'target/{build_type}')
         scp('near-test-contracts/*', 'runtime/near-test-contracts/res')
@@ -427,8 +425,7 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
     if test[0] == 'expensive':
         test_name = test[2 + test[1].startswith('--')]
         if test_name not in _COPIED_EXPENSIVE_DEPS:
-            scp(f'expensive/{test_name}-*',
-                f'target_expensive/{build_type}/deps')
+            scp(f'expensive/{test_name}-*', 'target/expensive')
             _COPIED_EXPENSIVE_DEPS.append(test_name)
 
 
@@ -472,7 +469,7 @@ def handle_test(server: worker_db.WorkerDB,
     if tokens[0] in ('pytest', 'mocknet'):
         install_new_packages(test['sha'])
     server.test_started(test['test_id'])
-    code = run_test(outdir, tokens, remote, 'release' if release else 'debug')
+    code = run_test(outdir, tokens, remote)
     if code == 'POSTPONE':
         server.remark_test_pending(test['test_id'])
     else:
