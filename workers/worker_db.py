@@ -6,25 +6,34 @@ from lib import common_db
 
 class WorkerDB(common_db.DB):
 
+    def __init__(self, ipv4: int) -> None:
+        """Initialises the connection.
+
+        Args:
+            ipv4: IP address of the worker (as an integer).  This will be stored
+                in a database when marking tests "owned" by the worker and also
+                used to query tests "owned" by the worker.
+        """
+        super().__init__()
+        self._ipv4 = ipv4
+
     def get_pending_test(
-            self, include_mocknet: bool,
-            ipv4: int) -> typing.Optional[typing.Dict[str, typing.Any]]:
+            self, include_mocknet: bool
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Returns a pending test to process or None if none found.
 
         Args:
             include_mocknet: Whether to consider mocknet tests in the result.
-            ipv4: IP address of the worker as an integer.  This is stored in the
-                database to be able to continue with the test after worker
-                process restart.
         Returns:
             A build to process or None if none are present.
         """
         return self._with_transaction(
-            lambda: self.__get_pending_test(include_mocknet, ipv4))
+            lambda: self.__get_pending_test(include_mocknet))
 
     def __get_pending_test(
-            self, mocknet: bool,
-            ipv4: int) -> typing.Optional[typing.Dict[str, typing.Any]]:
+        self,
+        mocknet: bool,
+    ) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Implementation of get_pending_test method (which see).
 
         This method must be run inside of a transaction because it uses
@@ -45,7 +54,7 @@ class WorkerDB(common_db.DB):
                   LIMIT 1'''.format(
             where='' if mocknet else 'AND category != "mocknet"',
             order_by='category != "mocknet", ' if mocknet else '')
-        res = self._exec(sql, ipv4, int(time.time()))
+        res = self._exec(sql, self._ipv4, int(time.time()))
         if res.rowcount == 0:
             return None
         sql = '''SELECT t.test_id, t.run_id, t.build_id, t.name,
@@ -89,8 +98,8 @@ class WorkerDB(common_db.DB):
                   WHERE test_id = %s'''
         self._exec(sql, int(time.time()) + delay, test_id)
 
-    def handle_restart(self, ipv4: int) -> None:
+    def handle_restart(self) -> None:
         sql = '''UPDATE tests
                     SET started = NULL, status = 'PENDING', worker_ip = 0
                   WHERE status = 'RUNNING' AND worker_ip = %s'''
-        self._exec(sql, ipv4)
+        self._exec(sql, self._ipv4)

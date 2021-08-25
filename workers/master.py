@@ -131,7 +131,7 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
         return False
 
 
-def wait_for_free_space(server: master_db.MasterDB, ipv4: int) -> None:
+def wait_for_free_space(server: master_db.MasterDB) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
     If there's less than 50GB of free space on /datadrive file system, delete
@@ -142,16 +142,16 @@ def wait_for_free_space(server: master_db.MasterDB, ipv4: int) -> None:
 
     Args:
         server: Database to query for finished tests.
-        ipv4: This builder's IP address (as an integer) used to retrieve list of
-            builds we've performed from the database.
     """
 
     def enough_space() -> bool:
         return psutil.disk_usage(str(utils.WORKDIR)).free >= 50_000_000_000
 
     def clean_finished() -> bool:
-        server.with_builds_without_pending_tests(
-            ipv4, lambda ids: utils.rmdirs(*[Path(str(bid)) for bid in ids]))
+        bids = server.builds_without_pending_tests()
+        if bids:
+            utils.rmdirs(*[utils.BUILDS_DIR / str(bid) for bid in bids])
+            server.unassign_builds(bids)
         return enough_space()
 
     if enough_space() or clean_finished():
@@ -175,15 +175,15 @@ def keep_pulling() -> None:
     print('Starting master at {} ({})'.format(socket.gethostname(),
                                               utils.int_to_ip(ipv4)))
 
-    with master_db.MasterDB() as server:
-        server.handle_restart(ipv4)
+    with master_db.MasterDB(ipv4) as server:
+        server.handle_restart()
 
         while True:
-            time.sleep(5)
-            wait_for_free_space(server, ipv4)
+            wait_for_free_space(server)
             try:
-                new_build = server.get_new_build(ipv4)
+                new_build = server.get_new_build()
                 if not new_build:
+                    time.sleep(5)
                     continue
 
                 print(new_build)

@@ -501,11 +501,11 @@ def main() -> None:
     print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)))
 
     mocknet = 'mocknet' in hostname
-    with worker_db.WorkerDB() as server:
-        server.handle_restart(ipv4)
+    with worker_db.WorkerDB(ipv4) as server:
+        server.handle_restart()
         while True:
             try:
-                test = server.get_pending_test(mocknet, ipv4)
+                test = server.get_pending_test(mocknet)
                 if test:
                     handle_test(server, test)
                 else:
