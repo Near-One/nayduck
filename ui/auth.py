@@ -144,13 +144,12 @@ def _decrypt(
 
 class AuthCode:
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self,
-            login: str,
-            is_authorised: bool,
-            last_check: int,
-            token: str,
-            code: typing.Optional[str] = None) -> None:
+    def __init__(self,
+                 login: str,
+                 is_authorised: bool,
+                 last_check: int,
+                 token: str,
+                 code: typing.Optional[str] = None) -> None:
         """Should not be called directly; use from_* methods instead."""
         self.__login = login
         self.__is_authorised = is_authorised

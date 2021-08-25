@@ -1,9 +1,14 @@
 import os
 import pathlib
+import shlex
 import shutil
+import signal
 import socket
 import struct
 import subprocess
+import sys
+import tempfile
+import traceback
 import typing
 
 import psutil
@@ -38,46 +43,153 @@ def list_test_node_dirs() -> typing.List[pathlib.Path]:
     ]
 
 
+def _kill_process_tree(pid: int) -> None:
+    """Kills a process tree (including grandchildren).
+
+    Sends SIGTERM to the process and all its descendant and waits for them to
+    terminate.  If a process doesn't terminate within five seconds, sends
+    SIGKILL to remaining stragglers.
+
+    Args:
+        pid: Process ID of the parent whose process tree to kill.
+    """
+
+    def send_to_all(procs: typing.List[psutil.Process], sig: int) -> None:
+        for proc in procs:
+            try:
+                proc.send_signal(sig)
+            except psutil.NoSuchProcess:
+                pass
+
+    proc = psutil.Process(pid)
+    procs = proc.children(recursive=True) + [proc]
+    print('Sending SIGTERM to {} process tree'.format(pid))
+    send_to_all(procs, signal.SIGTERM)
+    _, procs = psutil.wait_procs(procs, timeout=5)
+    if procs:
+        print('Sending SIGKILL to {} remaining processes'.format(len(procs)))
+        send_to_all(procs, signal.SIGKILL)
+
+
 class Runner:
+    """Class for running commands redirecting their output to files."""
 
-    def __init__(self, capture=False):
-        self._stdout_data: typing.Sequence[typing.Union[str, bytes]] = []
-        self._stderr_data: typing.Sequence[typing.Union[str, bytes]] = []
-        if capture:
-            self._stdout = self._stderr = subprocess.PIPE
+    def __init__(self, outdir: typing.Optional[pathlib.Path] = None) -> None:
+        """Initialises the object.
+
+        If outdir is given creates "stdout" and "stderr" files in given
+        directory and redirects all output from commands to those files.  In
+        this case, it’s caller’s responsibility to clean up the files and
+        guarantee that "stdout" and "stderr" file names are available and won’t
+        conflict with anything.
+
+        Otherwise, creates two temporary files and redirects output there.
+
+        Args:
+            outdir: Optionally a directory to create "stdout" and "stderr" files
+                in.
+        """
+        # pylint: disable=consider-using-with
+        if outdir:
+            self.stdout = open(outdir / 'stdout', 'w+b')
+            self.stderr = open(outdir / 'stderr', 'w+b')
         else:
-            self._stdout = self._stderr = None
+            self.stdout = typing.cast(typing.BinaryIO, tempfile.TemporaryFile())
+            self.stderr = typing.cast(typing.BinaryIO, tempfile.TemporaryFile())
+        self.__last_cwd: typing.Optional[pathlib.Path] = None
 
-    def __call__(self, cmd: typing.Sequence[str], **kw: typing.Any) -> bool:
-        res = subprocess.run(cmd,
-                             **kw,
-                             check=False,
-                             stdin=subprocess.DEVNULL,
-                             stdout=self._stdout,
-                             stderr=self._stderr)
-        if res.stdout:
-            self._stdout_data.append(self.__to_bytes(res.stdout))
-        if res.stderr:
-            self._stderr_data.append(self.__to_bytes(res.stderr))
-        return res.returncode == 0
+    def __call__(self,
+                 cmd: typing.Sequence[typing.Union[str, pathlib.Path]],
+                 *,
+                 cwd: pathlib.Path,
+                 check: bool = False,
+                 timeout: int = 3 * 3600,
+                 **kw: typing.Any) -> bool:
+        """Calls given command after printing it to standard error.
 
-    def write_err(self, data: typing.Any):
-        if data:
-            self._stderr_data.append(self.__to_bytes(data))
+        If directory the command is run in is different than one previous
+        command was run prints a "+ cd <dir>" line to standard error.
+        Afterwards, prints "+ <command>" to standard error and executes the
+        command.
 
-    stdout = property(lambda self: b''.join(self._stdout_data))
-    stderr = property(lambda self: b''.join(self._stderr_data))
+        Command’s output as well as the aforementioned log messages are
+        redirected to separate temporary files.
 
-    @staticmethod
-    def __to_bytes(data: typing.Any) -> bytes:
-        if isinstance(data, str):
-            return data.encode('utf-8')
-        if isinstance(data, bytes):
-            return data
-        return b''
+        Args:
+            cmd: Command to execute.
+            cwd: Directory to execute the command in.
+            check: Whether to raise a subprocess.CalledProcessError exception if
+                command fails.  By default, rather than rising the exception,
+                False is returned.
+            timeout: Time in seconds to allow the command to run.  If the
+                command does not finish in allotted time it’s terminated and
+                subprocess.TimeoutExpired expcetion is risen.
+            kw: Keyword arguments passed to subprocess.run() function.
+        Returns:
+            Command’s exit code.
+        Raises:
+            subprocess.CalledProcessError: If check argument is True and command
+                returned non-zero exit code.
+            subprocess.TimeoutExpired: If the command run longer that timeout
+                seconds.
+        """
+        cwd = self.log_command(cmd, cwd)
+        with subprocess.Popen(cmd,
+                              cwd=cwd,
+                              stdin=subprocess.DEVNULL,
+                              stdout=self.stdout,
+                              stderr=self.stderr,
+                              **kw) as proc:
+            try:
+                ret = proc.wait(timeout)
+            except subprocess.TimeoutExpired:
+                _kill_process_tree(proc.pid)
+                raise
+
+        if check and ret:
+            raise subprocess.CalledProcessError(ret, cmd)
+        return ret
+
+    def log_command(self, cmd: typing.Sequence[typing.Union[str, pathlib.Path]],
+                    cwd: pathlib.Path) -> pathlib.Path:
+        """Logs information about command about to be executed.
+
+        Args:
+            cmd: Command which is going to be executed.
+            cwd: Directory in which the command will be executed.
+        Returns:
+            Resolved cwd (i.e. cwd turned into an absolute path).
+        """
+
+        def log(cmd: typing.Iterable[typing.Any]) -> None:
+            msg = '+ ' + ' '.join(shlex.quote(str(arg)) for arg in cmd) + '\n'
+            sys.stderr.write(msg)
+            self.stderr.write(msg.encode('utf-8'))
+
+        cwd = cwd.resolve()
+        if self.__last_cwd != cwd:
+            self.__last_cwd = cwd
+            log(('cd', cwd))
+        log(cmd)
+        self.stderr.flush()
+        return cwd
+
+    def log_traceback(self) -> None:
+        """Writes traceback to standard error and command’s standard error."""
+        exc = traceback.format_exc()
+        sys.stderr.write(exc)
+        self.stderr.write(exc.encode('utf-8'))
+        self.stderr.flush()
+
+    def __enter__(self) -> 'Runner':
+        return self
+
+    def __exit__(self, *_: typing.Any) -> None:
+        self.stdout.close()
+        self.stderr.close()
 
 
-def checkout(sha: str, runner: typing.Optional[Runner] = None) -> bool:
+def checkout(sha: str, runner: Runner) -> bool:
     """Checks out given SHA in the nearcore repository.
 
     If the repository directory exists updates the origin remote and then checks
@@ -94,24 +206,23 @@ def checkout(sha: str, runner: typing.Optional[Runner] = None) -> bool:
     Returns:
         Whether operation succeeded.
     """
-    runner = runner or Runner()
     if REPO_DIR.is_dir():
-        print('Checkout', sha)
         result = subprocess.run(
             ('git', 'rev-parse', '--verify', '-q', sha + '^{commit}'),
             stdout=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
             check=False,
             cwd=REPO_DIR)
-        if ((result.returncode == 0 or runner(
-            ('git', 'remote', 'update', '-p'), cwd=REPO_DIR)) and runner(
-                ('git', 'checkout', sha), cwd=REPO_DIR)):
+        # yapf: disable
+        if ((result.returncode == 0 or
+             runner(('git', 'remote', 'update', '-p'), cwd=REPO_DIR) == 0) and
+            runner(('git', 'checkout', sha), cwd=REPO_DIR) == 0):
             return True
+        # yapf: enable
+        rmdirs(REPO_DIR)
 
-    print('Clone', sha)
-    rmdirs(REPO_DIR)
-    return (runner(('git', 'clone', REPO_URL), cwd=WORKDIR) and runner(
-        ('git', 'checkout', sha), cwd=REPO_DIR))
+    return (runner(('git', 'clone', REPO_URL), cwd=REPO_DIR.parent) == 0 and
+            runner(('git', 'checkout', sha), cwd=REPO_DIR) == 0)
 
 
 def get_ip() -> int:
@@ -189,6 +300,8 @@ def setup_environ() -> None:
     # Tell tests this is NayDuck
     env[b'NAYDUCK'] = b'1'
     env[b'NIGHTLY_RUNNER'] = b'1'
+
+    env.pop(b'NEAR_PYTEST_CONFIG', None)
 
     # Apply
     os.environb.clear()

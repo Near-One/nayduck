@@ -1,18 +1,16 @@
 import concurrent.futures
+import contextlib
 import json
 import os
 from pathlib import Path, PurePath
-import shlex
 import shutil
-import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import traceback
 import typing
-
-import psutil
 
 from . import blobs
 from . import worker_db
@@ -23,8 +21,9 @@ BACKTRACE_PATTERN = 'stack backtrace:'
 FAIL_PATTERNS = [BACKTRACE_PATTERN]
 INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 
-_Test = typing.Sequence[str]
+_Test = typing.List[str]
 _Cmd = typing.Sequence[typing.Union[str, Path]]
+_EnvB = typing.MutableMapping[bytes, bytes]
 
 
 def get_sequential_test_cmd(cwd: Path, test: _Test) -> _Cmd:
@@ -41,108 +40,42 @@ def get_sequential_test_cmd(cwd: Path, test: _Test) -> _Cmd:
 _LAST_PIP_INSTALL: typing.Optional[str] = None
 
 
-def install_new_packages(sha: str) -> None:
+def install_new_packages(sha: str, runner: utils.Runner) -> None:
     """Makes sure all Python requirements for the pytests are satisfied.
 
     Args:
         sha: Hash of the commit we are on.  This is used to compare to hash the
             last time this function was called.  If they match, the function
             won’t bother calling pip.
+        runner: Runner whose standard output and error files output of the
+            command will be redirected into.
     """
     global _LAST_PIP_INSTALL
 
     if _LAST_PIP_INSTALL != sha:
-        subprocess.check_call(
-            ('python', '-m', 'pip', 'install', '--user', '-q', '-r',
-             utils.REPO_DIR / 'pytest/requirements.txt'))
+        runner(('python', '-m', 'pip', 'install', '--user', '-q',
+                '--disable-pip-version-check', '--no-warn-script-location',
+                '-r', 'requirements.txt'),
+               cwd=utils.REPO_DIR / 'pytest',
+               check=True)
         _LAST_PIP_INSTALL = sha
 
 
-def kill_process_tree(pid: int) -> None:
-    """Kills a process tree (including grandchildren).
-
-    Sends SIGTERM to the process and all its descendant and waits for them to
-    terminate.  If a process doesn't terminate within five seconds, sends
-    SIGKILL to remaining stragglers.
-
-    Args:
-        pid: Process ID of the parent whose process tree to kill.
-    """
-
-    def send_to_all(procs: typing.List[psutil.Process], sig: int) -> None:
-        for proc in procs:
-            try:
-                proc.send_signal(sig)
-            except psutil.NoSuchProcess:
-                pass
-
-    proc = psutil.Process(pid)
-    procs = proc.children(recursive=True) + [proc]
-    print('Sending SIGTERM to {} process tree'.format(pid))
-    send_to_all(procs, signal.SIGTERM)
-    _, procs = psutil.wait_procs(procs, timeout=5)
-    if procs:
-        print('Sending SIGKILL to {} remaining processes'.format(len(procs)))
-        send_to_all(procs, signal.SIGKILL)
-
-
-def run_command_with_tmpdir(cmd: typing.Sequence[str],
-                            stdout: typing.IO[typing.AnyStr],
-                            stderr: typing.IO[typing.AnyStr], cwd: Path,
-                            timeout: int) -> str:
-    """Executes a command and cleans up its temporary files once it’s done.
-
-    Executes a command with TMPDIR, TEMP and TMP environment variables set to
-    a temporary directory which is cleared after the command terminates.  This
-    should clean up all temporary file that the command might have created.
-
-    Args:
-        cmd: The command to execute.
-        stdout: File to direct command’s standard output to.
-        stderr: File to direct command’s standard error output to.
-        cwd: Work directory to run the command in.
-        timeout: Time in seconds to allow the test to run.  After that time
-            passes, the test process will be killed and function will raise
-            subprocess.Timeout exception.
-    Raises:
-        subprocess.Timeout: if process takes longer that timeout seconds to
-        complete.
-    """
-    with tempfile.TemporaryDirectory() as tmpdir, \
-         subprocess.Popen(cmd, stdout=stdout, stderr=stderr, cwd=cwd,
-                          env=dict(os.environ,
-                                   RUST_BACKTRACE='1',
-                                   TMPDIR=tmpdir,
-                                   TEMP=tmpdir,
-                                   TMP=tmpdir)) as handle:
-        try:
-            return handle.wait(timeout)
-        except subprocess.TimeoutExpired:
-            kill_process_tree(handle.pid)
-            raise
-
-
-def analyse_test_outcome(test: typing.Sequence[str], ret: int,
-                         stdout: typing.BinaryIO,
+def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
                          stderr: typing.BinaryIO) -> str:
     """Returns test's outcome based on exit code and test's output.
 
     Args:
         test: The test whose result is being analysed.
         ret: Test process exit code.
-        stdout: Test's standard output opened as binary file.  The file
-            descriptor must be seekable since it will be seeked to the beginning
-            of the file if necessary.
-        stderr: Test's standard error output opened as binary file.  The file
-            descriptor must be seekable since it will be seeked to the beginning
-            of the file if necessary.
+        stdout: Test's standard output opened as binary file.
+        stderr: Test's standard error output opened as binary file.
     Returns:
         Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE' or 'IGNORED'.
     """
 
     def get_last_line(rd: typing.BinaryIO) -> bytes:
         """Returns last non-empty line of a file or empty string."""
-        rd.seek(0)
         last_line = b''
         for line in rd:
             line = line.strip()
@@ -152,7 +85,6 @@ def analyse_test_outcome(test: typing.Sequence[str], ret: int,
 
     def analyze_rust_test():
         """Analyses outcome of an expensive or lib tests."""
-        stdout.seek(0)
         for line in stdout:
             line = line.strip()
             if not line:
@@ -163,7 +95,6 @@ def analyse_test_outcome(test: typing.Sequence[str], ret: int,
                 # Report that as a failure rather than ignored test.
                 return 'FAILED'
             break
-        stderr.seek(0)
         for line in stderr:
             if line.strip().decode('utf-8', 'replace') in FAIL_PATTERNS:
                 return 'FAILED'
@@ -185,35 +116,44 @@ def analyse_test_outcome(test: typing.Sequence[str], ret: int,
     return 'PASSED'
 
 
-def execute_test_command(dir_name: Path, test: _Test, cwd: Path,
-                         timeout: int) -> str:
+def execute_test_command(test: _Test, cwd: Path, envb: _EnvB, timeout: int,
+                         runner: utils.Runner) -> str:
     """Executes a test command and returns test's outcome.
 
     Args:
-        dir_name: Directory where to save 'stdout' and 'stderr' files.
         test: The test to execute.  Test command is constructed based on that
             list by calling get_sequential_test_cmd()
         cwd: Working directory to execute the test in.
+        envb: Environment variables to pass to the process.
         timeout: Time in seconds to allow the test to run.  After that time
             passes, the test process will be killed and function will return
             'TIMEOUT' outcome.
+        runner: Runner whose standard output and error files output of the
+            command will be redirected into.
     Returns:
         Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE', 'IGNORED' or
         'TIMEOUT'.
     """
-    cmd = get_sequential_test_cmd(cwd, test)
-    print('[RUNNING] {}\n+ {}'.format(
-        ' '.join(test), ' '.join(shlex.quote(str(arg)) for arg in cmd)))
-    with open(dir_name / 'stdout', 'wb+') as stdout, \
-         open(dir_name / 'stderr', 'wb+') as stderr:
-        try:
-            ret = run_command_with_tmpdir(cmd, stdout, stderr, cwd, timeout)
-        except subprocess.TimeoutExpired:
-            return 'TIMEOUT'
-        return analyse_test_outcome(test, ret, stdout, stderr)
+    print('[RUNNING] ' + ' '.join(test), file=sys.stderr)
+    stdout_start = runner.stdout.tell()
+    stderr_start = runner.stderr.tell()
+    envb[b'RUST_BACKTRACE'] = b'1'
+    try:
+        cmd = get_sequential_test_cmd(cwd, test)
+        ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
+    except subprocess.TimeoutExpired:
+        return 'TIMEOUT'
+    try:
+        runner.stdout.seek(stdout_start)
+        runner.stderr.seek(stderr_start)
+        return analyse_test_outcome(test, ret, runner.stdout, runner.stderr)
+    finally:
+        runner.stdout.seek(0, 2)
+        runner.stderr.seek(0, 2)
 
 
-def run_test(dir_name: Path, test, remote=False) -> str:
+def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
+             runner: utils.Runner) -> str:
     cwd = utils.REPO_DIR
     if test[0] in ('pytest', 'mocknet'):
         cwd = cwd / 'pytest'
@@ -231,14 +171,14 @@ def run_test(dir_name: Path, test, remote=False) -> str:
             utils.rmdirs(*utils.list_test_node_dirs())
             utils.mkdirs(Path.home() / '.near')
 
-        outcome = execute_test_command(dir_name, test, cwd, timeout)
+        outcome = execute_test_command(test, cwd, envb, timeout, runner)
         print('[{:<7}] {}'.format(outcome, ' '.join(test)))
 
         if outcome != 'POSTPONE' and test[0] == 'pytest':
             for node_dir in utils.list_test_node_dirs():
-                shutil.copytree(node_dir, dir_name / PurePath(node_dir).name)
-    except Exception as ex:
-        print(ex)
+                shutil.copytree(node_dir, outdir / PurePath(node_dir).name)
+    except Exception:
+        runner.log_traceback()
     return outcome
 
 
@@ -356,7 +296,28 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> typing.Tuple[bytes, bool]:
         if pos < limit:  # If we went too far it doesn't look like UTF-8.
             ending = ending[pos:]
 
-    return data + b'\n...\n' + ending, False
+    # Don’t split in the middle of a line unless we’d need to discard too much
+    # data to split cleanly.
+    pos = data.rfind(b'\n')
+    if -1 < pos and len(data) - pos < 500:
+        data = data[:pos]
+    pos = ending.find(b'\n')
+    if -1 < pos < 500:
+        ending = ending[pos + 1:]
+
+    # If there are escape codes, make sure the state is reset.
+    parts = [data]
+    pos = data.rfind(b'\x1b[')
+    if (pos > 0 and data[pos:pos + 3] != b'\x1b[m' and
+            data[pos:pos + 4] != b'\x1b[0m'):
+        parts.append(b'\x1b[m')
+    pos = data.rfind(b'\x1b(')
+    if pos > 0 and data[pos:pos + 3] != b'\x1b(B':
+        parts.append(b'\x1b(B')
+
+    parts.append(b'\n...\n')
+    parts.append(ending)
+    return b''.join(parts), False
 
 
 def save_logs(server: worker_db.WorkerDB, test_id: int,
@@ -398,24 +359,26 @@ _LAST_COPIED_BUILD_ID = None
 _COPIED_EXPENSIVE_DEPS = []
 
 
-def scp_build(build_id, master_ip, test, build_type='debug'):
-    global _LAST_COPIED_BUILD_ID, _COPIED_EXPENSIVE_DEPS
+def scp_build(build_id: int, master_ip: int, test: _Test, build_type: str,
+              runner: utils.Runner) -> None:
+    global _LAST_COPIED_BUILD_ID
 
     if test[0] == 'mocknet':
         return
 
-    master_auth = 'azureuser@' + utils.int_to_ip(master_ip)
+    master_auth = utils.int_to_ip(master_ip)
 
     def scp(src: str, dst: str) -> None:
         src = f'{master_auth}:{utils.BUILDS_DIR}/{build_id}/{src}'
-        dst = utils.REPO_DIR / dst
-        utils.mkdirs(dst)
-        cmd = ('scp', '-o', 'StrictHostKeyChecking=no', src, dst)
-        subprocess.check_call(cmd)
+        path = utils.REPO_DIR / dst
+        if not path.is_dir():
+            runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
+            utils.mkdirs(path)
+        runner(('scp', src, dst), cwd=utils.REPO_DIR, check=True)
 
     if _LAST_COPIED_BUILD_ID != build_id:
         _LAST_COPIED_BUILD_ID = None
-        _COPIED_EXPENSIVE_DEPS = []
+        _COPIED_EXPENSIVE_DEPS[:] = ()
         utils.rmdirs(utils.REPO_DIR / 'target',
                      utils.REPO_DIR / 'runtime/near-test-contracts/res')
         scp('target/*', f'target/{build_type}')
@@ -429,22 +392,60 @@ def scp_build(build_id, master_ip, test, build_type='debug'):
             _COPIED_EXPENSIVE_DEPS.append(test_name)
 
 
+@contextlib.contextmanager
+def temp_dir():
+    """A context manager setting a new temporary directory.
+
+    Create a new temporary directory and sets it as tempfile.tempdir as well as
+    TMPDIR, TEMP and TMP environment directories.  Once the context manager
+    exits, values of all those variables are restored and the temporary
+    directory deleted.
+    """
+    old_tempdir = tempfile.tempdir
+    old_env = {
+        var: os.environb.get(var) for var in (b'TMPDIR', b'TEMP', b'TMP')
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tempfile.tempdir = tmpdir
+        for var in old_env:
+            os.environb[var] = os.fsencode(tmpdir)
+        try:
+            yield Path(tmpdir)
+        finally:
+            tempfile.tempdir = old_tempdir
+            for var, old_value in old_env.items():
+                if old_value is None:
+                    os.environb.pop(var, None)
+                else:
+                    os.environb[var] = old_value
+
+
 def handle_test(server: worker_db.WorkerDB,
                 test: typing.Dict[str, typing.Any]) -> None:
     print(test)
-    if not utils.checkout(test['sha']):
+    with temp_dir() as tmpdir:
+        outdir = tmpdir / 'output'
+        utils.mkdirs(outdir)
+        with utils.Runner(outdir) as runner:
+            __handle_test(server, outdir, runner, test)
+
+
+def __handle_test(server: worker_db.WorkerDB, outdir: Path,
+                  runner: utils.Runner, test: typing.Dict[str,
+                                                          typing.Any]) -> None:
+    if not utils.checkout(test['sha'], runner):
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
         return
-    outdir = utils.WORKDIR / 'output'
-    utils.rmdirs(outdir, Path.home() / '.rainbow')
-    outdir = outdir / str(test['test_id'])
-    utils.mkdirs(outdir)
+
+    utils.rmdirs(Path.home() / '.rainbow')
+
+    config_override: typing.Dict[str, typing.Any] = {}
+    envb: _EnvB = typing.cast(_EnvB, os.environb)
 
     tokens = test['name'].split()
     if '--features' in tokens:
         del tokens[tokens.index('--features'):]
 
-    config_override = {}
     remote = '--remote' in tokens
     if remote:
         config_override.update(local=False, preexist=True)
@@ -453,27 +454,32 @@ def handle_test(server: worker_db.WorkerDB,
     if release:
         config_override.update(release=True, near_root='../target/release/')
         tokens.remove('--release')
-    os.environ.pop('NEAR_PYTEST_CONFIG', None)
-    if config_override:
-        os.environ['NEAR_PYTEST_CONFIG'] = '/datadrive/nayduck/.remote'
-        with open('/datadrive/nayduck/.remote', 'w') as wr:
-            json.dump(config_override, wr)
 
+    if config_override:
+        fd, path = tempfile.mkstemp(prefix=b'config-', suffix=b'.json')
+        with os.fdopen(fd, 'wb') as wr:
+            json.dump(config_override, wr)
+        envb = envb.copy()
+        envb[b'NEAR_PYTEST_CONFIG'] = path
+
+    status = None
     try:
         scp_build(test['build_id'], test['master_ip'], tokens,
-                  'release' if release else 'debug')
+                  'release' if release else 'debug', runner)
     except (OSError, subprocess.SubprocessError):
-        server.update_test_status('SCP FAILED', test['test_id'])
-        raise
+        runner.log_traceback()
+        status = 'SCP FAILED'
 
-    if tokens[0] in ('pytest', 'mocknet'):
-        install_new_packages(test['sha'])
-    server.test_started(test['test_id'])
-    code = run_test(outdir, tokens, remote)
-    if code == 'POSTPONE':
+    if status is None:
+        if tokens[0] in ('pytest', 'mocknet'):
+            install_new_packages(test['sha'], runner)
+        server.test_started(test['test_id'])
+        status = run_test(outdir, tokens, remote, envb, runner)
+
+    if status == 'POSTPONE':
         server.remark_test_pending(test['test_id'])
     else:
-        server.update_test_status(code, test['test_id'])
+        server.update_test_status(status, test['test_id'])
         save_logs(server, test['test_id'], outdir)
 
 

@@ -60,7 +60,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
             cmd.extend(spec.features)
         if spec.is_release:
             cmd.append('--release')
-        if not runner(cmd, cwd=utils.REPO_DIR):
+        if runner(cmd, cwd=utils.REPO_DIR) != 0:
             raise BuildFailure()
 
     def copy(src_dir, files: typing.Iterable[str], dst_dir: Path):
@@ -126,8 +126,7 @@ def build(spec: BuildSpec, runner: utils.Runner) -> bool:
     except BuildFailure:
         return False
     except Exception:
-        traceback.print_exc()
-        runner.write_err(traceback.format_exc())
+        runner.log_traceback()
         return False
 
 
@@ -188,14 +187,18 @@ def keep_pulling():
 
                 print(new_build)
                 spec = BuildSpec.from_dict(new_build)
-                runner = utils.Runner(capture=True)
-                success = build(spec, runner)
-                print('Build {}; updating database'.format(
-                    'succeeded' if success else 'failed'))
+                with utils.Runner() as runner:
+                    success = build(spec, runner)
+                    print('Build {}; updating database'.format(
+                        'succeeded' if success else 'failed'))
+                    runner.stdout.seek(0)
+                    stdout = runner.stdout.read()
+                    runner.stderr.seek(0)
+                    stderr = runner.stderr.read()
                 server.update_build_status(spec.build_id,
                                            success,
-                                           out=runner.stdout,
-                                           err=runner.stderr)
+                                           out=stdout,
+                                           err=stderr)
                 print('Done; starting another pool iteration')
             except Exception:
                 traceback.print_exc()
