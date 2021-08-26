@@ -22,18 +22,28 @@ class BuildSpec(typing.NamedTuple):
     is_expensive: bool
 
     @classmethod
-    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> 'BuildSpec':
-        build_id = int(data['build_id'])
+    def from_row(cls, data: master_db.Build) -> 'BuildSpec':
+        build_id = int(data.build_id)
         return cls(build_id=build_id,
                    build_dir=utils.BUILDS_DIR / str(build_id),
-                   sha=str(data['sha']),
-                   features=tuple(str(data['features']).strip().split()),
-                   is_release=bool(data['is_release']),
-                   is_expensive=bool(data['expensive']))
+                   sha=data.sha,
+                   features=tuple(data.features.split()),
+                   is_release=bool(data.is_release),
+                   is_expensive=bool(data.expensive))
 
     @property
     def build_type(self) -> str:
         return ('debug', 'release')[self.is_release]
+
+    def __str__(self) -> str:
+        ret = f'Build #{self.build_id}: sha={self.sha}'
+        if self.is_release:
+            ret += ' --relaese'
+        if self.features:
+            ret += ' ' + ' '.join(self.features)
+        if self.is_expensive:
+            ret += ' (inc. expensive)'
+        return ret
 
 
 class BuildFailure(RuntimeError):
@@ -118,19 +128,6 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
          ])
 
 
-def build(spec: BuildSpec, runner: utils.Runner) -> bool:
-    try:
-        if not utils.checkout(spec.sha, runner=runner):
-            return False
-        build_target(spec, runner=runner)
-        return True
-    except BuildFailure:
-        return False
-    except Exception:
-        runner.log_traceback()
-        return False
-
-
 def wait_for_free_space(server: master_db.MasterDB) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
@@ -170,6 +167,29 @@ def wait_for_free_space(server: master_db.MasterDB) -> None:
     print('Got enough free space; continuing')
 
 
+def handle_build(server: master_db.MasterDB, spec: BuildSpec) -> None:
+    """Handles a single build request."""
+    print(spec)
+    with utils.Runner() as runner:
+        success = False
+        try:
+            if utils.checkout(spec.sha, runner=runner):
+                build_target(spec, runner=runner)
+                success = True
+        except BuildFailure:
+            pass
+        except Exception:
+            runner.log_traceback()
+
+        print('Build #{} {}'.format(spec.build_id,
+                                    'succeeded' if success else 'failed'))
+        runner.stdout.seek(0)
+        stdout = runner.stdout.read()
+        runner.stderr.seek(0)
+        stderr = runner.stderr.read()
+    server.update_build_status(spec.build_id, success, out=stdout, err=stderr)
+
+
 def keep_pulling() -> None:
     ipv4 = utils.get_ip()
     print('Starting master at {} ({})'.format(socket.gethostname(),
@@ -177,32 +197,17 @@ def keep_pulling() -> None:
 
     with master_db.MasterDB(ipv4) as server:
         server.handle_restart()
-
         while True:
             wait_for_free_space(server)
             try:
                 new_build = server.get_new_build()
-                if not new_build:
-                    time.sleep(5)
+                if new_build:
+                    handle_build(server, BuildSpec.from_row(new_build))
                     continue
-
-                print(new_build)
-                spec = BuildSpec.from_dict(new_build)
-                with utils.Runner() as runner:
-                    success = build(spec, runner)
-                    print('Build {}; updating database'.format(
-                        'succeeded' if success else 'failed'))
-                    runner.stdout.seek(0)
-                    stdout = runner.stdout.read()
-                    runner.stderr.seek(0)
-                    stderr = runner.stderr.read()
-                server.update_build_status(spec.build_id,
-                                           success,
-                                           out=stdout,
-                                           err=stderr)
-                print('Done; starting another pool iteration')
             except Exception:
                 traceback.print_exc()
+                server.handle_restart()
+            time.sleep(10)
 
 
 if __name__ == '__main__':

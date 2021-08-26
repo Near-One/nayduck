@@ -3,6 +3,14 @@ import typing
 from lib import common_db
 
 
+class Build:
+    build_id: int
+    sha: str
+    features: str
+    is_release: int
+    expensive: int
+
+
 class MasterDB(common_db.DB):
 
     def __init__(self, ipv4: int) -> None:
@@ -16,11 +24,11 @@ class MasterDB(common_db.DB):
         super().__init__()
         self._ipv4 = ipv4
 
-    def get_new_build(self) -> typing.Optional[typing.Dict[str, typing.Any]]:
+    def get_new_build(self) -> typing.Optional[Build]:
         """Returns a pending build to process or None if none found."""
-        return self._with_transaction(self.__get_new_build)
+        return self._in_transaction(self.__get_new_build)
 
-    def __get_new_build(self) -> typing.Optional[typing.Dict[str, typing.Any]]:
+    def __get_new_build(self) -> typing.Optional[Build]:
         """Implementation of get_new_build method (which see).
 
         This method must be run inside of a transaction because it uses
@@ -28,13 +36,14 @@ class MasterDB(common_db.DB):
         """
         sql = '''UPDATE builds
                     SET started = NOW(),
+                        finished = NULL,
                         status = 'BUILDING',
-                        master_ip = %s,
+                        master_ip = :ip,
                         build_id = (@build_id := build_id)
                   WHERE status = 'PENDING'
                   ORDER BY priority, build_id
                   LIMIT 1'''
-        result = self._exec(sql, self._ipv4)
+        result = self._exec(sql, ip=self._ipv4)
         if result.rowcount == 0:
             return None
         # We're executing this query once in a blue moon so it doesn't need to
@@ -50,9 +59,9 @@ class MasterDB(common_db.DB):
                    JOIN runs r ON (r.id = b.run_id)
                    JOIN tests t USING (build_id)
                   WHERE b.build_id = @build_id
+                  GROUP BY 1
                   LIMIT 1'''
-        row = self._exec(sql).fetchone()
-        return row
+        return typing.cast(typing.Optional[Build], self._exec(sql).first())
 
     def update_build_status(self, build_id: int, success: bool, *, out: bytes,
                             err: bytes) -> None:
@@ -70,21 +79,21 @@ class MasterDB(common_db.DB):
             sql = '''UPDATE builds
                         SET finished = NOW(),
                             status = "BUILD DONE",
-                            stderr = %s,
-                            stdout = %s
-                      WHERE build_id = %s'''
+                            stderr = :err,
+                            stdout = :out
+                      WHERE build_id = :id'''
         else:
             sql = '''UPDATE builds JOIN tests USING (build_id)
                         SET builds.finished = NOW(),
                             builds.status = "BUILD FAILED",
-                            builds.stderr = %s,
-                            builds.stdout = %s,
+                            builds.stderr = :err,
+                            builds.stdout = :out,
                             tests.status = "CANCELED"
-                      WHERE builds.build_id = %s
+                      WHERE builds.build_id = :id
                         AND tests.status = "PENDING"'''
         out = self._blob_from_data(out)
         err = self._blob_from_data(err)
-        self._exec(sql, err, out, build_id)
+        self._exec(sql, err=err, out=out, id=build_id)
 
     def handle_restart(self) -> None:
         sql = '''UPDATE builds
@@ -92,18 +101,18 @@ class MasterDB(common_db.DB):
                         status = 'PENDING',
                         master_ip = 0
                   WHERE status = 'BUILDING'
-                    AND master_ip = %s'''
-        self._exec(sql, self._ipv4)
+                    AND master_ip = :ip'''
+        self._exec(sql, ip=self._ipv4)
 
     def builds_without_pending_tests(self) -> typing.Sequence[int]:
         """Returns IDs of builds assigned to this master w/no pending tests."""
         sql = '''SELECT build_id
                    FROM builds LEFT JOIN tests USING (build_id)
-                  WHERE master_ip = %s
+                  WHERE master_ip = :ip
                   GROUP BY 1
                  HAVING SUM(tests.status IN ('PENDING', 'RUNNING')) = 0'''
-        result = self._exec(sql, self._ipv4)
-        return tuple(int(build['build_id']) for build in result.fetchall())
+        scalars = self._exec(sql, ip=self._ipv4).scalars()
+        return tuple(int(bid) for bid in scalars)
 
     def unassign_builds(self, ids: typing.Sequence[int]) -> None:
         """Unassigns given builds from any master."""

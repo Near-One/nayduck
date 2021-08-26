@@ -471,8 +471,7 @@ def temp_dir() -> typing.Generator[Path, None, None]:
                     os.environb[var] = old_value
 
 
-def handle_test(server: worker_db.WorkerDB,
-                test: typing.Dict[str, typing.Any]) -> None:
+def handle_test(server: worker_db.WorkerDB, test: worker_db.Test) -> None:
     print(test)
     with temp_dir() as tmpdir:
         outdir = tmpdir / 'output'
@@ -482,10 +481,9 @@ def handle_test(server: worker_db.WorkerDB,
 
 
 def __handle_test(server: worker_db.WorkerDB, outdir: Path,
-                  runner: utils.Runner, test: typing.Dict[str,
-                                                          typing.Any]) -> None:
-    if not utils.checkout(test['sha'], runner):
-        server.update_test_status('CHECKOUT FAILED', test['test_id'])
+                  runner: utils.Runner, test: worker_db.Test) -> None:
+    if not utils.checkout(test.sha, runner):
+        server.update_test_status('CHECKOUT FAILED', test.test_id)
         return
 
     utils.rmdirs(Path.home() / '.rainbow',
@@ -494,7 +492,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
     config_override: typing.Dict[str, typing.Any] = {}
     envb: _EnvB = typing.cast(_EnvB, os.environb)
 
-    tokens = test['name'].split()
+    tokens = test.name.split()
     if '--features' in tokens:
         del tokens[tokens.index('--features'):]
 
@@ -516,7 +514,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
 
     status = None
     try:
-        scp_build(test['build_id'], test['master_ip'], tokens,
+        scp_build(test.build_id, test.master_ip, tokens,
                   'release' if release else 'debug', runner)
     except (OSError, subprocess.SubprocessError):
         runner.log_traceback()
@@ -525,14 +523,14 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
     if status is None:
         if tokens[0] in ('pytest', 'mocknet'):
             install_new_packages(runner)
-        server.test_started(test['test_id'])
+        server.test_started(test.test_id)
         status = run_test(outdir, tokens, remote, envb, runner)
 
     if status == 'POSTPONE':
-        server.remark_test_pending(test['test_id'])
+        server.remark_test_pending(test.test_id)
     else:
-        server.update_test_status(status, test['test_id'])
-        save_logs(server, test['test_id'], outdir)
+        server.update_test_status(status, test.test_id)
+        save_logs(server, test.test_id, outdir)
 
 
 def main() -> None:

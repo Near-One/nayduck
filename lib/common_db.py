@@ -1,52 +1,126 @@
 import gzip
+import time
 import typing
 
-import mysql.connector
+import sqlalchemy
 
 from lib import config
 
-_CONFIG = config.load('database')
-_CONFIG.setdefault('host', '127.0.0.1')
-_CONFIG.setdefault('user', 'nayduck')
-_CONFIG.setdefault('database', 'nayduck')
+_Row = typing.Any
+_Dict = typing.Dict[str, typing.Any]
 
 _T = typing.TypeVar('_T')
 _D = typing.TypeVar('_D', bound='DB')
 
 
+def __create_engine() -> sqlalchemy.engine.Engine:
+    cfg = config.load('database')
+    cfg.setdefault('host', '127.0.0.1')
+    cfg.setdefault('database', 'nayduck')
+    # For the time being accept 'user' as alias of 'username' and 'passwd' as
+    # alias of 'password'.
+    cfg.setdefault('username', cfg.pop('user', 'nayduck'))
+    if 'passwd' in cfg:
+        cfg.setdefault('password', cfg.pop('passwd'))
+    cfg.setdefault('query', {}).update({
+        'charset': 'utf8mb4',
+        'collation': 'utf8mb4_general_ci',
+    })
+    url = sqlalchemy.engine.URL.create('mysql+mysqlconnector', **cfg)
+    return sqlalchemy.create_engine(url,
+                                    future=True,
+                                    pool_size=1,
+                                    pool_recycle=4 * 3600,
+                                    max_overflow=20,
+                                    encoding='utf-8')
+
+
+_ENGINE = __create_engine()
+
+
 class DB:
 
     def __init__(self) -> None:
-        self.mydb = mysql.connector.connect(**_CONFIG, autocommit=True)
-        self.mycursor = self.mydb.cursor(buffered=True, dictionary=True)
+        self.__conn = _ENGINE.connect()
+        self.__in_transaction = False
 
     def __enter__(self: _D) -> _D:
         return self
 
     def __exit__(self, *_: typing.Any) -> None:
-        self.mycursor.close()
-        self.mydb.close()
+        self.__conn.close()
 
-    def _exec(
-            self, sql: str,
-            *val: typing.Any) -> mysql.connector.abstracts.MySQLCursorAbstract:
+    def _exec(self, sql: str,
+              **kw: typing.Any) -> sqlalchemy.engine.cursor.CursorResult:
         """Executes given SQL statement.
 
         Args:
-            sql: Template of the statement to execute.  Any `%s` placeholders in
-                the template will be replaced by corresponding values in val.
-            val: Values it substitute in the statement template.
+            sql: Template of the statement to execute.  Any `:name` placeholders
+                in the template will be replaced by corresponding keyword
+                arguments
+            kw: Keyword arguments to put in place of placeholders in the query.
         Returns:
-            A MySQL cursor which can be used to retrieve result.
+            A cursor result which can be used to retrieve result.
         """
-        # If we're not inside of a transaction check if connection is active and
-        # reconnect if necessary.  If we are in a transaction, don't try to
-        # reconnect since that would rollback what has been executed so far
-        # without the caller knowing.
-        if not self.mydb.in_transaction:
-            self.mydb.ping(True)
-        self.mycursor.execute(sql, val)
-        return self.mycursor
+        stmt = sqlalchemy.text(sql).bindparams(**kw)
+
+        def execute() -> sqlalchemy.engine.cursor.CursorResult:
+            return self.__conn.execute(stmt)
+
+        # _in_transaction takes care of retries on disconnect.
+        return self._in_transaction(execute)
+
+    def _fetch_one(self, sql: str, **kw: typing.Any) -> typing.Optional[_Dict]:
+        """Returns first row of a query as dictionary."""
+        row = self._exec(sql, **kw).first()
+        return row and self._to_dict(row)
+
+    def _fetch_all(self, sql: str, **kw: typing.Any) -> typing.Sequence[_Dict]:
+        """Returns iterator over rows of a query as dictionaries."""
+        return tuple(self._to_dict(row) for row in self._exec(sql, **kw))
+
+    def _in_transaction(self, callback: typing.Callable[..., _T],
+                        *args: typing.Any, **kw: typing.Any) -> _T:
+        """Executes callback inside of an SQL transaction.
+
+        Postpones committing queries until the callback finishes.  If callback
+        terminates by raising an exception rolls the transaction back rather
+        than committing it.  Note that the callback may be invoked multiple
+        times if disconnection happens while communicating with the database.
+
+        If we’re already inside of a transaction (i.e. this method is called
+        recursively), simply executes the callback.
+
+        Args:
+            callback: Code to execute within the transaction.
+            args: Positional arguments passed to the callback.
+            kw: Keyword arguments passed to the callback.
+        Returns:
+            Whatever callback returns.
+        """
+        if self.__in_transaction:
+            return callback(*args, **kw)
+
+        self.__in_transaction = True
+        try:
+            retry = 0
+            while True:
+                try:
+                    result = callback(*args, **kw)
+                    self.__conn.commit()
+                    return result
+                except BaseException as ex:
+                    self.__conn.rollback()
+                    if not (retry < 2 and
+                            isinstance(ex, sqlalchemy.exc.DBAPIError) and
+                            ex.connection_invalidated):  # pylint: disable=no-member
+                        raise
+                    print(f'Got {ex}; retrying')
+                    time.sleep(1 + retry * 4)
+                    retry += 1
+                    self.__conn = _ENGINE.connect()
+        finally:
+            self.__in_transaction = False
 
     def _insert(self, table: str, **kw: typing.Any) -> int:
         """Executes an INSERT statement.
@@ -62,27 +136,14 @@ class DB:
         Returns:
             Id of the inserted row.
         """
-        return self.__insert_impl('INSERT', table, kw)
-
-    def _replace(self, table: str, **kw: typing.Any) -> int:
-        """Like _insert but executes a REPLACE statement."""
-        return self.__insert_impl('REPLACE', table, kw)
-
-    def __insert_impl(self, verb: str, table: str,
-                      fields: typing.Dict[str, typing.Any]) -> int:
-        """Executes an INSERT or REPLACE statement."""
-        columns, values = zip(*fields.items())
-        sql = '{verb} INTO {table} ({columns}) VALUES ({placeholders})'.format(
-            verb=verb,
-            table=table,
-            columns=', '.join(columns),
-            placeholders=', '.join(['%s'] * len(columns)))
-        return typing.cast(int, self._exec(sql, *values).lastrowid)
+        sql = 'INSERT INTO {} (`{}`) VALUES ({})'.format(
+            table, '`, `'.join(kw), ', '.join(f':{col}' for col in kw))
+        return typing.cast(int, self._exec(sql, **kw).lastrowid)
 
     def _multi_insert(self,
                       table: str,
-                      columns: typing.Collection[str],
-                      rows: typing.Iterable[typing.Collection[typing.Any]],
+                      columns: typing.Sequence[str],
+                      rows: typing.Sequence[typing.Sequence[typing.Any]],
                       *,
                       replace: bool = False) -> None:
         """Executes an INSERT statement adding multiple rows at once.
@@ -95,45 +156,20 @@ class DB:
                 each element correspond to columns at the same index.
             replace: Whether to uses REPLACE statement rather than INSERT.
         """
-        vals: typing.List[typing.Any] = []
-        for row in rows:
-            assert len(row) == len(columns), row
-            vals.extend(row)
-        placeholders = '({})'.format(', '.join(['%s'] * len(columns)))
-        count = len(vals) // len(columns)
-        sql = '{verb} INTO {table} (`{columns}`) VALUES {placeholders}'.format(
-            verb='REPLACE' if replace else 'INSERT',
-            table=table,
-            columns='`, `'.join(columns),
-            placeholders=', '.join([placeholders] * count))
-        self._exec(sql, *vals)
+        verb = ['INSERT', 'REPLACE'][bool(replace)]
+        names = '`, `'.join(columns)
+        placeholders = ('%s, ' * len(columns))[:-2]
+        sql = f'{verb} INTO `{table}` (`{names}`) VALUES ({placeholders})'
 
-    def _with_transaction(self, callback: typing.Callable[[], _T]) -> _T:
-        """Executes callback inside of a SQL transaction.
+        def execute() -> None:
+            self.__conn.exec_driver_sql(sql, rows)
 
-        Starts a transaction before calling the callback and ends it once the
-        callback finishes.  If the callback raises an exception, the method
-        rolls back the transaction.  Otherwise, it commits the transaction and
-        returns whatever value the callback returned.
+        self._in_transaction(execute)
 
-        Raises an exception if transaction is already active.
-
-        Args:
-            callback: Code to execute within the transaction.
-        Returns:
-            Whatever callback returns.
-        """
-        self.mydb.start_transaction()
-        commit = False
-        try:
-            result = callback()
-            commit = True
-            return result
-        finally:
-            if commit:
-                self.mydb.commit()
-            else:
-                self.mydb.rollback()
+    @classmethod
+    def _to_dict(cls, row: _Row) -> typing.Dict[str, typing.Any]:
+        """Converts an SQLAlchemy row into a dictionary."""
+        return dict(zip(row.keys(), row))
 
     @classmethod
     def _blob_from_data(cls, data: typing.Union[str, bytes]) -> bytes:
@@ -163,7 +199,7 @@ class DB:
         return data
 
     @classmethod
-    def _str_from_blob(cls, blob: typing.Optional[bytes]) -> str:
+    def _str_from_blob(cls, blob: typing.Union[None, bytes, memoryview]) -> str:
         """Converts BLOB read from database into a string.
 
         This conversion is necessary because the data may be compressed in which
@@ -178,6 +214,6 @@ class DB:
         """
         if not blob:
             return ''
-        if blob.startswith(b'\x1f\x8b'):
+        if bytes(blob[:2]) == b'\x1f\x8b':
             blob = gzip.decompress(blob)
-        return blob.decode('utf-8', 'replace')
+        return str(blob, 'utf-8', 'replace')

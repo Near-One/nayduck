@@ -389,18 +389,17 @@ def _schedule_nightly_impl(server: ui_db.UIDB) -> datetime.timedelta:
     """Implementation of schedule_nightly_run."""
     last = server.last_nightly_run()
     if last:
-        delta = datetime.datetime.utcnow() - typing.cast(datetime.datetime,
-                                                         last['timestamp'])
+        delta = datetime.datetime.utcnow() - last.timestamp
         need_new_run = delta >= datetime.timedelta(hours=24)
         print('Last nightly at {}; {} ago; sha={}{}'.format(
-            last['timestamp'], delta, last['sha'],
+            last.timestamp, delta, last.sha,
             '' if need_new_run else '; no need for a new run'))
         if not need_new_run:
             return datetime.timedelta(hours=24) - delta
 
         repo_dir = _update_repo()
         commit = CommitInfo.for_commit(repo_dir, 'origin/master')
-        need_new_run = last['sha'] != commit.sha
+        need_new_run = last.sha != commit.sha
         print('origin/master sha={}{}'.format(
             commit.sha, '' if need_new_run else '; no need for a new run'))
         if not need_new_run:

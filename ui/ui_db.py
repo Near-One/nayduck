@@ -1,28 +1,35 @@
 import collections
+import datetime
 import gzip
 import itertools
 import typing
 
 from lib import common_db
 
-_Row = typing.Dict[str, typing.Any]
-_T = typing.TypeVar('_T')
+_Row = typing.Any
+_Dict = typing.Dict[str, typing.Any]
 
 
-def _pop_falsy(dictionary: typing.Dict[_T, typing.Any], *keys: _T) -> None:
+def _pop_falsy(dictionary: _Dict, *keys: str) -> None:
     """Remove keys from a dictionary if their values are falsy."""
     for key in keys:
         if not dictionary.get(key, True):
             dictionary.pop(key)
 
 
+def _update_true(dictionary: _Dict, **kw: typing.Any) -> None:
+    for key, value in kw.items():
+        if value:
+            dictionary[key] = value
+
+
 class UIDB(common_db.DB):
 
     def cancel_the_run(self, run_id: int, status: str = 'CANCELED') -> None:
         sql = '''UPDATE tests
-                    SET finished = NOW(), status = %s
-                  WHERE status = 'PENDING' AND run_id = %s'''
-        self._exec(sql, status, run_id)
+                    SET finished = NOW(), status = :status
+                  WHERE status = 'PENDING' AND run_id = :id'''
+        self._exec(sql, status=status, id=run_id)
 
     _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
                           'build_failed', 'canceled', 'timeout')
@@ -35,27 +42,29 @@ class UIDB(common_db.DB):
         'tests': _NO_STATUSES,
     },)
 
-    def get_all_runs(self) -> typing.Iterable[_Row]:
+    def get_all_runs(self) -> typing.Iterable[_Dict]:
         # Get the last 100 runs
         sql = '''SELECT id, branch, sha, title, requester
                    FROM runs
                   ORDER BY id DESC
                   LIMIT 100'''
-        all_runs = dict(
-            (int(run['id']), run) for run in self._exec(sql).fetchall())
-        run_id_range = min(all_runs), max(all_runs)
+        all_runs = {run['id']: run for run in self._fetch_all(sql)}
+        min_id, max_id = min(all_runs), max(all_runs)
 
-        statuses = self.__get_statuses_for_runs(*run_id_range)
+        statuses = self.__get_statuses_for_runs(min_id, max_id)
 
         # Get builds for the last 100 runs.
         sql = '''SELECT run_id, build_id, status, is_release, features
                    FROM builds
-                  WHERE run_id BETWEEN %s AND %s'''
-        for build in self._exec(sql, *run_id_range).fetchall():
-            run_id = int(build.pop('run_id'))
-            build_id = int(build['build_id'])
-            build['tests'] = statuses.get((run_id, build_id), self._NO_STATUSES)
-            _pop_falsy(build, 'is_release', 'features')
+                  WHERE run_id BETWEEN :lo AND :hi'''
+        result = self._exec(sql, lo=min_id, hi=max_id)
+        for run_id, build_id, status, is_release, features in result:
+            build = {
+                'build_id': build_id,
+                'status': status,
+                'tests': statuses.get((run_id, build_id), self._NO_STATUSES)
+            }
+            _update_true(build, is_release=is_release, features=features)
             all_runs[run_id].setdefault('builds', []).append(build)
 
         # Fill out fake builds for any old runs which don't have corresponding
@@ -81,34 +90,33 @@ class UIDB(common_db.DB):
         statuses: typing.Dict[typing.Tuple[int, int],
                               typing.Counter[str]] = collections.defaultdict(
                                   collections.Counter)
-        sql = '''SELECT run_id, build_id, status, COUNT(status) AS cnt
+        sql = '''SELECT run_id, build_id, status, COUNT(status)
                    FROM tests
-                  WHERE run_id BETWEEN %s AND %s
+                  WHERE run_id BETWEEN :lo AND :hi
                   GROUP BY 1, 2, 3'''
-        result = self._exec(sql, min_run_id, max_run_id)
-        for test in result.fetchall():
-            counter = statuses[(int(test['run_id']), int(test['build_id'] or
-                                                         0))]
-            status = test['status'].lower().replace(' ', '_')
+        result = self._exec(sql, lo=min_run_id, hi=max_run_id)
+        for run_id, build_id, status, count in result:
+            counter = statuses[(run_id, build_id or 0)]
+            status = status.lower().replace(' ', '_')
             if status in self._STATUS_CATEGORIES:
-                counter[status.lower().replace(' ', '_')] += int(test['cnt'])
+                counter[status.lower().replace(' ', '_')] += count
             if 'failed' in status:
-                counter['failed'] += int(test['cnt'])
+                counter['failed'] += count
         return statuses
 
-    def get_test_history_by_id(self, test_id: int) -> typing.Optional[_Row]:
+    def get_test_history_by_id(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT t.name, r.branch
                    FROM tests AS t, runs AS r
-                  WHERE t.test_id = %s AND r.id = t.run_id
+                  WHERE t.test_id = :id AND r.id = t.run_id
                   LIMIT 1'''
-        row = self._exec(sql, test_id).fetchone()
+        row = self._exec(sql, id=test_id).first()
         if not row:
             return None
-        tests = self.get_test_history(row['name'],
-                                      row['branch'],
+        tests = self.get_test_history(row.name,
+                                      row.branch,
                                       interested_in_logs=True)
         return {
-            'branch': row['branch'],
+            'branch': row.branch,
             'tests': tests,
             'history': self.history_stats(tests),
         }
@@ -117,24 +125,24 @@ class UIDB(common_db.DB):
             self,
             test_name: str,
             branch: str,
-            interested_in_logs: bool = False) -> typing.Sequence[_Row]:
+            interested_in_logs: bool = False) -> typing.Sequence[_Dict]:
         sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
                         t.finished, r.branch, r.sha
                    FROM tests AS t, runs AS r
-                  WHERE name = %s AND t.run_id = r.id AND r.branch = %s
+                  WHERE name = :name AND t.run_id = r.id AND r.branch = :branch
                   ORDER BY t.test_id DESC
                   LIMIT 30'''
-        tests = self._exec(sql, test_name, branch).fetchall()
+        tests = self._fetch_all(sql, name=test_name, branch=branch)
         if interested_in_logs:
             self._populate_test_logs(tests, blob=False)
         return tests
 
-    def get_one_run(self, run_id: int) -> typing.Sequence[_Row]:
+    def get_one_run(self, run_id: int) -> typing.Sequence[_Dict]:
         sql = '''SELECT test_id, status, name, started, finished, branch
                    FROM tests JOIN runs ON (runs.id = tests.run_id)
-                  WHERE run_id = %s
+                  WHERE run_id = :id
                   ORDER BY status, started'''
-        tests = self._exec(sql, run_id).fetchall()
+        tests = self._fetch_all(sql, id=run_id)
         if tests:
             branch = tests[0]['branch']
             for test in tests:
@@ -143,20 +151,23 @@ class UIDB(common_db.DB):
         return tests
 
     def _populate_test_logs(self,
-                            tests: typing.Collection[_Row],
+                            tests: typing.Collection[_Dict],
                             blob: bool = False) -> None:
         if not tests:
             return
 
-        def process_log(log: _Row) -> _Row:
-            log.pop('test_id')
+        def process_log(log: _Row) -> _Dict:
+            ret = self._to_dict(log)
+            ret.pop('test_id')
             if blob:
-                if log['type'].endswith('.gz'):
-                    log.pop('log')
+                data = None
+                if not ret['type'].endswith('.gz'):
+                    data = self._str_from_blob(ret['log'])
+                if data:
+                    ret['log'] = data
                 else:
-                    log['log'] = self._str_from_blob(log['log'])
-                    _pop_falsy(log, 'log')
-            return log
+                    ret.pop('log')
+            return ret
 
         tests_by_id = {int(test['test_id']): test for test in tests}
         sql = '''SELECT test_id, type, size, storage, stack_trace, patterns
@@ -167,12 +178,11 @@ class UIDB(common_db.DB):
             log_column=', log' if blob else '',
             ids=','.join(str(test_id) for test_id in tests_by_id))
         for test_id, rows in itertools.groupby(
-                self._exec(sql).fetchall(),
-                lambda row: typing.cast(int, row['test_id'])):
+                self._exec(sql), lambda row: typing.cast(int, row.test_id)):
             tests_by_id[test_id]['logs'] = [process_log(row) for row in rows]
 
     def _populate_data_about_tests(self,
-                                   tests: typing.Collection[_Row],
+                                   tests: typing.Collection[_Dict],
                                    branch: str,
                                    blob: bool = False) -> None:
         self._populate_test_logs(tests, blob=blob)
@@ -180,14 +190,13 @@ class UIDB(common_db.DB):
             history = self.get_test_history(test['name'], branch)
             test['history'] = self.history_stats(history)
 
-    def get_build_info(self, build_id: int) -> typing.Optional[_Row]:
+    def get_build_info(self, build_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT run_id, status, started, finished, stderr, stdout,
                         features, is_release, branch, sha, title, requester
                    FROM builds JOIN runs ON (runs.id = builds.run_id)
-                  WHERE build_id = %s
+                  WHERE build_id = :id
                   LIMIT 1'''
-        res = self._exec(sql, build_id)
-        build = res.fetchone()
+        build = self._fetch_one(sql, id=build_id)
         if build:
             build['stdout'] = self._str_from_blob(build['stdout'])
             build['stderr'] = self._str_from_blob(build['stderr'])
@@ -196,12 +205,12 @@ class UIDB(common_db.DB):
 
     def get_histoty_for_base_branch(self, test_id: int,
                                     branch: str) -> typing.Optional[_Row]:
-        sql = 'SELECT name FROM tests WHERE test_id = %s LIMIT 1'
-        test = self._exec(sql, test_id).fetchone()
+        sql = 'SELECT name FROM tests WHERE test_id = :id LIMIT 1'
+        test = self._fetch_one(sql, id=test_id)
         if not test:
             return None
         history = self.get_test_history(test['name'], branch)
-        if len(history):
+        if history:
             test_id_base_branch = history[0]['test_id']
         else:
             test_id_base_branch = -1
@@ -212,7 +221,7 @@ class UIDB(common_db.DB):
 
     @classmethod
     def history_stats(cls,
-                      history: typing.Sequence[_Row]) -> typing.Sequence[int]:
+                      history: typing.Sequence[_Dict]) -> typing.Sequence[int]:
         # passed, other, failed
         res = [0, 0, 0]
         for hist in history:
@@ -224,16 +233,15 @@ class UIDB(common_db.DB):
                 res[1] += 1
         return res
 
-    def get_one_test(self, test_id: int) -> typing.Optional[_Row]:
+    def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, started,
                         finished, branch, sha, title, requester
                    FROM tests JOIN runs ON (runs.id = tests.run_id)
-                  WHERE test_id = %s
+                  WHERE test_id = :id
                   LIMIT 1'''
-        test = self._exec(sql, test_id).fetchone()
-        if not test:
-            return None
-        self._populate_data_about_tests([test], test['branch'], blob=True)
+        test = self._fetch_one(sql, id=test_id)
+        if test:
+            self._populate_data_about_tests([test], test['branch'], blob=True)
         return test
 
     class BuildSpec:
@@ -308,14 +316,14 @@ class UIDB(common_db.DB):
         Returns:
             Id of the scheduled run.
         """
-        return self._with_transaction(
-            lambda: self.__do_schedule(branch=branch,
-                                       sha=sha,
-                                       title=title,
-                                       builds=builds,
-                                       tests=tests,
-                                       requester=requester,
-                                       is_nightly=is_nightly))
+        return self._in_transaction(self.__do_schedule,
+                                    branch=branch,
+                                    sha=sha,
+                                    title=title,
+                                    builds=builds,
+                                    tests=tests,
+                                    requester=requester,
+                                    is_nightly=is_nightly)
 
     def __do_schedule(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['UIDB.BuildSpec'],
@@ -344,19 +352,24 @@ class UIDB(common_db.DB):
         columns = ('run_id', 'build_id', 'name', 'category', 'priority',
                    'remote')
         self._multi_insert('tests', columns,
-                           ((run_id, test.build.build_id, test.name,
+                           [(run_id, test.build.build_id, test.name,
                              test.category, int(is_nightly), test.is_remote)
-                            for test in tests))
+                            for test in tests])
 
         return run_id
 
-    def last_nightly_run(self) -> typing.Optional[typing.Dict[str, typing.Any]]:
+    class LastNightlyRun:
+        timestamp: datetime.datetime
+        sha: str
+
+    def last_nightly_run(self) -> typing.Optional['UIDB.LastNightlyRun']:
         """Returns the last nightly run."""
-        return self._exec('''SELECT timestamp, sha
-                               FROM runs
-                              WHERE is_nightly
-                              ORDER BY timestamp DESC
-                              LIMIT 1''').fetchone()
+        row = self._exec('''SELECT timestamp, sha
+                              FROM runs
+                             WHERE is_nightly
+                             ORDER BY timestamp DESC
+                             LIMIT 1''').first()
+        return typing.cast(typing.Optional[UIDB.LastNightlyRun], row)
 
     def add_auth_nonce(self, nonce: bytes, now: int) -> None:
         """Adds an authentication nonce to the database.
@@ -367,7 +380,7 @@ class UIDB(common_db.DB):
             nonce: A 12-byte nonce to add to the database.
             now: Time when the nonce was generated.
         """
-        self._exec('DELETE FROM auth_codes WHERE timestamp < %s', now - 600)
+        self._exec('DELETE FROM auth_codes WHERE timestamp < :tm', tm=now - 600)
         self._insert('auth_codes', nonce=nonce, timestamp=now)
 
     def verify_auth_nonce(self, nonce: bytes, now: int) -> bool:
@@ -382,9 +395,9 @@ class UIDB(common_db.DB):
         Returns:
             Whether the nonce existed in the database.
         """
-        sql = 'DELETE FROM auth_codes WHERE nonce = %s'
-        found = bool(self._exec(sql, nonce).rowcount)
-        self._exec('DELETE FROM auth_codes WHERE timestamp < %s', now - 600)
+        sql = 'DELETE FROM auth_codes WHERE nonce = :nonce'
+        found = bool(self._exec(sql, nonce=nonce).rowcount)
+        self._exec('DELETE FROM auth_codes WHERE timestamp < :tm', tm=now - 600)
         return found
 
     def get_test_log(self, test_id: int, log_type: str,
@@ -405,8 +418,8 @@ class UIDB(common_db.DB):
         Raises:
             KeyError: if given log does not exist.
         """
-        sql = 'SELECT log FROM logs WHERE test_id = %s AND type = %s LIMIT 1'
-        return self._get_log_impl(sql, test_id, log_type, gzip_ok=gzip_ok)
+        sql = 'SELECT log FROM logs WHERE test_id = :id AND type = :tp LIMIT 1'
+        return self._get_log_impl(sql, id=test_id, tp=log_type, gzip_ok=gzip_ok)
 
     def get_build_log(self, build_id: int, log_type: str,
                       gzip_ok: bool) -> typing.Tuple[bytes, bool]:
@@ -429,21 +442,21 @@ class UIDB(common_db.DB):
             AssertionError: if log_type is not 'stderr' or 'stdout'.
         """
         assert log_type in ('stderr', 'stdout')
-        sql = f'SELECT {log_type} FROM builds WHERE build_id = %s LIMIT 1'
-        return self._get_log_impl(sql, build_id, gzip_ok=gzip_ok)
+        sql = f'SELECT {log_type} FROM builds WHERE build_id = :id LIMIT 1'
+        return self._get_log_impl(sql, id=build_id, gzip_ok=gzip_ok)
 
-    def _get_log_impl(self, sql: str, *args: typing.Any,
-                      gzip_ok: bool) -> typing.Tuple[bytes, bool]:
+    def _get_log_impl(self, sql: str, gzip_ok: bool,
+                      **kw: typing.Any) -> typing.Tuple[bytes, bool]:
         """Returns a log from the database.
 
         Args:
             sql: The SQL query to execute to fetch the log.  The query should
                 return one row with a single column whose value is the log
                 contents.
-            args: Arguments to use in placeholders of the query.
             gzip_ok: If True and the log is stored compressed in the database
                 returns the log as such.  If False will always return
                 decompressed log.
+            kw: Arguments to use in placeholders of the query.
         Returns:
             A (contents, is_compressed) tuple where the first element is
             contents of the log and second says whether the contents is
@@ -452,13 +465,11 @@ class UIDB(common_db.DB):
         Raises:
             KeyError: if given SQL query returned no rows.
         """
-        row = self._exec(sql, *args).fetchone()
+        row = self._exec(sql, **kw).first()
         if not row:
             raise KeyError()
-        blob = row.popitem()[1]
-        if blob is None:
-            raise KeyError()
-        is_compressed = blob.startswith(b'\x1f\x8b')
+        blob = row[0]
+        is_compressed = bytes(blob[:2]) == b'\x1f\x8b'
         if is_compressed and not gzip_ok:
             blob = gzip.decompress(blob)
             is_compressed = False
