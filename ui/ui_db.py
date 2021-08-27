@@ -44,7 +44,7 @@ class UIDB(common_db.DB):
 
     def get_all_runs(self) -> typing.Iterable[_Dict]:
         # Get the last 100 runs
-        sql = '''SELECT id, branch, sha, title, requester
+        sql = '''SELECT id, branch, sha, title, requester, timestamp
                    FROM runs
                   ORDER BY id DESC
                   LIMIT 100'''

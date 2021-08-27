@@ -173,7 +173,7 @@ function formatTZOffset(value) {
 }
 
 
-function formatDateTime(timestampMs) {
+export function formatDateTime(timestampMs) {
     if (!timestampMs) {
         return null;
     }

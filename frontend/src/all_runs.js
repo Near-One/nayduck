@@ -73,7 +73,9 @@ function AllRuns () {
     const formatRow = a_run => <tr key={a_run.id}>
       <td>{common.commitLink(a_run)}</td>
       <td><NavLink to={'/run/' + a_run.id}>{a_run.title}</NavLink></td>
-      <td>{a_run.requester}</td>
+      <td>{a_run.requester}<br/><small>{
+        common.formatDateTime(a_run.timestamp)
+      }</small></td>
       <td>{
         a_run.builds.map(build => <div key={build.build_id}>
           <NavLink to={"/build/" + build.build_id}
