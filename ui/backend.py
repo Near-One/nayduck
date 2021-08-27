@@ -107,25 +107,6 @@ def cancel_the_run(run_id: int):
     return jsonify({})
 
 
-# TODO(#17): Deprecated in favour of /api/run/new.
-@app.route('/request_a_run', methods=['POST'])
-@flask_cors.cross_origin(origins=[])
-def request_a_run():
-    request_json = flask.request.get_json(force=True)
-    try:
-        request = scheduler.Request.from_json_request(request_json)
-        with ui_db.UIDB() as server:
-            run_id = request.schedule(server)
-        url = f'Success. {NAYDUCK_UI}/#/run/{run_id}'
-        response = {'code': 0, 'response': f'Success. {url}'}
-    except scheduler.Failure as ex:
-        response = ex.to_response()
-    except Exception as ex:
-        traceback.print_exc()
-        response = scheduler.Failure(ex).to_response()
-    return jsonify(response)
-
-
 @app.route('/api/run/new', methods=['POST'])
 @flask_cors.cross_origin(origins=[])
 @auth.authenticated

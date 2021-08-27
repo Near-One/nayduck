@@ -134,47 +134,6 @@ class Request(typing.NamedTuple):
     is_nightly: bool
 
     @classmethod
-    def from_json_request(cls, request_json: typing.Any) -> 'Request':
-        """Validates JSON request and returns a new Request object.
-
-        Checks if all required keys are present and if all of them are of
-        correct types.
-
-        Furthermore, validates that --features in test names are correct.  The
-        latter is important because anything following --features string in test
-        name is included in cargo commands and we don't want to allow arbitrary
-        switches to be passed.  The tests are somewhat modified after the
-        verification to be in a more of a canonical form.
-
-        Args:
-            request_json: The JSON request that user made.
-        Returns:
-            A new Request object describing the request.
-        Raises:
-            Failure: if validation fails.
-        """
-        requester = request_json.get('requester', 'unknown')
-        branch = request_json.get('branch', _SENTINEL)
-        sha = request_json.get('sha', _SENTINEL)
-        tests = request_json.get('tests')
-
-        if branch is _SENTINEL or sha is _SENTINEL:
-            raise Failure('Invalid request object: missing branch or sha field')
-        if not tests:
-            raise Failure('No tests specified')
-
-        if not (isinstance(requester, str) and isinstance(branch, str) and
-                isinstance(sha, str) and isinstance(tests, (list, tuple))):
-            raise Failure('Invalid request object: '
-                          'one of the fields has wrong type')
-
-        return cls(branch=branch,
-                   sha=sha,
-                   requester=requester,
-                   tests=cls.verify_tests(tests),
-                   is_nightly=False)
-
-    @classmethod
     def from_json(cls, request_json: typing.Any, requester: str) -> 'Request':
         branch = request_json.get('branch', _SENTINEL)
         sha = request_json.get('sha', _SENTINEL)
