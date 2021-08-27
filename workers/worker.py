@@ -51,28 +51,26 @@ def get_test_command(test: _Test) -> typing.Tuple[Path, _Cmd]:
     raise ValueError('Invalid test command: ' + ' '.join(test))
 
 
-_LAST_PIP_INSTALL: typing.Optional[str] = None
+_LAST_PIP_REQUIREMENTS: typing.Optional[bytes] = None
 
 
-def install_new_packages(sha: str, runner: utils.Runner) -> None:
+def install_new_packages(runner: utils.Runner) -> None:
     """Makes sure all Python requirements for the pytests are satisfied.
 
     Args:
-        sha: Hash of the commit we are on.  This is used to compare to hash the
-            last time this function was called.  If they match, the function
-            won’t bother calling pip.
         runner: Runner whose standard output and error files output of the
             command will be redirected into.
     """
-    global _LAST_PIP_INSTALL
+    global _LAST_PIP_REQUIREMENTS
 
-    if _LAST_PIP_INSTALL != sha:
+    data = (utils.REPO_DIR / 'pytest' / 'requirements.txt').read_bytes()
+    if _LAST_PIP_REQUIREMENTS != data:
         runner((sys.executable, '-m', 'pip', 'install', '--user', '-q',
                 '--disable-pip-version-check', '--no-warn-script-location',
                 '-r', 'requirements.txt'),
                cwd=utils.REPO_DIR / 'pytest',
                check=True)
-        _LAST_PIP_INSTALL = sha
+        _LAST_PIP_REQUIREMENTS = data
 
 
 def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
@@ -484,7 +482,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
 
     if status is None:
         if tokens[0] in ('pytest', 'mocknet'):
-            install_new_packages(test['sha'], runner)
+            install_new_packages(runner)
         server.test_started(test['test_id'])
         status = run_test(outdir, tokens, remote, envb, runner)
 
