@@ -79,24 +79,17 @@ function ARun (props) {
         <table className="big"><tbody>
           <tr>
             <th>Build
-            <select onChange={filterByAll} id="build_fltr" name="filters">
+            <select onChange={filterByAll} id="build_fltr">
               <option value=" "> </option>
               <option value="dev">Dev</option>
               <option value="rel">Release</option>
             </select>
             </th>
-            <th>Features
-            <input style={{width: "100%"}} type="text"  name="filters" id="features_fltr" onChange={filterByAll} />
-            </th>
-            <th>Test
-            <input style={{width: "100%"}} type="text"  name="filters" id="name_fltr" onChange={filterByAll} />
-            </th>
-            <th>Status
-            <input style={{width: "100%"}} type="text"  name="filters" id="status_fltr" onChange={filterByAll} />
-            </th>
-            <th>Logs
-            </th>
-            <th>Run Time <button style={{textDecoration: "none"}} onClick={orderByTestTime}>&#8597;</button></th>
+            <th>Features <input id="features_fltr" onChange={filterByAll}/></th>
+            <th>Test <input id="name_fltr" onChange={filterByAll} /></th>
+            <th>Status <input id="status_fltr" onChange={filterByAll} /></th>
+            <th>Logs</th>
+            <th>Run Time <button onClick={orderByTestTime}>↕</button></th>
             <th>Started</th>
             <th>Finished</th>
         </tr>

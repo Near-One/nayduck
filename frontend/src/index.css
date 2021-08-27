@@ -1,8 +1,10 @@
+* { box-sizing: border-box; }
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+               'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+               'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -29,10 +31,17 @@ td, th {
 table.big tr:nth-child(even){background-color: #f2f2f2;}
 table.big tr:hover {background-color: #ddd;}
 
-table th {
+th {
   text-align: center;
   background-color: #4CAF50;
   color: white;
+}
+
+th input {
+  width: 100%;
+}
+td button {
+  padding: 0;
 }
 
 .blob {
@@ -140,8 +149,8 @@ table th {
   border: 4px solid #f3f3f3;
   border-top: 4px solid #3498db;
   border-radius: 50%;
-  width: 12px;
-  height: 12px;
+  width: 20px;
+  height: 20px;
   animation: spin 2s linear infinite;
   @keyframes spin {
     0% {

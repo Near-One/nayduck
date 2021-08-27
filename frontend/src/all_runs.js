@@ -96,7 +96,7 @@ function AllRuns () {
             </div>
           )}
         </td>
-        <td><button style={{borderRadius: "0.25em"}} onClick={cancelRun(a_run.id)}>x</button></td>
+        <td><button onClick={cancelRun(a_run.id)}>×</button></td>
       </tr>;
 
     return (
@@ -104,14 +104,11 @@ function AllRuns () {
         <table className="big App">
           <thead>
             <tr>
-              <th>Branch
-                  <input style={{width: "100%"}} type="text" name="filters" id="branch" onChange={filterHandler}/></th>
-              <th>Title
-                  <input style={{width: "100%"}} type="text" name="filters" id="title" onChange={filterHandler}/></th>
-              <th>User
-                  <input style={{width: "100%"}} type="text" name="filters" id="requester" onChange={filterHandler}/></th>
+              <th>Branch <input id="branch" onChange={filterHandler}/></th>
+              <th>Title <input id="title" onChange={filterHandler}/></th>
+              <th>User <input id="requester" onChange={filterHandler}/></th>
               <th>Status</th>
-              <th>x</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>{filteredRuns.map(formatRow)}</tbody>
