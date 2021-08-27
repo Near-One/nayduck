@@ -327,7 +327,7 @@ class UIDB(common_db.DB):
 
         return run_id
 
-    def last_nightly_run(self) -> typing.Dict[str, typing.Any]:
+    def last_nightly_run(self) -> typing.Optional[typing.Dict[str, typing.Any]]:
         """Returns the last nightly run."""
         return self._exec('''SELECT timestamp, sha
                                FROM runs
