@@ -174,6 +174,19 @@ function pad(value) {
 }
 
 
+function formatTZOffset(value) {
+    if (!value) {
+        return 'UTC';
+    }
+    const ret = value < 0 ? 'UTC+' : 'UTC-';
+    if (value < 0) {
+        value = -value;
+    }
+    const m = value % 60;
+    return ret + pad(0 | (value / 60)) + (m ? ':' + pad(m) : '');
+}
+
+
 function formatDateTime(timestampMs) {
     if (!timestampMs) {
         return null;
@@ -185,7 +198,8 @@ function formatDateTime(timestampMs) {
     const hours = pad(date.getHours());
     const minutes = pad(date.getMinutes());
     const seconds = pad(date.getSeconds());
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    const offset = formatTZOffset(date.getTimezoneOffset());
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${offset}`;
 }
 
 
