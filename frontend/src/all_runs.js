@@ -42,7 +42,7 @@ function AllRuns () {
     };
 
     var cancelRun = id => event => {
-        common.fetchAPI('/run/' + (0 | id), true)
+        common.fetchAPI('/run/' + (0 | id) + '/cancel', true)
             .then(data => console.log(data));
     };
 
