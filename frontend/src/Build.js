@@ -25,10 +25,11 @@ function Build (props) {
         const log = {
             storage: '/logs/build/' + id + '/' + name,
             patterns: '',
+            log: blob,
             size: blob.length,
             type: name
         };
-        return <tr><td>{common.logLink(log)}</td><td>{common.logBlob(blob)}</td></tr>;
+        return <tr><td>{common.logLink(log)}</td><td>{common.logBlob(log)}</td></tr>;
     };
 
     return (

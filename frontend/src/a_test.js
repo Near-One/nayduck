@@ -50,7 +50,7 @@ function ATest (props) {
              {aTest.logs.map(log =>
                <tr key={aTest.test_id + '/' + log.type}>
                  <td>{common.logLink(log)}</td>
-                 <td>{common.logBlob(log.log)}</td></tr>
+                 <td>{common.logBlob(log)}</td></tr>
              )}
            </> : null}
         </tbody></table>

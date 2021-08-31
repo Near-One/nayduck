@@ -151,9 +151,13 @@ class DB:
         """
         if isinstance(data, str):
             data = data.encode('utf-8')
+        # If the data is already compressed than we have to at least add a gzip
+        # header.  If we don’t do that, when we serve the file we’re going to
+        # serve it decompressed.
         must_compress = data.startswith(b'\x1f\x8b')
         if must_compress or len(data) > 18:
-            compressed = gzip.compress(data)
+            level = 0 if must_compress else 9
+            compressed = gzip.compress(data, level)
             if must_compress or len(compressed) < len(data):
                 return compressed
         return data

@@ -215,9 +215,9 @@ def find_patterns(rd: typing.BinaryIO,
     return [pattern for ok, pattern in zip(found, patterns) if ok]
 
 
-class LogFile:
+class LogFile:  # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, name: str, path: Path) -> None:
+    def __init__(self, name: str, path: Path, binary: bool = False) -> None:
         self.name = name
         self.path = path
         self.patterns = ''
@@ -225,10 +225,35 @@ class LogFile:
         self.size = path.stat().st_size
         self.data: typing.Optional[bytes] = None
         self.url: typing.Optional[str] = None
+        self.binary = binary
+
+
+def generate_artifacts_file(directory: Path, name: str) -> None:
+    """Generates a tar archive with fuzz crash artefacts if any are availabe."""
+    artdir = utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts'
+    subdir = 'runtime-fuzzer'
+    if not (artdir / subdir).is_dir():
+        return
+
+    files = sorted(f'{subdir}/{entry}' for entry in os.listdir(artdir / subdir)
+                   if entry.startswith('crash-'))
+    if not files:
+        return
+
+    outfile = directory / name
+    cmd: typing.Sequence[typing.Union[str, Path]] = ('tar', 'cf', outfile, '-I',
+                                                     'gzip -9', '--', *files)
+    print('+ ' + ' '.join(str(arg) for arg in cmd), file=sys.stderr)
+    returncode = subprocess.run(cmd, check=False, cwd=artdir).returncode
+    if returncode != 0 and outfile.exists():
+        outfile.unlink()
 
 
 def list_logs(directory: Path) -> typing.Sequence[LogFile]:
     """Lists all log files to be saved."""
+    crashes_file_name = 'crashes.tar.gz'
+    generate_artifacts_file(directory, crashes_file_name)
+
     files = []
     for entry in os.listdir(directory):
         entry_path = directory / entry
@@ -241,8 +266,11 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
             ):
                 if (entry_path / filename).exists():
                     files.append(LogFile(base + suffix, entry_path / filename))
-        elif entry in ('stderr', 'stdout', 'build_err', 'build_out'):
-            files.append(LogFile(entry, directory / entry))
+        elif entry in ('stderr', 'stdout', crashes_file_name):
+            files.append(
+                LogFile(entry,
+                        directory / entry,
+                        binary=entry == 'crashes.tar.gz'))
 
     rainbow_logs = Path.home() / '.rainbow' / 'logs'
     if rainbow_logs.is_dir():
@@ -259,7 +287,9 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
 _MAX_SHORT_LOG_SIZE = 10 * 1024
 
 
-def read_short_log(size: int, rd: typing.BinaryIO) -> typing.Tuple[bytes, bool]:
+def read_short_log(  # pylint: disable=too-many-branches
+        size: int, rd: typing.BinaryIO,
+        is_binary: bool) -> typing.Tuple[bytes, bool]:
     """Reads a short log from given file.
 
     A short log it at most _MAX_SHORT_LOG_SIZE bytes long.  If the file is
@@ -270,16 +300,27 @@ def read_short_log(size: int, rd: typing.BinaryIO) -> typing.Tuple[bytes, bool]:
     Args:
         size: Actual size of the file.
         rd: The file opened for reading.
+        is_binary: Whether the file is a binary file.  If true, the function
+            won’t try to do a partial read and use slightly lower limit for the
+            maximum short log length.
     Returns:
         A (short_log, is_full) tuple where first element is the short contents
         of the file and the second is whether the short content is the same is
         actually the full content.
     """
-    if size < _MAX_SHORT_LOG_SIZE:
-        data = rd.read()
-        if len(data) < _MAX_SHORT_LOG_SIZE:  # Sanity check
+    limit = _MAX_SHORT_LOG_SIZE
+    if is_binary:
+        # Binary files don’t compress as well as text log files so use lower
+        # limit for the size we’re willing to store in the database.
+        limit //= 2
+    if size <= limit:
+        data = rd.read(limit + 1)
+        if len(data) <= limit:  # Sanity check
             return data, True
         rd.seek(0)
+
+    if is_binary:
+        return b'', False
 
     data = rd.read(_MAX_SHORT_LOG_SIZE // 2 - 3)
     if data:
@@ -337,16 +378,16 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
 
     def process_log(log: LogFile) -> LogFile:
         with open(log.path, 'rb') as rd:
-            patterns = find_patterns(rd, INTERESTING_PATTERNS)
-            try:
-                patterns.remove(BACKTRACE_PATTERN)
-                log.stack_trace = True
-            except ValueError:
-                pass
-            log.patterns = ','.join(sorted(patterns))
-
-            rd.seek(0)
-            log.data, is_full = read_short_log(log.size, rd)
+            if not log.binary:
+                patterns = find_patterns(rd, INTERESTING_PATTERNS)
+                try:
+                    patterns.remove(BACKTRACE_PATTERN)
+                    log.stack_trace = True
+                except ValueError:
+                    pass
+                log.patterns = ','.join(sorted(patterns))
+                rd.seek(0)
+            log.data, is_full = read_short_log(log.size, rd, log.binary)
             if is_full:
                 log.url = blob_client.get_test_log_href(test_id, log.name)
             else:
@@ -447,7 +488,8 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
         server.update_test_status('CHECKOUT FAILED', test['test_id'])
         return
 
-    utils.rmdirs(Path.home() / '.rainbow')
+    utils.rmdirs(Path.home() / '.rainbow',
+                 utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts')
 
     config_override: typing.Dict[str, typing.Any] = {}
     envb: _EnvB = typing.cast(_EnvB, os.environb)

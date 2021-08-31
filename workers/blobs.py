@@ -97,6 +97,13 @@ class GoogleBlobClient(BlobClient):
         self.__bucket = self.__service.bucket(kw.get('bucket_name', 'nayduck'))
 
     def _upload(self, name: str, rd: typing.BinaryIO) -> str:
+        if name.endswith('.gz'):
+            blob = self.__bucket.blob(name)
+            blob.cache_control = _CACHE_CONTROL
+            blob.content_type = 'application/gzip'
+            blob.upload_from_file(rd)
+            return blob.public_url
+
         try:
             mtime = os.fstat(rd.fileno()).st_mtime
         except Exception:

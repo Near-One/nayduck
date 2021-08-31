@@ -162,10 +162,12 @@ function makeSpan(span, idx) {
 }
 
 
-export function logBlob(blob) {
-    return blob ? <div className="blob">{
-        ansicolor.parse(blob).spans.filter(span => span.text).map(makeSpan)
-    }</div> : <small style={{fontStyle: 'italic'}}>(empty)</small>;
+export function logBlob(log) {
+    return log.log ? <div className="blob">{
+        ansicolor.parse(log.log).spans.filter(span => span.text).map(makeSpan)
+    }</div> : <small style={{fontStyle: 'italic'}}>{
+        log.size ? '(binary file)' : '(empty)'
+    }</small>;
 }
 
 

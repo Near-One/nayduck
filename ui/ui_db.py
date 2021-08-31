@@ -151,8 +151,11 @@ class UIDB(common_db.DB):
         def process_log(log: _Row) -> _Row:
             log.pop('test_id')
             if blob:
-                log['log'] = self._str_from_blob(log['log'])
-                _pop_falsy(log, 'log')
+                if log['type'].endswith('.gz'):
+                    log.pop('log')
+                else:
+                    log['log'] = self._str_from_blob(log['log'])
+                    _pop_falsy(log, 'log')
             return log
 
         tests_by_id = {int(test['test_id']): test for test in tests}

@@ -163,7 +163,11 @@ def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
     response.headers['vary'] = 'Accept-Encoding'
     response.headers['cache-control'] = (
         f'public, max-age={365 * 24 * 3600}, immutable')
-    response.headers['content-type'] = 'text/plain; charset=utf-8'
+    if log_type.endswith('.gz'):
+        content_type = 'application/gzip'
+    else:
+        content_type = 'text/plain; charset=utf-8'
+    response.headers['content-type'] = content_type
     if compressed:
         response.headers['content-encoding'] = 'gzip'
     return response
