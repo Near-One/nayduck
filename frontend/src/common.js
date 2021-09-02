@@ -139,11 +139,12 @@ export function logLink(log, test_id=null) {
     if (href.startsWith('/')) {
         href = apiBaseHref() + href;
     }
-    const link = <><a style={{color: colour}}
-                      href={href}>{log.type}</a> {size}</>;
-    return test_id !== null
-        ? <React.Fragment key={'log/' + test_id + '/' + log.type}>• {link} </React.Fragment>
-        : link;
+    const link = <>{
+        href ? <a style={{color: colour}} href={href}>{log.type}</a>
+             : <span style={{color: colour}}>{log.type}</span>
+    } {size}</>;
+    const key = test_id ? ('log/' + test_id + '/' + log.type) : null;
+    return key ? <React.Fragment key={key}>• {link} </React.Fragment> : link;
 }
 
 
