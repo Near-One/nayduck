@@ -388,11 +388,11 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
                 log.patterns = ','.join(sorted(patterns))
                 rd.seek(0)
             log.data, is_full = read_short_log(log.size, rd, log.binary)
-            if is_full:
-                log.url = blob_client.get_test_log_href(test_id, log.name)
-            else:
+            if not is_full:
                 rd.seek(0)
                 log.url = blob_client.upload_test_log(test_id, log.name, rd)
+            elif log.size:
+                log.url = blob_client.get_test_log_href(test_id, log.name)
 
         return log
 

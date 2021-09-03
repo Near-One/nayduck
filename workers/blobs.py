@@ -33,7 +33,7 @@ class BlobClient:
             Returns a path which can be used to download the short log from the
             UI back end.  The path is in '/logs/<test_id>/<name>' format.
         """
-        assert re.search('^[-a-zA-Z0-9_]+$', name)
+        assert re.search('^[-a-zA-Z0-9_][-a-zA-Z0-9_.]*$', name)
         return f'/logs/test/{int(test_id)}/{name}'
 
     def upload_test_log(self, test_id: int, name: str,
