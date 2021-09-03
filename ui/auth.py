@@ -204,31 +204,21 @@ class AuthCode:
         """
         try:
             assoc_data, plaintext, _ = _decrypt(_KIND_CODE, code)
-        except ValueError as ex:
+            assert assoc_data, 'Missing associated data'
+        except (ValueError, AssertionError) as ex:
             raise _unauthorised('Invalid authorisation code') from ex
         _code: typing.Optional[str] = code
-        if assoc_data is not None:
-            # New code uses `["_"] <login>` associated data and encrypted
-            # four-byte timestamp followed by the token.  The "_" in associated
-            # data indicates the user is not authorised.
-            last_check, = struct.unpack('<L', plaintext[:4])
-            token = 'gho_' + plaintext[4:].decode('ascii')
-            if assoc_data.startswith('_'):
-                is_authorised = False
-                login = assoc_data[1:]
-            else:
-                is_authorised = True
-                login = assoc_data
+        # Code uses `["_"] <login>` associated data and encrypted four-byte
+        # timestamp followed by the token.  The "_" in associated data indicates
+        # that the user is not authorised.
+        last_check = int.from_bytes(plaintext[:4], 'little')
+        token = 'gho_' + plaintext[4:].decode('ascii')
+        if assoc_data.startswith('_'):
+            is_authorised = False
+            login = assoc_data[1:]
         else:
-            # Old code has no associated data and instead encrypts four-byte
-            # timestamp, one-byte login length followed by login and token.
-            last_check, login_len = struct.unpack('<LB', plaintext[:5])
-            login = plaintext[5:5 + login_len].decode('ascii')
-            token = 'gho_' + plaintext[5 + login_len:].decode('ascii')
             is_authorised = True
-            # Setting code to None will make the constructor reconstruct the
-            # code.
-            _code = None
+            login = assoc_data
         return cls(code=_code,
                    login=login,
                    is_authorised=is_authorised,
@@ -275,7 +265,7 @@ class AuthCode:
     def __format_code(self) -> str:
         """Recomputes and returns auth code."""
         assoc_data = ('' if self.__is_authorised else '_') + self.__login
-        data = struct.pack('<L', self.__last_check)
+        data = self.__last_check.to_bytes(4, 'little')
         data += self.__token[4:].encode('ascii')
         return _encrypt(_KIND_CODE, data, assoc_data)[0]
 
