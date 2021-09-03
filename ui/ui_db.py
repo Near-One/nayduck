@@ -2,6 +2,7 @@ import collections
 import datetime
 import gzip
 import itertools
+import time
 import typing
 
 from lib import common_db
@@ -372,33 +373,50 @@ class UIDB(common_db.DB):
                              LIMIT 1''').first()
         return typing.cast(typing.Optional[UIDB.LastNightlyRun], row)
 
-    def add_auth_nonce(self, nonce: bytes, now: int) -> None:
-        """Adds an authentication nonce to the database.
+    def add_auth_cookie(self, timestamp: int, cookie: int) -> None:
+        """Adds an authentication cookie to the database.
 
-        While at it also deletes all expired nonces.
+        While at it also deletes all expired cookies.
+
+        Authentication cookies are used in the GitHub authentication flow.  When
+        user logs in we generate a cookie and send it as state with a request to
+        GitHub.  GitHub than sends it back to us so we can verify that the
+        request came from us and is valid.
 
         Args:
-            nonce: A 12-byte nonce to add to the database.
-            now: Time when the nonce was generated.
+            timestamp: Time when the cookie was generated as a 32-bit integer
+                timestamp.  This is also interpreted as ‘now’, i.e. the method
+                decides which cookies have expired based on this value.
+            cookie: A 64-bit integer cookie to add to the database.
         """
-        self._exec('DELETE FROM auth_codes WHERE timestamp < :tm', tm=now - 600)
-        self._insert('auth_codes', nonce=nonce, timestamp=now)
+        self._exec('DELETE FROM auth_cookies WHERE timestamp < :ts',
+                   ts=timestamp - 600)
+        self._insert('auth_cookies', timestamp=timestamp, cookie=cookie)
 
-    def verify_auth_nonce(self, nonce: bytes, now: int) -> bool:
-        """Verifies that an authentication nonce exists in the database.
+    def verify_auth_cookie(self, timestamp: int, cookie: int) -> bool:
+        """Verifies that an authentication cookie exists in the database.
 
-        The nonce (as well as all expired nonces) are removed from the database
-        so subsequent calls to this method will return False for the same nonce.
+        The cookie (as well as all expired cookies) are removed from the
+        database so subsequent calls to this method will return False for the
+        same cookie.
+
+        Authentication cookies are used in the GitHub authentication flow.  When
+        user logs in we generate a cookie and send it as state with a request to
+        GitHub.  GitHub than sends it back to us so we can verify that the
+        request came from us and is valid.
 
         Args:
-            nonce: Nonce to verify existence of.
-            now: Current timestamp.
+            timestamp: Timestamp when the cookie was generated as a 32-bit
+                integer timestamp.
+            cookie: A 64-bit integer cookie to add to the database.
         Returns:
-            Whether the nonce existed in the database.
+            Whether the cookie existed in the database.
         """
-        sql = 'DELETE FROM auth_codes WHERE nonce = :nonce'
-        found = bool(self._exec(sql, nonce=nonce).rowcount)
-        self._exec('DELETE FROM auth_codes WHERE timestamp < :tm', tm=now - 600)
+        sql = '''DELETE FROM auth_cookies
+                  WHERE timestamp = :ts AND cookie = :cookie'''
+        found = bool(self._exec(sql, ts=timestamp, cookie=cookie).rowcount)
+        self._exec('DELETE FROM auth_cookies WHERE timestamp < :tm',
+                   tm=int(time.time()) - 600)
         return found
 
     def get_test_log(self, test_id: int, log_type: str,

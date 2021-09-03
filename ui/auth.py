@@ -1,6 +1,5 @@
 import base64
 import secrets
-import struct
 import time
 import traceback
 import typing
@@ -61,10 +60,11 @@ def _verify_organisations(token: str) -> bool:
     return False
 
 
-def _encrypt(
-        kind: bytes,
-        plaintext: bytes,
-        assoc_data: typing.Optional[str] = None) -> typing.Tuple[str, bytes]:
+def _encrypt(kind: bytes,
+             plaintext: bytes,
+             assoc_data: typing.Optional[str] = None,
+             *,
+             nonce: typing.Optional[bytes] = None) -> typing.Tuple[str, bytes]:
     """Encrypts given plain text.
 
     Encryption uses an AEAD scheme which means that the returned data is
@@ -79,6 +79,8 @@ def _encrypt(
         assoc_data: Associated data which will be authenticated and also
             included unencrypted in the ciphertext.  If present, the string must
             be urlsafe.
+        nonce: If given, 12-byte nonce to use instead of generating a random
+            one.
     Returns:
         (urlsafe_ciphertext, nonce) tuple where first element is an URL-safe
         tagged cipher text of the given data and the second is the nonce used
@@ -89,7 +91,10 @@ def _encrypt(
     """
     if assoc_data:
         kind = assoc_data.encode('ascii') + b':' + kind
-    nonce = secrets.token_bytes(12)
+    if nonce:
+        assert len(nonce) == 12
+    else:
+        nonce = secrets.token_bytes(12)
     ciphertext = __CHACHA.encrypt(nonce, plaintext, kind)
     urlsafe = base64.urlsafe_b64encode(nonce + ciphertext).decode('ascii')
     if assoc_data:
@@ -279,13 +284,15 @@ def generate_redirect(mode: str) -> str:
     Returns:
         An URL to GitHub OAuth authorisation page.
     """
-    now = int(time.time())
-    msg = struct.pack('<L1s', now, mode.encode('ascii'))
-    state, nonce = _encrypt(_KIND_GITHUB, msg)
+    timestamp = int(time.time())
+    enc_ts = -timestamp if mode == 'web' else timestamp
+    nonce = enc_ts.to_bytes(4, 'little', signed=True) + secrets.token_bytes(8)
+    cookie = int.from_bytes(nonce[4:], 'little', signed=True)
+    state, _ = _encrypt(_KIND_GITHUB, b'', nonce=nonce)
     url = ('https://github.com/login/oauth/authorize'
            f'?scope=read:org&client_id={__CLIENT_ID}&state={state}')
     with ui_db.UIDB() as server:
-        server.add_auth_nonce(nonce, now)
+        server.add_auth_cookie(timestamp, cookie)
     return url
 
 
@@ -314,26 +321,22 @@ def get_code(state: typing.Optional[str],
     if not state or not code:
         raise AuthFailed('Missing state or code parameters')
     try:
-        _, data, nonce = _decrypt(_KIND_GITHUB, state)
+        _, _, nonce = _decrypt(_KIND_GITHUB, state)
     except ValueError as ex:
         raise AuthFailed('Invalid request') from ex
 
-    try:
-        then, mode = struct.unpack('<L1s', data)
-    except Exception as ex:
-        print(ex)
-        raise AuthFailed('Invalid request') from ex
+    timestamp = int.from_bytes(nonce[:4], 'little', signed=True)
+    is_web = timestamp < 0
+    if is_web:
+        timestamp = -timestamp
+    cookie = int.from_bytes(nonce[4:], 'little', signed=True)
 
-    now = int(time.time())
-    if then < now - 600:
-        print(f'Expired: {then}')
+    if timestamp < time.time() - 600:
+        print(f'Expired: {timestamp}')
         raise AuthFailed('Request expired')
-    if mode not in b'cw':
-        print('Invalid mode')
-        raise AuthFailed('Invalid request')
 
     with ui_db.UIDB() as server:
-        if not server.verify_auth_nonce(nonce, now):
+        if not server.verify_auth_cookie(timestamp, cookie):
             print('Nonce not in database')
             raise AuthFailed('Invalid request')
 
@@ -357,7 +360,7 @@ def get_code(state: typing.Optional[str],
         traceback.print_exc()
         raise AuthFailed('GitHub rejected the code') from ex
 
-    return AuthCode.for_user(login=login, token=token), mode == b'w'
+    return AuthCode.for_user(login=login, token=token), is_web
 
 
 def add_cookie(response: werkzeug.wrappers.Response, code: str) -> None:

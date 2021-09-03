@@ -67,9 +67,9 @@ CREATE TABLE `tests` (
   CONSTRAINT `tests_ibfk_2` FOREIGN KEY (`build_id`) REFERENCES `builds` (`build_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
-CREATE TABLE `auth_codes` (
-  `nonce` binary(12) NOT NULL,
-  `timestamp` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`nonce`),
-  KEY `stamp` (`timestamp`)
+DROP TABLE IF EXISTS `auth_cookies`;
+CREATE TABLE `auth_cookies` (
+  `timestamp` int NOT NULL,
+  `cookie` bigint NOT NULL,
+  PRIMARY KEY (`timestamp`, `cookie`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
