@@ -5,10 +5,10 @@ from lib import common_db
 
 class Build:
     build_id: int
-    sha: str
     features: str
     is_release: int
-    expensive: int
+    sha: str
+    expensive: bool
 
 
 class BuilderDB(common_db.DB):
@@ -26,41 +26,28 @@ class BuilderDB(common_db.DB):
 
     def get_new_build(self) -> typing.Optional[Build]:
         """Returns a pending build to process or None if none found."""
-        return self._in_transaction(self.__get_new_build)
-
-    def __get_new_build(self) -> typing.Optional[Build]:
-        """Implementation of get_new_build method (which see).
-
-        This method must be run inside of a transaction because it uses
-        variables and so we cannot tolerate disconnects between the two queries.
-        """
-        sql = '''UPDATE builds
-                    SET started = NOW(),
-                        finished = NULL,
-                        status = 'BUILDING',
-                        builder_ip = :ip,
-                        build_id = (@build_id := build_id)
-                  WHERE status = 'PENDING'
-                  ORDER BY priority, build_id
-                  LIMIT 1'''
-        result = self._exec(sql, ip=self._ipv4)
-        if result.rowcount == 0:
-            return None
-        # We're executing this query once in a blue moon so it doesn't need to
-        # be super optimised.  If we cared about the performance we could
-        # duplicate `sha` column in a build and add `has_expensive` column, but
-        # in this instance we care more about database normalisation.
-        sql = '''SELECT b.build_id,
-                        r.sha,
-                        b.features,
-                        b.is_release,
-                        SUM(t.category = "expensive") != 0 AS expensive
-                   FROM builds b
-                   JOIN runs r ON (r.id = b.run_id)
-                   JOIN tests t USING (build_id)
-                  WHERE b.build_id = @build_id
-                  GROUP BY 1
-                  LIMIT 1'''
+        build_sql = '''SELECT build_id
+                         FROM builds
+                        WHERE status = 'PENDING'
+                        ORDER BY low_priority, build_id
+                        LIMIT 1
+                          FOR UPDATE'''
+        update_sql = f'''UPDATE builds
+                            SET started = NOW(),
+                                finished = NULL,
+                                status = 'BUILDING',
+                                builder_ip = {int(self._ipv4)}
+                          WHERE build_id IN ({build_sql})
+                      RETURNING build_id, run_id, features, is_release'''
+        expensive_tests_sql = '''SELECT test_id FROM tests
+                                  WHERE status = 'PENDING'
+                                    AND category = 'expensive'
+                                    AND build_id = build.build_id'''
+        sql = f'''WITH build AS ({update_sql})
+                  SELECT build_id, features, is_release,
+                         ENCODE(sha, 'hex') sha,
+                         EXISTS ({expensive_tests_sql}) expensive
+                    FROM build JOIN runs USING (run_id)'''
         return typing.cast(typing.Optional[Build], self._exec(sql).first())
 
     def update_build_status(self, build_id: int, success: bool, *, out: bytes,
@@ -75,29 +62,29 @@ class BuilderDB(common_db.DB):
             out: Standard output of the build process.
             err: Standard error output of the build process.
         """
+        sql = '''UPDATE builds
+                    SET finished = NOW(),
+                        status = :status,
+                        stderr = :err,
+                        stdout = :out
+                  WHERE build_id = :id'''
         if success:
-            sql = '''UPDATE builds
-                        SET finished = NOW(),
-                            status = "BUILD DONE",
-                            stderr = :err,
-                            stdout = :out
-                      WHERE build_id = :id'''
+            status = 'BUILD DONE'
         else:
-            sql = '''UPDATE builds JOIN tests USING (build_id)
-                        SET builds.finished = NOW(),
-                            builds.status = "BUILD FAILED",
-                            builds.stderr = :err,
-                            builds.stdout = :out,
-                            tests.status = "CANCELED"
-                      WHERE builds.build_id = :id
-                        AND tests.status = "PENDING"'''
+            status = 'BUILD FAILED'
+            sql = f'''
+                WITH b AS ({sql} RETURNING build_id)
+                UPDATE tests SET status = 'CANCELED'
+                 WHERE build_id IN (SELECT build_id FROM b)
+                   AND tests.status = 'PENDING'
+            '''
         out = self._blob_from_data(out)
         err = self._blob_from_data(err)
-        self._exec(sql, err=err, out=out, id=build_id)
+        self._exec(sql, status=status, err=err, out=out, id=build_id)
 
     def handle_restart(self) -> None:
         sql = '''UPDATE builds
-                    SET started = null,
+                    SET started = NULL,
                         status = 'PENDING',
                         builder_ip = 0
                   WHERE status = 'BUILDING'
@@ -106,11 +93,11 @@ class BuilderDB(common_db.DB):
 
     def builds_without_pending_tests(self) -> typing.Sequence[int]:
         """Returns IDs of builds assigned to this builder w/no pending tests."""
-        sql = '''SELECT build_id
-                   FROM builds LEFT JOIN tests USING (build_id)
-                  WHERE builder_ip = :ip
-                  GROUP BY 1
-                 HAVING SUM(tests.status IN ('PENDING', 'RUNNING')) = 0'''
+        sql = '''SELECT builds.build_id
+                   FROM builds
+                   LEFT JOIN tests ON (tests.build_id = builds.build_id
+                                   AND tests.status IN ('RUNNING', 'PENDING'))
+                  WHERE builder_ip = :ip AND test_id IS NULL'''
         scalars = self._exec(sql, ip=self._ipv4).scalars()
         return tuple(int(bid) for bid in scalars)
 

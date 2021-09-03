@@ -8,6 +8,8 @@ import subprocess
 import traceback
 import typing
 
+import pytz
+
 from . import backend_db
 
 
@@ -141,7 +143,6 @@ class Request(typing.NamedTuple):
     sha: str
     requester: str
     tests: typing.List[str]
-    is_nightly: bool
 
     @classmethod
     def from_json(cls, request_json: typing.Any, requester: str) -> 'Request':
@@ -162,8 +163,7 @@ class Request(typing.NamedTuple):
         return cls(branch=branch,
                    sha=sha,
                    requester=requester,
-                   tests=cls.verify_tests(tests),
-                   is_nightly=False)
+                   tests=cls.verify_tests(tests))
 
     def schedule(self,
                  server: backend_db.BackendDB,
@@ -205,7 +205,6 @@ class Request(typing.NamedTuple):
                                      sha=commit.sha,
                                      title=commit.title,
                                      requester=self.requester,
-                                     is_nightly=self.is_nightly,
                                      tests=tests,
                                      builds=sorted(
                                          builds.values(),
@@ -404,7 +403,8 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
     """Implementation of schedule_nightly_run."""
     last = server.last_nightly_run()
     if last:
-        delta = datetime.datetime.utcnow() - last.timestamp
+        now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
+        delta = now - last.timestamp
         need_new_run = delta >= datetime.timedelta(hours=24)
         print('Last nightly at {}; {} ago; sha={}{}'.format(
             last.timestamp, delta, last.sha,
@@ -424,8 +424,7 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
     req = Request(branch='master',
                   sha=commit.sha,
                   requester='NayDuck',
-                  tests=tests,
-                  is_nightly=True)
+                  tests=tests)
     run_id = req.schedule(server, commit)
     print(f'Scheduled new nightly run: /#/run/{run_id}')
     return datetime.timedelta(hours=24)

@@ -32,42 +32,38 @@ class WorkerDB(common_db.DB):
         Returns:
             A build to process or None if none are present.
         """
-        return self._in_transaction(self.__get_pending_test, include_mocknet)
-
-    def __get_pending_test(self, mocknet: bool) -> typing.Optional[Test]:
-        """Implementation of get_pending_test method (which see).
-
-        This method must be run inside of a transaction because it uses
-        variables and so we cannot tolerate disconnects between the two queries.
-        """
-        sql = '''UPDATE tests
-                    SET started = NOW(),
-                        finished = NULL,
-                        status = 'RUNNING',
-                        worker_ip = :ip,
-                        test_id = (@test_id := test_id)
-                  WHERE status = 'PENDING'
-                    AND build_id IN (SELECT build_id
-                                       FROM builds
-                                      WHERE status IN ('BUILD DONE', 'SKIPPED'))
-                    {where}
-                  ORDER BY {order_by} priority, test_id
-                  LIMIT 1'''.format(
-            where='' if mocknet else 'AND category != "mocknet"',
-            order_by='category != "mocknet", ' if mocknet else '')
-        res = self._exec(sql, ip=self._ipv4)
-        if res.rowcount == 0:
-            return None
-        sql = '''SELECT t.test_id, t.build_id, t.name, b.builder_ip, r.sha
-                   FROM tests t
-                   JOIN runs r ON (r.id = t.run_id)
-                   JOIN builds b USING (build_id)
-                  WHERE t.test_id = @test_id
-                  LIMIT 1'''
-        return typing.cast(typing.Optional[Test], self._exec(sql).first())
+        # pylint: disable=invalid-string-quote
+        build_is_ready = '''builds.status = 'SKIPPED'
+                        OR (builds.status = 'BUILD DONE' AND builder_ip != 0)'''
+        mocknet_filter = 'TRUE' if include_mocknet else "category != 'mocknet'"
+        sql = f'''SELECT test_id
+                    FROM tests
+                    JOIN builds USING (build_id)
+                   WHERE ({build_is_ready})
+                     AND tests.status = 'PENDING'
+                     AND {mocknet_filter}
+                   ORDER BY category != 'mocknet', low_priority, test_id
+                   LIMIT 1'''
+        sql = f'''UPDATE tests
+                     SET started = NOW(),
+                         finished = NULL,
+                         status = 'RUNNING',
+                         worker_ip = :ip
+                  WHERE test_id IN ({sql})
+               RETURNING test_id, build_id, run_id, name'''
+        sql = f'''WITH test AS ({sql})
+                  SELECT test_id, build_id, name, builder_ip,
+                         ENCODE(sha, 'hex') AS sha
+                    FROM test
+                    JOIN runs USING (run_id)
+                    JOIN builds USING (build_id)'''
+        test = self._exec(sql, ip=self._ipv4).first()
+        return typing.cast(typing.Optional[Test], test)
 
     def test_started(self, test_id: int) -> None:
-        sql = 'UPDATE tests SET started = NOW() WHERE test_id = :id'
+        sql = '''UPDATE tests
+                    SET started = NOW(), finished = NULL
+                  WHERE test_id = :id'''
         self._exec(sql, id=test_id)
 
     def update_test_status(self, status: str, test_id: int) -> None:
@@ -85,7 +81,10 @@ class WorkerDB(common_db.DB):
             [(test_id, log.name, log.size, self._blob_from_data(
                 log.data or b''), log.url or '', log.stack_trace)
              for log in logs],
-            replace=True)
+            on_conflict=('(test_id, type) DO UPDATE'
+                         ' SET size = excluded.size, log = excluded.log,'
+                         '     storage = excluded.storage,'
+                         '     stack_trace = excluded.stack_trace'))
 
     def handle_restart(self) -> None:
         sql = '''UPDATE tests

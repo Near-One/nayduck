@@ -46,11 +46,12 @@ class BackendDB(common_db.DB):
 
     def get_all_runs(self) -> typing.Iterable[_Dict]:
         # Get the last 100 runs
-        sql = '''SELECT id, branch, sha, title, requester, timestamp
+        sql = '''SELECT run_id, branch, encode(sha, 'hex') AS sha, title,
+                        requester, timestamp
                    FROM runs
-                  ORDER BY id DESC
+                  ORDER BY run_id DESC
                   LIMIT 100'''
-        all_runs = {run['id']: run for run in self._fetch_all(sql)}
+        all_runs = {run['run_id']: run for run in self._fetch_all(sql)}
         min_id, max_id = min(all_runs), max(all_runs)
 
         statuses = self.__get_statuses_for_runs(min_id, max_id)
@@ -69,14 +70,8 @@ class BackendDB(common_db.DB):
             _update_true(build, is_release=is_release, features=features)
             all_runs[run_id].setdefault('builds', []).append(build)
 
-        # Fill out fake builds for any old runs which don't have corresponding
-        # builds.  In practice this is never executed since those runs no longer
-        # show up on the dashboard in the top 100.
-        for run in all_runs.values():
-            run.setdefault('builds', self._NO_BUILDS)
-
         return sorted(all_runs.values(),
-                      key=lambda run: -typing.cast(int, run['id']))
+                      key=lambda run: -typing.cast(int, run['run_id']))
 
     def __get_statuses_for_runs(
         self, min_run_id: int, max_run_id: int
@@ -107,9 +102,9 @@ class BackendDB(common_db.DB):
         return statuses
 
     def get_test_history_by_id(self, test_id: int) -> typing.Optional[_Dict]:
-        sql = '''SELECT t.name, r.branch
-                   FROM tests AS t, runs AS r
-                  WHERE t.test_id = :id AND r.id = t.run_id
+        sql = '''SELECT name, branch
+                   FROM tests JOIN runs USING (run_id)
+                  WHERE test_id = :id
                   LIMIT 1'''
         row = self._exec(sql, id=test_id).first()
         if not row:
@@ -128,11 +123,11 @@ class BackendDB(common_db.DB):
             test_name: str,
             branch: str,
             interested_in_logs: bool = False) -> typing.Sequence[_Dict]:
-        sql = '''SELECT t.test_id, r.requester, r.title, t.status, t.started,
-                        t.finished, r.branch, r.sha
-                   FROM tests AS t, runs AS r
-                  WHERE name = :name AND t.run_id = r.id AND r.branch = :branch
-                  ORDER BY t.test_id DESC
+        sql = '''SELECT test_id, requester, title, status, started, finished,
+                        branch, encode(sha, 'hex') AS sha
+                   FROM tests JOIN runs USING (run_id)
+                  WHERE name = :name AND branch = :branch
+                  ORDER BY test_id DESC
                   LIMIT 30'''
         tests = self._fetch_all(sql, name=test_name, branch=branch)
         if interested_in_logs:
@@ -141,7 +136,7 @@ class BackendDB(common_db.DB):
 
     def get_one_run(self, run_id: int) -> typing.Sequence[_Dict]:
         sql = '''SELECT test_id, status, name, started, finished, branch
-                   FROM tests JOIN runs ON (runs.id = tests.run_id)
+                   FROM tests JOIN runs USING (run_id)
                   WHERE run_id = :id
                   ORDER BY status, started'''
         tests = self._fetch_all(sql, id=run_id)
@@ -193,8 +188,9 @@ class BackendDB(common_db.DB):
 
     def get_build_info(self, build_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT run_id, status, started, finished, stderr, stdout,
-                        features, is_release, branch, sha, title, requester
-                   FROM builds JOIN runs ON (runs.id = builds.run_id)
+                        features, is_release, branch, encode(sha, 'hex') AS sha,
+                        title, requester
+                   FROM builds JOIN runs USING (run_id)
                   WHERE build_id = :id
                   LIMIT 1'''
         build = self._fetch_one(sql, id=build_id)
@@ -236,8 +232,9 @@ class BackendDB(common_db.DB):
 
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, started,
-                        finished, branch, sha, title, requester
-                   FROM tests JOIN runs ON (runs.id = tests.run_id)
+                        finished, branch, encode(sha, 'hex') AS sha, title,
+                        requester
+                   FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
                   LIMIT 1'''
         test = self._fetch_one(sql, id=test_id)
@@ -293,7 +290,7 @@ class BackendDB(common_db.DB):
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
                        builds: typing.Sequence['BackendDB.BuildSpec'],
                        tests: typing.Sequence['BackendDB.TestSpec'],
-                       requester: str, is_nightly: bool) -> int:
+                       requester: str) -> int:
         """Schedules a run with given set of pending tests to the database.
 
         Adds a run comprising of all specified tests as well as all builds the
@@ -310,10 +307,6 @@ class BackendDB(common_db.DB):
                 builds are modified in place by having their build_id set.
             tests: A sequence of tests to add as a sequence of TestSpec objects.
             requester: User who requested the tests.
-            is_nightly: Whether this request is a nightly run requests.  It will
-                be marked as such in the database so that the scheduler can
-                figure out when was the last nightly run.  Furthermore, nightly
-                runs are run with lower priority.
         Returns:
             Id of the scheduled run.
         """
@@ -323,39 +316,41 @@ class BackendDB(common_db.DB):
                                     title=title,
                                     builds=builds,
                                     tests=tests,
-                                    requester=requester,
-                                    is_nightly=is_nightly)
+                                    requester=requester)
 
     def __do_schedule(self, *, branch: str, sha: str, title: str,
                       builds: typing.Sequence['BackendDB.BuildSpec'],
                       tests: typing.Sequence['BackendDB.TestSpec'],
-                      requester: str, is_nightly: bool) -> int:
+                      requester: str) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
         # Into Runs
         run_id = self._insert('runs',
+                              'run_id',
                               branch=branch,
-                              sha=sha,
+                              sha=bytes.fromhex(sha),
                               title=title,
-                              requester=requester,
-                              is_nightly=is_nightly)
+                              requester=requester)
 
         # Into Builds
-        for build in builds:
-            build_status = 'PENDING' if build.has_non_mocknet else 'SKIPPED'
-            build.build_id = self._insert('builds',
-                                          run_id=run_id,
-                                          status=build_status,
-                                          features=build.features,
-                                          is_release=build.is_release,
-                                          priority=int(is_nightly))
+        builds_dict = {
+            (build.is_release, build.features): build for build in builds
+        }
+        rows = self._multi_insert(
+            'builds',
+            ('run_id', 'status', 'features', 'is_release', 'low_priority'),
+            [(run_id, 'PENDING' if build.has_non_mocknet else 'SKIPPED',
+              build.features, build.is_release, requester == 'NayDuck')
+             for build in builds],
+            returning=('build_id', 'features', 'is_release'))
+        for row in rows:
+            key = (row['is_release'], row['features'])
+            builds_dict[key].build_id = row['build_id']
 
         # Into Tests
-        columns = ('run_id', 'build_id', 'name', 'category', 'priority',
-                   'remote')
+        columns = ('run_id', 'build_id', 'name', 'category', 'remote')
         self._multi_insert('tests', columns,
                            [(run_id, test.build.build_id, test.name,
-                             test.category, int(is_nightly), test.is_remote)
-                            for test in tests])
+                             test.category, test.is_remote) for test in tests])
 
         return run_id
 
@@ -365,9 +360,9 @@ class BackendDB(common_db.DB):
 
     def last_nightly_run(self) -> typing.Optional['BackendDB.LastNightlyRun']:
         """Returns the last nightly run."""
-        row = self._exec('''SELECT timestamp, sha
+        row = self._exec('''SELECT timestamp, encode(sha, 'hex') AS sha
                               FROM runs
-                             WHERE is_nightly
+                             WHERE requester = 'NayDuck'
                              ORDER BY timestamp DESC
                              LIMIT 1''').first()
         return typing.cast(typing.Optional[BackendDB.LastNightlyRun], row)
@@ -491,4 +486,6 @@ class BackendDB(common_db.DB):
         if is_compressed and not gzip_ok:
             blob = gzip.decompress(blob)
             is_compressed = False
+        else:
+            blob = bytes(blob)
         return blob, is_compressed

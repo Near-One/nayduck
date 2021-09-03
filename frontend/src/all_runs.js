@@ -78,9 +78,9 @@ function AllRuns () {
             : null;
     };
 
-    const formatRow = a_run => <tr key={a_run.id}>
+    const formatRow = a_run => <tr key={a_run.run_id}>
       <td>{common.commitLink(a_run)}</td>
-      <td><NavLink to={'/run/' + a_run.id}>{a_run.title}</NavLink></td>
+      <td><NavLink to={'/run/' + a_run.run_id}>{a_run.title}</NavLink></td>
       <td>{a_run.requester}<br/><small>{
         common.formatDateTime(a_run.timestamp)
       }</small></td>
@@ -102,8 +102,9 @@ function AllRuns () {
           </div>
         </div>)
       }</td>
-      {isAuthorised ? <td><button onClick={cancelRun(a_run.id)}>×</button></td>
-                    : null}
+      {isAuthorised
+           ? <td><button onClick={cancelRun(a_run.run_id)}>×</button></td>
+           : null}
     </tr>;
 
     return <table className="big list">

@@ -23,3 +23,7 @@ echo -ne '\n' | sudo update-alternatives --install /usr/bin/python python /usr/b
 echo -ne '\n' | sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.7 2
 echo -ne '\n' | sudo update-alternatives --config python
 echo -ne '\n' | sudo apt-get -y install python3-pip
+
+
+
+sudo apt install -y libpq-dev

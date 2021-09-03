@@ -2,8 +2,8 @@ Flask-APScheduler
 azure-storage-blob
 flask
 google-cloud-storage
-mysql-connector-python
 psutil
+psycopg2
 requests
 sqlalchemy
 types-flask

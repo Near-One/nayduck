@@ -15,18 +15,10 @@ _D = typing.TypeVar('_D', bound='DB')
 
 def __create_engine() -> sqlalchemy.engine.Engine:
     cfg = config.load('database')
-    cfg.setdefault('host', '127.0.0.1')
     cfg.setdefault('database', 'nayduck')
-    # For the time being accept 'user' as alias of 'username' and 'passwd' as
-    # alias of 'password'.
-    cfg.setdefault('username', cfg.pop('user', 'nayduck'))
-    if 'passwd' in cfg:
-        cfg.setdefault('password', cfg.pop('passwd'))
-    cfg.setdefault('query', {}).update({
-        'charset': 'utf8mb4',
-        'collation': 'utf8mb4_general_ci',
-    })
-    url = sqlalchemy.engine.URL.create('mysql+mysqlconnector', **cfg)
+    cfg.setdefault('username', 'nayduck')
+    cfg.setdefault('query', {}).update({'client_encoding': 'utf8'})
+    url = sqlalchemy.engine.URL.create('postgresql', **cfg)
     return sqlalchemy.create_engine(url,
                                     future=True,
                                     pool_size=1,
@@ -122,7 +114,10 @@ class DB:
         finally:
             self.__in_transaction = False
 
-    def _insert(self, table: str, **kw: typing.Any) -> int:
+    def _insert(self,
+                table: str,
+                id_column: typing.Optional[str] = None,
+                **kw: typing.Any) -> int:
         """Executes an INSERT statement.
 
         This is a convenience wrapper around _exec which automatically formats
@@ -132,20 +127,27 @@ class DB:
 
         Args:
             table: Table to insert a row into.
+            id_column: Name of an ID column if one exists in the table.  If
+                given, value of that column will be returned after the insert.
             kw: The column-value mapping for the row to insert.
         Returns:
             Id of the inserted row.
         """
-        sql = 'INSERT INTO {} (`{}`) VALUES ({})'.format(
-            table, '`, `'.join(kw), ', '.join(f':{col}' for col in kw))
-        return typing.cast(int, self._exec(sql, **kw).lastrowid)
+        sql = 'INSERT INTO {} ("{}") VALUES ({})'.format(
+            table, '", "'.join(kw), ', '.join(f':{col}' for col in kw))
+        if id_column:
+            sql += 'RETURNING "{}"'.format(id_column)
+            return int(self._exec(sql, **kw).first()[0])
+        self._exec(sql, **kw)
+        return 0
 
     def _multi_insert(self,
                       table: str,
                       columns: typing.Sequence[str],
                       rows: typing.Sequence[typing.Sequence[typing.Any]],
                       *,
-                      replace: bool = False) -> None:
+                      returning: typing.Optional[typing.Sequence[str]] = None,
+                      on_conflict: str = '') -> typing.Sequence[_Dict]:
         """Executes an INSERT statement adding multiple rows at once.
 
         Args:
@@ -154,17 +156,29 @@ class DB:
             rows: An iterable of rows to insert.  Each element must be
                 a collection of the same length as columns count.  Values of
                 each element correspond to columns at the same index.
-            replace: Whether to uses REPLACE statement rather than INSERT.
+            returning: If present, list of columns to return for each inserted
+                row.
+            id_columns: If non-empty, body of the ‘ON CONFLICT’ phrase of the
+                query.'.
         """
-        verb = ['INSERT', 'REPLACE'][bool(replace)]
-        names = '`, `'.join(columns)
-        placeholders = ('%s, ' * len(columns))[:-2]
-        sql = f'{verb} INTO `{table}` (`{names}`) VALUES ({placeholders})'
+        names = '", "'.join(columns)
+        sql = ', '.join(':r{i}c' + str(i) for i in range(len(columns)))
+        sql = ', '.join('(' + sql.format(i=i) + ')' for i in range(len(rows)))
+        sql = f'INSERT INTO "{table}" ("{names}") VALUES {sql}'
+        if on_conflict:
+            sql = f'{sql} ON CONFLICT {on_conflict}'
+        if returning:
+            names = '", "'.join(returning)
+            sql += f' RETURNING "{names}"'
+        values = {
+            f'r{rno}c{cno}': value for rno, row in enumerate(rows)
+            for cno, value in enumerate(row)
+        }
 
-        def execute() -> None:
-            self.__conn.exec_driver_sql(sql, rows)
-
-        self._in_transaction(execute)
+        result = self._exec(sql, **values)
+        if returning:
+            return tuple(self._to_dict(row) for row in result)
+        return ()
 
     @classmethod
     def _to_dict(cls, row: _Row) -> typing.Dict[str, typing.Any]:

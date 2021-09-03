@@ -26,7 +26,7 @@ class BuildSpec(typing.NamedTuple):
         build_id = int(data.build_id)
         return cls(build_id=build_id,
                    build_dir=utils.BUILDS_DIR / str(build_id),
-                   sha=data.sha,
+                   sha=str(data.sha),
                    features=tuple(data.features.split()),
                    is_release=bool(data.is_release),
                    is_expensive=bool(data.expensive))
