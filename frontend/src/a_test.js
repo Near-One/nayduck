@@ -27,6 +27,7 @@ function ATest (props) {
     }
 
     const timeStats = common.formatTimeStats(aTest);
+    const statusCls = common.statusClassName('text', aTest.status);
     return (
       <>
         <table claass="nav"><tbody><tr>
@@ -44,7 +45,7 @@ function ATest (props) {
           <tr><td>Run Time</td><td>{timeStats.delta}</td></tr>
           <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
           <tr><td>Started</td><td>{timeStats.started}</td></tr>
-          <tr><td>Status</td><td style={{color: common.testStatusColour(aTest.status)}}>{aTest.status}</td></tr>
+          <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>
           {aTest.logs ? <>
              <tr><th colSpan="2">Logs</th></tr>
              {aTest.logs.map(log =>

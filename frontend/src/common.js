@@ -6,27 +6,9 @@ import GithubIcon from "mdi-react/GithubIcon";
 import * as ansicolor from "ansicolor";
 
 
-export function testStatusColour(status) {
-    switch (status) {
-    case "FAILED" || "BUILD FAILED":   return "red";
-    case "PASSED":   return "green";
-    case "RUNNING":   return "blue";
-    case "OTHER":   return "grey";
-    default:      return "black";
-    }
+export function statusClassName(base, status) {
+    return base + '-' + status.replace(/ /g, '_').toLowerCase();
 }
-
-
-export function buildStatusColour(status) {
-    switch (status) {
-    case "PENDING": return "FF99FF";
-    case "BUILDING": return "#9999FF";
-    case "BUILD DONE":
-    case "SKIPPED": return "#CCFFCC";
-    case "BUILD FAILED": return "#FFCCCC";
-    default: return "E0E0E0";
-    }
-};
 
 
 export function renderHistory(a_test, branch = null) {
@@ -34,10 +16,10 @@ export function renderHistory(a_test, branch = null) {
     const history = <ul>{a_test.history.map((count, index) => {
         const status = statuses[index];
         return status
-            ? <li key={branch + '/history/' + index} style={{
-                      color: testStatusColour(status)
-                  }}>{branch ? status : status.substr(0, 1)}:{count}</li>
-        : null;
+            ? <li key={branch + '/history/' + index} className={
+                      statusClassName('text', status)
+              }>{branch ? status : status.substr(0, 1)}:{count}</li>
+            : null;
     })}</ul>;
     const inner = branch
           ? <>This test history for branch <b>{branch}</b>: {history}</>
@@ -131,17 +113,18 @@ function formatSize(size) {
 
 
 export function logLink(log, test_id=null) {
-    const colour = !log.stack_trace
-          ? String(log.patterns).includes("LONG DELAY") ? 'orange' : 'blue'
-          : 'red';
+    const className = !log.stack_trace
+          ? String(log.patterns).includes("LONG DELAY") ? 'log-delayed'
+                                                        : 'log-normal'
+          : 'log-failed';
     const size = <small>({formatSize(log.size)})</small>;
     let href = log.storage;
     if (href.startsWith('/')) {
         href = apiBaseHref() + href;
     }
     const link = <>{
-        href ? <a style={{color: colour}} href={href}>{log.type}</a>
-             : <span style={{color: colour}}>{log.type}</span>
+        href ? <a className={className} href={href}>{log.type}</a>
+             : <span className={className}>{log.type}</span>
     } {size}</>;
     const key = test_id ? ('log/' + test_id + '/' + log.type) : null;
     return key ? <React.Fragment key={key}>• {link} </React.Fragment> : link;
@@ -166,7 +149,7 @@ function makeSpan(span, idx) {
 export function logBlob(log) {
     return log.log ? <div className="blob">{
         ansicolor.parse(log.log).spans.filter(span => span.text).map(makeSpan)
-    }</div> : <small style={{fontStyle: 'italic'}}>{
+    }</div> : <small className="blob">{
         log.size ? '(binary file)' : '(empty)'
     }</small>;
 }

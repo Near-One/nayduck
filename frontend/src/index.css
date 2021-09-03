@@ -14,11 +14,13 @@ code {
     monospace;
 }
 
-table {
-  border-collapse: collapse;
-  word-wrap: break-word;
+a:hover {
+  text-decoration: none;
 }
+
 .big {
+  border-collapse: collapse;
+  overflow-wrap: break-word;
   width: 100%;
 }
 td, th {
@@ -26,15 +28,13 @@ td, th {
 }
 .big td, .big th {
   border: 1px solid #ddd;
+  border-width: 1px 0;
 }
-
-table.big tr:nth-child(even){background-color: #f2f2f2;}
-table.big tr:hover {background-color: #ddd;}
 
 th {
   text-align: center;
   background-color: #4CAF50;
-  color: white;
+  color: #fff;
 }
 
 th input {
@@ -44,49 +44,57 @@ td button {
   padding: 0;
 }
 
-.blob {
+.with-features td:nth-child(2) {
+  font-size: 0.625em;
+}
+
+div.blob {
   max-height: 20em;
   overflow: auto;
   font-variant: lining-nums slashed-zero;
   font-family: DejaVu Sans Mono, Source Code Pro, Liberation Mono, Courier New, monospace;
   white-space: pre-wrap;
 }
+small.blob {
+  font-style: italic
+}
 
 .status {
   display: inline-block;
-  margin: 2px;
-  padding: 2px;
-  padding-left: 5px;
-  border-radius: 10px;
-  padding-right: 5px;
-}
-.status-passed       { background: green }
-.status-failed       { background: red }
-.status-timeout      { background: #f0a3aa }
-.status-build_failed { background: #864E4E }
-.status-canceled     { background: #FCF88C }
-.status-ignored      { background: grey }
-.status-pending      { background: #ED8CFC }
-.status-running      { background: #697DCB }
-
-.build_status {
-  display: inline-block;
-  margin: 2px;
-  padding: 2px;
-  padding-left: 5px;
-  border-radius: 10px;
-  padding-right: 5px;
+  margin: 0.125em;
+  padding: 0.125em 0.25em;
+  border-radius: 0.5em;
   color: #000;
 }
 
-.one_build {
-  margin: 2px;
-  padding: 2px;
-  padding-left: 5px;
-  border-radius: 10px;
-  padding-right: 5px;
-  border: 1px solid grey;
-}
+.status-passed       { background: #008000 }
+.status-failed       { background: #ff0000 }
+.status-timeout      { background: #f0a3aa }
+.status-build_failed { background: #864E4E }
+.status-canceled     { background: #FCF88C }
+.status-ignored      { background: #808080 }
+.status-pending      { background: #ED8CFC }
+.status-running      { background: #697DCB }
+
+.build_status-pending      { background: #ff99ff }
+.build_status-building     { background: #9999ff }
+.build_status-build_done   { background: #ccffcc }
+.build_status-skipped      { background: #ccffcc }
+.build_status-build_failed { background: #ffcccc }
+
+.text-failed       { color: #ff0000 }
+.text-build_failed { color: #ff0000 }
+.text-passed       { color: #008000 }
+.text-build_done   { color: #008000 }
+.text-skipped      { color: #008000 }
+.text-running      { color: #0000FF }
+.text-building     { color: #0000FF }
+.text-other        { color: #808080 }
+.text-pending      { color: #ED8CFC }
+
+.log-failed  { color: #ff0000 }
+.log-delayed { color: #ffa500 }
+.log-normal  { color: #0000ff }
 
 .logout{
   all: unset;

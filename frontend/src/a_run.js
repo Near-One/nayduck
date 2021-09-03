@@ -76,7 +76,7 @@ function ARun (props) {
           <tr><td><NavLink to="/">« Back to all runs</NavLink></td></tr>
         </tbody></table>
 
-        <table className="big"><tbody>
+        <table className="big"><thead>
           <tr>
             <th>Build
             <select onChange={filterByAll} id="build_fltr">
@@ -92,21 +92,20 @@ function ARun (props) {
             <th>Run Time <button onClick={orderByTestTime}>↕</button></th>
             <th>Started</th>
             <th>Finished</th>
-        </tr>
+          </tr>
+        </thead><tbody className="with-features">
         {filteredRuns.map(a_test => {
             const timeStats = common.formatTimeStats(a_test);
+            const statusCls = common.statusClassName(
+                'text', a_test.status);
+            const features = (a_test.features || '')
+                .replace('--features ', '').replace(/,/, ',​')
             return (
               <tr key={a_test.test_id}>
-                <td>
-                  {a_test.is_release ? 'Release' : 'Dev'}
-                </td>
-                <td style={{fontSize: "x-small", "margin": 0}}>
-                    {(a_test.features || '').replace('--features ', '').replace(/,/, ',​')}
-                </td>
-                <td>
-                    <NavLink to={"/test/" + a_test.test_id} >{a_test.name}</NavLink>
-                </td>
-                <td style={{color: common.testStatusColour(a_test.status)}}>{a_test.status}<br/>
+                <td>{a_test.is_release ? 'Release' : 'Dev'}</td>
+                <td>{features}</td>
+                <td><NavLink to={"/test/" + a_test.test_id}>{a_test.name}</NavLink></td>
+                <td className={statusCls}>{a_test.status}<br/>
                 {common.renderHistory(a_test)}
                 </td>
                 <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>

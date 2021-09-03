@@ -79,8 +79,7 @@ function AllRuns () {
           {a_run.builds.map(build =>
             <div key={build.build_id}>
               <NavLink to={"/build/" + build.build_id}
-                       className="build_status"
-                       style={{background: common.buildStatusColour(build.status)}}>
+                       className={'status ' + common.statusClassName('build_status', build.status)}>
                 {buildName(build)} {build.status}
               </NavLink>
               <div>

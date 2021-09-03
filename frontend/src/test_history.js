@@ -43,7 +43,7 @@ function TestHistory (props) {
           <tr key={a_test.test_id}>
             <td>{common.commitLink(a_test)}</td>
             <td><NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
-            <td style={{color: common.testStatusColour(a_test.status)}}>{a_test.status}</td>
+            <td className={common.statusClassName('text', a_test.status)}>{a_test.status}</td>
             <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
             <td>{timeStats.delta}</td>
             <td>{timeStats.started}</td>
