@@ -25,7 +25,8 @@ class Failure(Exception):
         return {'code': 1, 'response': self.args[0]}
 
 
-def _run(*cmd: str, cwd: typing.Optional[pathlib.Path] = None) -> bytes:
+def _run(*cmd: typing.Union[str, pathlib.Path],
+         cwd: typing.Optional[pathlib.Path] = None) -> bytes:
     """Executes a command; returns its output as "bytes"; raises on failure.
 
     Args:
@@ -41,7 +42,7 @@ def _run(*cmd: str, cwd: typing.Optional[pathlib.Path] = None) -> bytes:
     try:
         return subprocess.check_output(cmd, cwd=cwd, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as ex:
-        command = ' '.join(shlex.quote(arg) for arg in cmd)
+        command = ' '.join(shlex.quote(str(arg)) for arg in cmd)
         stderr = ex.stderr.decode('utf-8', 'replace')
         raise Failure('Command <{}> terminated with exit code {}:\n{}'.format(
             command, ex.returncode, stderr)) from ex
@@ -63,22 +64,37 @@ def _update_repo() -> pathlib.Path:
     Raises:
         Failure: if cloning of the remote repository fails.
     """
-    home_dir = pathlib.Path.home()
-    repo_dir = home_dir / 'nearcore.git'
+    repo_dir = pathlib.Path.home() / 'nearcore.git'
 
     if repo_dir.is_dir():
         try:
-            _run('git', 'remote', 'update', '--prune', cwd=repo_dir)
+            _run('git', 'remote', 'update', cwd=repo_dir)
             return repo_dir
         except Failure as ex:
             print(ex.args[0])
+
+    if repo_dir.exists():
         shutil.rmtree(repo_dir)
 
-    _run('git',
-         'clone',
-         '--mirror',
-         'https://github.com/near/nearcore',
-         cwd=home_dir)
+    # Don’t use `clone --mirror` mostly to avoid making `refs/remotes/origin/*`
+    # references which (I think) come from GitHub’s internal remotes.  Cloning
+    # them gets confusing with `origin/master` not being the expected head of
+    # the master branch.
+    #
+    # There are also `refs/pull/*` references which we’re also skipping.  We
+    # probably could include them and offer possibility to run tests on a commit
+    # from a pull request. For now, I’m leaving the configuration without that.
+    _run('git', 'init', '--bare', repo_dir)
+    with open(repo_dir / 'config', 'a') as wr:
+        wr.write('''[remote "origin"]
+	url = https://github.com/near/nearcore
+	fetch = +refs/heads/*:refs/heads/*
+	fetch = +refs/notes/*:refs/notes/*
+	fetch = +refs/tags/*:refs/tags/*
+	tagOpt = --no-tags
+	prune = true
+''')
+    _run('git', 'remote', 'update', cwd=repo_dir)
     return repo_dir
 
 
@@ -398,9 +414,9 @@ def _schedule_nightly_impl(server: ui_db.UIDB) -> datetime.timedelta:
             return datetime.timedelta(hours=24) - delta
 
         repo_dir = _update_repo()
-        commit = CommitInfo.for_commit(repo_dir, 'origin/master')
+        commit = CommitInfo.for_commit(repo_dir, 'master')
         need_new_run = last.sha != commit.sha
-        print('origin/master sha={}{}'.format(
+        print('master sha={}{}'.format(
             commit.sha, '' if need_new_run else '; no need for a new run'))
         if not need_new_run:
             return datetime.timedelta(hours=24)
