@@ -21,18 +21,14 @@ export default function Home() {
       type: "LOGOUT"
     });
   }
-  return (
-      <div className="container">
-        <button className="logout" onClick={()=> handleLogout()}>Logout</button>
-      <HashRouter>
-        <div className="content">
-            <Route exact path="/" component={AllRuns}/>
-            <Route path="/run/:run_id" component={ARun}/>
-            <Route path="/test/:test_id" component={ATest}/>
-            <Route path="/test_history/:test_id" component={TestHistory}/>
-            <Route path="/build/:build_id" component={Build}/>
-        </div>
-      </HashRouter>
-  </div>
-  );
+  return <>
+    <button className="logout" onClick={handleLogout}>Logout</button>
+    <HashRouter>
+      <Route exact path="/" component={AllRuns}/>
+      <Route path="/run/:run_id" component={ARun}/>
+      <Route path="/test/:test_id" component={ATest}/>
+      <Route path="/test_history/:test_id" component={TestHistory}/>
+      <Route path="/build/:build_id" component={Build}/>
+    </HashRouter>
+  </>;
 };

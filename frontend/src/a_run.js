@@ -76,7 +76,7 @@ function ARun (props) {
           <tr><td><NavLink to="/">« Back to all runs</NavLink></td></tr>
         </tbody></table>
 
-        <table className="big"><thead>
+        <table className="big list"><thead>
           <tr>
             <th>Build
             <select onChange={filterByAll} id="build_fltr">

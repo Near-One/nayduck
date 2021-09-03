@@ -23,6 +23,9 @@ a:hover {
   overflow-wrap: break-word;
   width: 100%;
 }
+.list {
+  text-align: center;
+}
 td, th {
   padding: 0.5em;
 }

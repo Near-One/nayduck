@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { NavLink, HashRouter } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import * as common from "./common";
 
@@ -70,50 +70,43 @@ function AllRuns () {
             : null;
     };
 
-    const formatRow = a_run =>
-      <tr key={a_run.id}>
-        <td>{common.commitLink(a_run)}</td>
-        <td><NavLink to={"/run/" + a_run.id} name="title">{a_run.title}</NavLink></td>
-        <td>{a_run.requester}</td>
-        <td>
-          {a_run.builds.map(build =>
-            <div key={build.build_id}>
-              <NavLink to={"/build/" + build.build_id}
-                       className={'status ' + common.statusClassName('build_status', build.status)}>
-                {buildName(build)} {build.status}
-              </NavLink>
-              <div>
-                { testCounter(build, 'passed') }
-                { testCounter(build, 'failed') }
-                { testCounter(build, 'timeout') }
-                { testCounter(build, 'build_failed', 'build failed') }
-                { testCounter(build, 'canceled', 'cancelled') }
-                { testCounter(build, 'ignored') }
-                { testCounter(build, 'pending') }
-                { testCounter(build, 'running') }
-              </div>
-            </div>
-          )}
-        </td>
-        <td><button onClick={cancelRun(a_run.id)}>×</button></td>
-      </tr>;
+    const formatRow = a_run => <tr key={a_run.id}>
+      <td>{common.commitLink(a_run)}</td>
+      <td><NavLink to={'/run/' + a_run.id}>{a_run.title}</NavLink></td>
+      <td>{a_run.requester}</td>
+      <td>{
+        a_run.builds.map(build => <div key={build.build_id}>
+          <NavLink to={"/build/" + build.build_id}
+                   className={'status ' + common.statusClassName('build_status', build.status)}>
+            {buildName(build)} {build.status}
+          </NavLink>
+          <div>
+            { testCounter(build, 'passed') }
+            { testCounter(build, 'failed') }
+            { testCounter(build, 'timeout') }
+            { testCounter(build, 'build_failed', 'build failed') }
+            { testCounter(build, 'canceled', 'cancelled') }
+            { testCounter(build, 'ignored') }
+            { testCounter(build, 'pending') }
+            { testCounter(build, 'running') }
+          </div>
+        </div>)
+      }</td>
+      <td><button onClick={cancelRun(a_run.id)}>×</button></td>
+    </tr>;
 
-    return (
-      <HashRouter>
-        <table className="big App">
-          <thead>
-            <tr>
-              <th>Branch <input id="branch" onChange={filterHandler}/></th>
-              <th>Title <input id="title" onChange={filterHandler}/></th>
-              <th>User <input id="requester" onChange={filterHandler}/></th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>{filteredRuns.map(formatRow)}</tbody>
-        </table>
-      </HashRouter>
-    );
+    return <table className="big list">
+      <thead>
+        <tr>
+          <th>Branch <input id="branch" onChange={filterHandler}/></th>
+          <th>Title <input id="title" onChange={filterHandler}/></th>
+          <th>User <input id="requester" onChange={filterHandler}/></th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>{filteredRuns.map(formatRow)}</tbody>
+    </table>;
 }
 
 export default AllRuns;

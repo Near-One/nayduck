@@ -5,8 +5,6 @@ import Login from "./Login";
 import Home from "./Home";
 import * as reducer from "./reducer";
 
-import './App.css';
-
 
 export const AuthContext = createContext();
 

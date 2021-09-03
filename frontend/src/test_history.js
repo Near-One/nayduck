@@ -39,41 +39,37 @@ function TestHistory (props) {
 
     const formatRow = a_test => {
         const timeStats = common.formatTimeStats(a_test);
-        return (
-          <tr key={a_test.test_id}>
-            <td>{common.commitLink(a_test)}</td>
-            <td><NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
-            <td className={common.statusClassName('text', a_test.status)}>{a_test.status}</td>
-            <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
-            <td>{timeStats.delta}</td>
-            <td>{timeStats.started}</td>
-            <td>{timeStats.finished}</td>
-          </tr>
-        );
+        return <tr key={a_test.test_id}>
+          <td>{common.commitLink(a_test)}</td>
+          <td><NavLink to={"/test/" + a_test.test_id} >{a_test.title}</NavLink></td>
+          <td className={common.statusClassName('text', a_test.status)}>{a_test.status}</td>
+          <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
+          <td>{timeStats.delta}</td>
+          <td>{timeStats.started}</td>
+          <td>{timeStats.finished}</td>
+        </tr>;
     }
 
-    return history ? (
-      <>
-        <table className="nav"><tbody><tr>
-          <td><NavLink to={"/test/" + (0 | props.match.params.test_id)}>« Back to the test</NavLink></td>
-          {common.renderHistoryCell(currentBranchHistory, currentBranch)}
-          {common.renderHistoryCell(baseBranchHistory, baseBranch)}
-        </tr></tbody></table>
-        <table className="big"><thead>
-          <tr>
-            <th>Commit</th>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Logs</th>
-            <th>Run Time</th>
-            <th>Started</th>
-            <th>Finished</th>
-          </tr>
-        </thead><tbody>
-         {history.map(formatRow)}
-        </tbody></table>
-      </>
-    ) : null;
+    return history ? <>
+      <table className="nav"><tbody><tr>
+        <td><NavLink to={"/test/" + (0 | props.match.params.test_id)}>« Back to the test</NavLink></td>
+        {common.renderHistoryCell(currentBranchHistory, currentBranch)}
+        {common.renderHistoryCell(baseBranchHistory, baseBranch)}
+      </tr></tbody></table>
+      <table className="big list"><thead>
+        <tr>
+          <th>Commit</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Logs</th>
+          <th>Run Time</th>
+          <th>Started</th>
+          <th>Finished</th>
+        </tr>
+      </thead><tbody>
+       {history.map(formatRow)}
+      </tbody></table>
+    </> : null;
 }
 
 export default TestHistory;
