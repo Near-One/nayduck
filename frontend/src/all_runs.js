@@ -8,16 +8,27 @@ function AllRuns () {
     const [allRuns, setAllRuns] = useState([]);
     const [filteredRuns, setFilteredRuns] = useState([])
 
-    useEffect(() => {
+    const loadAllRuns = () => {
         common.fetchAPI('/runs').then(data => {
             setAllRuns(data);
             setFilteredRuns(data)
         });
-    }, []);
+    };
 
-    var filterHandler = event => {
-      var fltr = document.getElementById('branch').value.toLowerCase();
-      var filtered = (
+    const cancelRun = id => event => {
+        common.fetchAPI('/run/' + (0 | id) + '/cancel', true).then(data => {
+            console.log(data)
+            if (data) {
+                loadAllRuns();
+            }
+        });
+    };
+
+    useEffect(loadAllRuns, []);
+
+    const filterHandler = event => {
+      let fltr = document.getElementById('branch').value.toLowerCase();
+      let filtered = (
         allRuns.filter(
           item =>
             (item['branch'].toLowerCase().includes(fltr) || item['sha'].toLowerCase().includes(fltr))
@@ -39,11 +50,6 @@ function AllRuns () {
       );
 
       setFilteredRuns(filtered);
-    };
-
-    var cancelRun = id => event => {
-        common.fetchAPI('/run/' + (0 | id) + '/cancel', true)
-            .then(data => console.log(data));
     };
 
     const buildName = build => {

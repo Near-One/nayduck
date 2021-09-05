@@ -25,11 +25,12 @@ def _update_true(dictionary: _Dict, **kw: typing.Any) -> None:
 
 class UIDB(common_db.DB):
 
-    def cancel_the_run(self, run_id: int, status: str = 'CANCELED') -> None:
+    def cancel_the_run(self, run_id: int, status: str = 'CANCELED') -> int:
         sql = '''UPDATE tests
                     SET finished = NOW(), status = :status
                   WHERE status = 'PENDING' AND run_id = :id'''
-        self._exec(sql, status=status, id=run_id)
+        rowcount = self._exec(sql, status=status, id=run_id).rowcount
+        return typing.cast(int, rowcount or 0)
 
     _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
                           'build_failed', 'canceled', 'timeout')

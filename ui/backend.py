@@ -104,8 +104,8 @@ def branch_history(test_id: int, branch: str) -> flask.Response:
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
 def cancel_the_run(run_id: int) -> flask.Response:
     with ui_db.UIDB() as server:
-        server.cancel_the_run(run_id)
-    return jsonify({})
+        count = server.cancel_the_run(run_id)
+    return jsonify(count)
 
 
 @app.route('/api/run/new', methods=['POST'])
