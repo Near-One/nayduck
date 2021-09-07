@@ -365,11 +365,11 @@ def get_code(state: typing.Optional[str],
 
 def add_cookie(response: werkzeug.wrappers.Response, code: str) -> None:
     """Adds a nay-code cookie to the response."""
-    response.set_cookie(CODE_KEY,
-                        code,
-                        max_age=90 * 7 * 24 * 3600,
-                        httponly=True,
-                        samesite='Lax')
+    max_age = 90 * 7 * 24 * 3600
+    response.set_cookie(CODE_KEY, code, max_age=max_age, samesite='Lax')
+    # Make sure proxies don’t cache this response so that random user’s don’t
+    # get the cookie.
+    response.headers['cache-control'] = 'private, max-age=0'
 
 
 def authenticated(

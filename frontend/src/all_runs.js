@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { NavLink } from "react-router-dom";
 
+import * as App from "./App";
 import * as common from "./common";
 
 
 function AllRuns () {
     const [allRuns, setAllRuns] = useState([]);
     const [filteredRuns, setFilteredRuns] = useState([])
+    const {isAuthorised} = useContext(App.AuthContext)[0];
 
     const loadAllRuns = () => {
         common.fetchAPI('/runs').then(data => {
@@ -100,7 +102,8 @@ function AllRuns () {
           </div>
         </div>)
       }</td>
-      <td><button onClick={cancelRun(a_run.id)}>×</button></td>
+      {isAuthorised ? <td><button onClick={cancelRun(a_run.id)}>×</button></td>
+                    : null}
     </tr>;
 
     return <table className="big list">
@@ -110,7 +113,7 @@ function AllRuns () {
           <th>Title <input id="title" onChange={filterHandler}/></th>
           <th>User <input id="requester" onChange={filterHandler}/></th>
           <th>Status</th>
-          <th></th>
+          {isAuthorised ? <th></th> : null }
         </tr>
       </thead>
       <tbody>{filteredRuns.map(formatRow)}</tbody>

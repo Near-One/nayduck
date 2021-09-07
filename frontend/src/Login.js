@@ -1,61 +1,55 @@
-import React, { useState, useEffect, useContext } from "react";
-import { Redirect } from "react-router-dom";
+import React, { useContext } from 'react';
+import Cookies from 'universal-cookie';
 
-import * as App from "./App";
-import * as common from "./common";
+import * as App from './App';
+import * as common from './common';
 
 
-export default function Login() {
-  const { state, dispatch } = useContext(App.AuthContext);
-  const [data, setData] = useState({ errorMessage: "", isLoading: false });
+const cookies = new Cookies();
+const COOKIE_NAME = 'nay-code';
 
-  const { client_id, redirect_uri } = state;
 
-  useEffect(() => {
-    // After requesting Github access, Github redirects back to your app with a code parameter
-    const url = window.location.href;
-    const hasCode = url.includes("?code=");
-
-    // If Github API returns the code parameter
-    if (hasCode) {
-      const newUrl = url.split("?code=");
-      window.history.pushState({}, null, newUrl[0]);
-      setData({ ...data, isLoading: true });
-
-      const requestData = {
-        client_id: state.client_id,
-        redirect_uri: state.redirect_uri,
-        client_secret: state.client_secret,
-        code: newUrl[1]
-      };
-
-      const proxy_url = state.proxy_url;
-
-      // Use code parameter and other parameters to make POST request to proxy_server
-      fetch(proxy_url, {
-        method: "POST",
-        body: JSON.stringify(requestData)
-      })
-        .then(response => response.json())
-        .then(data => {
-         console.log(data);
-          dispatch({
-            type: "LOGIN",
-            payload: { user: data, isLoggedIn: true }
-          });
-        })
-        .catch(error => {
-          setData({
-            isLoading: false,
-            errorMessage: "Sorry! Login failed"
-          });
-        });
+export function getLoginState() {
+    const code = cookies.get(COOKIE_NAME, {doNotParse: true});
+    if (code) {
+        const match = code.match(/^(_?)([a-zA-Z0-9]+):[-_a-zA-Z0-9=]+$/);
+        if (match) {
+            return {
+                username: match[2],
+                isAuthorised: !match[1],
+            };
+        }
+        console.log('Invalid code: ' + code);
     }
-  }, [state, dispatch, data]);
+    return {};
+}
 
-  if (state.isLoggedIn) {
-    return <Redirect to="/" />;
-  }
 
-  return common.LoginPage(client_id, redirect_uri, data, setData)
+export function LoginBar(props) {
+    const [authState, setAuthState] = useContext(App.AuthContext);
+
+    const logout = () => {
+        cookies.remove(COOKIE_NAME);
+        setAuthState({});
+        return false;
+    };
+
+    const userInfo = () => {
+        if (!authState.username) {
+            return <a href={common.apiBaseHref() + '/login/web'}>Log In</a>;
+        }
+        const avatarLink =
+              `https://github.com/${authState.username}.png?size=64`;
+        const nearIcon = authState.isAuthorised
+              ? <svg viewBox="70 70 148 148"><use href="#near-icon"/></svg>
+              : null;
+        return <>
+          <img src={avatarLink} width="16" height="16" alt="" />
+          {nearIcon}
+          <span>{authState.username}</span>
+          <button onClick={logout}>Log Out</button>
+        </>;
+    }
+
+    return <nav id="userinfo"><h1><svg viewBox="0 0 96 96"><use href="#duck"/></svg>NayDuck</h1><div>{userInfo()}</div></nav>;
 }

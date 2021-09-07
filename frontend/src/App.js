@@ -1,32 +1,30 @@
-import React, { createContext, useReducer }  from 'react';
-import { Route, BrowserRouter as Router, Switch } from "react-router-dom";
+import React, { createContext, useState } from 'react';
+import { HashRouter, Route } from "react-router-dom";
 
-import Login from "./Login";
-import Home from "./Home";
-import * as reducer from "./reducer";
+import ARun from "./a_run";
+import ATest from "./a_test";
+import AllRuns from "./all_runs";
+import Build from "./Build";
+import * as Login from "./Login";
+import TestHistory from "./test_history";
 
 
 export const AuthContext = createContext();
 
 
 function App() {
-  const [state, dispatch] = useReducer(reducer.reducer, reducer.initialState);
-
-  return (
-<AuthContext.Provider
-      value={{
-        state,
-        dispatch
-      }}
-    >
-    <Router>
-      <Switch>
-        <Route path="/login" component={Login}/>
-        <Route path="/" component={Home}/>
-      </Switch>
-    </Router>
-    </AuthContext.Provider>
-  );
+    const [authState, setAuthState] = useState(Login.getLoginState());
+    return <AuthContext.Provider value={[authState, setAuthState]}>
+        <Login.LoginBar/>
+        <HashRouter>
+            <Route path="/" exact component={AllRuns}/>
+            <Route path="/run/:run_id" component={ARun}/>
+            <Route path="/test/:test_id" component={ATest}/>
+            <Route path="/test_history/:test_id" component={TestHistory}/>
+            <Route path="/build/:build_id" component={Build}/>
+        </HashRouter>
+    </AuthContext.Provider>;
 }
+
 
 export default App;

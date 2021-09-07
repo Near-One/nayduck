@@ -208,7 +208,7 @@ def login_code() -> werkzeug.wrappers.Response:
 
 def _login_response(code: str, is_web: bool) -> werkzeug.wrappers.Response:
     if is_web:
-        response = flask.redirect(f'{NAYDUCK_UI}/#{auth.CODE_KEY}={code}')
+        response = flask.redirect(NAYDUCK_UI)
     else:
         text = f'''<!DOCTYPE html><html lang=en>
 <title>NayDuck Authorisation Code</title>
@@ -231,14 +231,6 @@ span {{ display: block; margin: 1em 0; font-size: 0.8em;\
                                   mimetype='text/html',
                                   headers=(('Content-Language', 'en'),))
     auth.add_cookie(response, code)
-    return response
-
-
-@app.route('/logout', methods=['GET'])
-def logout() -> werkzeug.wrappers.Response:
-    response = flask.redirect(flask.request.referrer or NAYDUCK_UI)
-    response.headers['clear-site-data'] = '*'
-    response.delete_cookie(auth.CODE_KEY)
     return response
 
 
