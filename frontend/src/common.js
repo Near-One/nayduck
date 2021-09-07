@@ -113,10 +113,7 @@ function formatSize(size) {
 
 
 export function logLink(log, test_id=null) {
-    const className = !log.stack_trace
-          ? String(log.patterns).includes("LONG DELAY") ? 'log-delayed'
-                                                        : 'log-normal'
-          : 'log-failed';
+    const className = log.stack_trace ? 'log-failed' : 'log-normal';
     const size = <small>({formatSize(log.size)})</small>;
     let href = log.storage;
     if (href.startsWith('/')) {

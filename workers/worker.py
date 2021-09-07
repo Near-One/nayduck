@@ -17,9 +17,6 @@ from . import worker_db
 from . import utils
 
 DEFAULT_TIMEOUT = 180
-BACKTRACE_PATTERN = 'stack backtrace:'
-FAIL_PATTERNS = [BACKTRACE_PATTERN]
-INTERESTING_PATTERNS = [BACKTRACE_PATTERN, 'LONG DELAY']
 
 _Test = typing.List[str]
 _Cmd = typing.Sequence[typing.Union[str, Path]]
@@ -73,6 +70,12 @@ def install_new_packages(runner: utils.Runner) -> None:
         _LAST_PIP_REQUIREMENTS = data
 
 
+def find_backtrace_line(rd: typing.BinaryIO) -> bool:
+    """Returns whether the stream contains a `stack backtrace:` pattern."""
+    return any('stack backtrace:' in line.decode('utf-8', 'replace').lower()
+               for line in rd)
+
+
 def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
                          stderr: typing.BinaryIO) -> str:
     """Returns test's outcome based on exit code and test's output.
@@ -107,9 +110,8 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
                 # Report that as a failure rather than ignored test.
                 return 'FAILED'
             break
-        for line in stderr:
-            if line.strip().decode('utf-8', 'replace') in FAIL_PATTERNS:
-                return 'FAILED'
+        if find_backtrace_line(stderr):
+            return 'FAILED'
         if b'0 passed' in get_last_line(stdout):
             return 'IGNORED'
         return 'PASSED'
@@ -189,38 +191,11 @@ def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
     return outcome
 
 
-def find_patterns(rd: typing.BinaryIO,
-                  patterns: typing.Collection[str]) -> typing.List[str]:
-    """Searches for patterns in given file; returns list of found patterns.
-
-    Args:
-        rd: The file opened for reading.
-        patterns: List of patterns to look for.  Patterns are matched as fixed
-            strings (no regex or globing) and must not span multiple lines since
-            search is done line-by-line.
-
-    Returns:
-        A list of patterns which were found in the file.
-    """
-    found = [False] * len(patterns)
-    count = len(found)
-    for raw_line in rd:
-        line = raw_line.decode('utf-8', 'replace')
-        for idx, pattern in enumerate(patterns):
-            if not found[idx] and pattern in line:
-                found[idx] = True
-                count -= 1
-                if not count:
-                    break
-    return [pattern for ok, pattern in zip(found, patterns) if ok]
-
-
-class LogFile:  # pylint: disable=too-many-instance-attributes
+class LogFile:
 
     def __init__(self, name: str, path: Path, binary: bool = False) -> None:
         self.name = name
         self.path = path
-        self.patterns = ''
         self.stack_trace = False
         self.size = path.stat().st_size
         self.data: typing.Optional[bytes] = None
@@ -379,13 +354,7 @@ def save_logs(server: worker_db.WorkerDB, test_id: int,
     def process_log(log: LogFile) -> LogFile:
         with open(log.path, 'rb') as rd:
             if not log.binary:
-                patterns = find_patterns(rd, INTERESTING_PATTERNS)
-                try:
-                    patterns.remove(BACKTRACE_PATTERN)
-                    log.stack_trace = True
-                except ValueError:
-                    pass
-                log.patterns = ','.join(sorted(patterns))
+                log.stack_trace = find_backtrace_line(rd)
                 rd.seek(0)
             log.data, is_full = read_short_log(log.size, rd, log.binary)
             if not is_full:

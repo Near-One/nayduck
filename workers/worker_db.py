@@ -80,13 +80,12 @@ class WorkerDB(common_db.DB):
 
     def save_short_logs(self, test_id: int,
                         logs: typing.Collection[typing.Any]) -> None:
-        columns = ('test_id', 'type', 'size', 'log', 'storage', 'stack_trace',
-                   'patterns')
+        columns = ('test_id', 'type', 'size', 'log', 'storage', 'stack_trace')
         self._multi_insert(
             'logs',
             columns,
             [(test_id, log.name, log.size, self._blob_from_data(
-                log.data or b''), log.url or '', log.stack_trace, log.patterns)
+                log.data or b''), log.url or '', log.stack_trace)
              for log in logs],
             replace=True)
 

@@ -6,7 +6,6 @@ CREATE TABLE `logs` (
   `size` bigint(20) unsigned NOT NULL,
   `storage` varchar(200) NOT NULL DEFAULT '',
   `stack_trace` tinyint(1) NOT NULL DEFAULT '0',
-  `patterns` varchar(200) NOT NULL DEFAULT '',
   PRIMARY KEY (`test_id`,`type`),
   CONSTRAINT `logs_ibfk_1` FOREIGN KEY (`test_id`) REFERENCES `tests` (`test_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

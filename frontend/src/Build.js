@@ -22,7 +22,6 @@ function Build (props) {
         const blob = BuildInfo[name] || '';
         const log = {
             storage: '/logs/build/' + id + '/' + name,
-            patterns: '',
             log: blob,
             size: blob.length,
             type: name

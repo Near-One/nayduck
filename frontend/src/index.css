@@ -327,7 +327,6 @@ small.blob {
 .text-pending      { color: #ED8CFC }
 
 .log-failed  { color: #ff0000 }
-.log-delayed { color: #ffa500 }
 .log-normal  { color: #0000ff }
 
 .logout{

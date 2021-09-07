@@ -172,8 +172,7 @@ class UIDB(common_db.DB):
             return ret
 
         tests_by_id = {int(test['test_id']): test for test in tests}
-        sql = '''SELECT test_id, type, size, storage, stack_trace, patterns
-                        {log_column}
+        sql = '''SELECT test_id, type, size, storage, stack_trace {log_column}
                    FROM logs
                   WHERE test_id IN ({ids})
                   ORDER BY test_id, type'''.format(
