@@ -133,22 +133,41 @@ export function allLogLinks(logs, test_id) {
 }
 
 
-function makeSpan(span, idx) {
-    const style = {};
-    for (const prop of span.css.split(';').filter(prop => prop)) {
-        const [name, val] = prop.split(':', 2);
-        style[name.replace(/-([a-z])/g, String.prototype.toUpperCase())] = val;
-    }
-    return <span style={style} key={idx}>{span.text}</span>;
-}
-
-
 export function logBlob(log) {
-    return log.log ? <div className="blob">{
-        ansicolor.parse(log.log).spans.filter(span => span.text).map(makeSpan)
-    }</div> : <small className="blob">{
-        log.size ? '(binary file)' : '(empty)'
-    }</small>;
+    if (!log.log) {
+        return <small className="blob">{
+            log.size ? '(binary file)' : '(empty)'
+        }</small>;
+    }
+
+    const makeSpan = (span, idx) => {
+        if (!span.css) {
+            return span.text;
+        }
+        const style = {};
+        for (const prop of span.css.replace(/;$/, '').split(';')) {
+            const [key, value] = prop.split(':', 2);
+            style[key.replace(/-([a-z])/g, (_, m) => m.toUpperCase())] = value;
+        }
+        return <span style={style} key={idx}>{span.text}</span>;
+    };
+
+    const formatBlob = blob => {
+        blob = blob
+            .replace(/^(?:\s*\n)+/, '')
+            .replace(/(?:\n\s*)+$/, '\n');
+        const spans = ansicolor.parse(blob).spans.filter(span => span.text);
+        return <>{spans.map(makeSpan)}</>;
+    };
+
+    const parts = log.log.split('\n...\n');
+    return parts.length === 2 ? <div className="blob">{
+        formatBlob(parts[0])
+    }<div className="ellipsis">⋮</div>{
+        formatBlob(parts[1])
+    }</div> : <div className="blob">{
+        formatBlob(log.log)
+    }</div>;
 }
 
 

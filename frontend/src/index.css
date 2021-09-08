@@ -237,10 +237,10 @@
 
 body {
   margin: 0;
-  font-family: Inter, Roboto, Fira Sans, Helvetica Neue, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+body, .ellipsis {
+  font-family: Inter, Roboto, Fira Sans, Helvetica Neue, Helvetica, sans-serif;
 }
 
 b { font-weight: 600 }
@@ -288,6 +288,11 @@ div.blob {
   font-variant: lining-nums slashed-zero;
   font-family: Source Code Pro, DejaVu Sans Mono, Courier New, monospace;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ellipsis {
+  color: #333;
+  margin: 0.5em;
 }
 small.blob {
   font-style: italic
