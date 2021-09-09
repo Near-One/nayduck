@@ -1,4 +1,5 @@
 import datetime
+import gzip
 import json
 import os
 import traceback
@@ -24,6 +25,11 @@ flask_cors.CORS(app, resources={'/api/.*': {'origins': [NAYDUCK_UI]}})
 sched = flask_apscheduler.APScheduler()
 sched.init_app(app)
 sched.start()
+
+
+def can_gzip(request: flask.Request) -> bool:
+    """Returns whether user agent accepts gzip content encoding."""
+    return 'gzip' in request.headers.get('accept-encoding', '')
 
 
 def jsonify(data: typing.Any) -> flask.Response:
@@ -53,10 +59,16 @@ def jsonify(data: typing.Any) -> flask.Response:
                           ensure_ascii=False,
                           check_circular=False,
                           separators=(',', ':'),
-                          default=default)
+                          default=default).encode('utf-8')
+    status = 404 if data is None else 200
+    headers = {}
+    if len(response) > 100 and can_gzip(flask.request):
+        response = gzip.compress(response, 6)
+        headers['Content-Encoding'] = 'gzip'
     return flask.Response(response=response,
-                          status=404 if data is None else 200,
-                          mimetype='application/json')
+                          status=status,
+                          mimetype='application/json',
+                          headers=headers)
 
 
 @app.route('/api/runs', methods=['GET'])
@@ -147,7 +159,7 @@ def schedule_nightly_run_check(delta: datetime.timedelta) -> None:
 
 @app.route('/logs/<any("test","build"):kind>/<int:obj_id>/<log_type>')
 def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
-    gzip_ok = 'gzip' in flask.request.headers.get('accept-encoding', '')
+    gzip_ok = can_gzip(flask.request)
     if kind == 'test':
         getter = lambda db, gzip_ok: db.get_test_log(obj_id, log_type, gzip_ok)
     elif log_type in ('stderr', 'stdout'):
