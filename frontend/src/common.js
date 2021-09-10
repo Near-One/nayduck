@@ -36,7 +36,7 @@ export function renderHistoryCell(history, branch) {
 
 
 export function apiBaseHref() {
-    return process.env.REACT_APP_SERVER_IP;
+    return process.env.REACT_APP_BACKEND_HREF;
 }
 
 
@@ -58,8 +58,8 @@ export function commitLink(object) {
     }
     const branch = object.branch;
     const sha = object.sha.substr(0, 7);
-    const url = process.env.REACT_APP_GIT_REPO + '/commit/' + sha;
-    return (<>{branch} <small>(<a href={url}>{sha}</a>)</small></>);
+    const href = 'https://github.com/near/nearcore/commit/' + sha;
+    return <>{branch} <small>(<a href={href}>{sha}</a>)</small></>;
 }
 
 

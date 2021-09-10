@@ -259,11 +259,8 @@ def setup_environ() -> None:
     home = pathlib.Path.home()
 
     # Clean up various NayDuck configuration variables and other junk
-    for var in list(os.environb):
-        if (var.startswith(b'REACT_') or var.startswith(b'SSH_') or
-                var.startswith(b'SERVER_') or
-                var in (b'GIT_REPO', b'NAYDUCK_UI', b'OLDPWD', b'MAIL')):
-            os.environb.pop(var)
+    for var in (b'BACKEND_HREF', b'NAYDUCK_UI', b'OLDPWD'):
+        os.environb.pop(var, None)
 
     # Set up Go and NVM variables
     script = '''

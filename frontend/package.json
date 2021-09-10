@@ -19,8 +19,8 @@
     "url-search-params-polyfill": "^8.1.0"
   },
   "scripts": {
-    "start": "REACT_APP_GIT_REPO=$GIT_REPO REACT_APP_SERVER_IP=$SERVER_IP react-scripts start",
-    "build": "react-scripts build",
+    "start": "REACT_APP_BACKEND_HREF=${BACKEND_HREF?} react-scripts start",
+    "build": "REACT_APP_BACKEND_HREF=${BACKEND_HREF?} react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
