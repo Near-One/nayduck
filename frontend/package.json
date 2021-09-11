@@ -8,7 +8,7 @@
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
     "ansicolor": "^1.1.95",
-    "cors": "^2.8.5",
+    "inline-source-cli": "^2.0.0",
     "node-fetch": "^2.6.0",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
@@ -19,8 +19,9 @@
     "url-search-params-polyfill": "^8.1.0"
   },
   "scripts": {
-    "start": "REACT_APP_BACKEND_HREF=${BACKEND_HREF?} react-scripts start",
-    "build": "REACT_APP_BACKEND_HREF=${BACKEND_HREF?} react-scripts build",
+    "build": "npm run build:build && npm run build:bundle",
+    "build:build": "react-scripts build",
+    "build:bundle": "sed -e 's#.js\"></script>#.js\" inline></script>#g' -e 's#rel=\"stylesheet\">#rel=\"stylesheet\" inline>#g' build/index.html | inline-source --root build >index.html && mv index.html build/index.html",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

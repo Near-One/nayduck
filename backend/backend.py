@@ -2,13 +2,14 @@ import datetime
 import gzip
 import json
 import os
+import pathlib
+import time
 import traceback
 import typing
 
 import flask
 import flask.json
 import flask_apscheduler
-import flask_cors
 import werkzeug.exceptions
 import werkzeug.wrappers
 
@@ -19,12 +20,13 @@ from . import backend_db
 NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
 
-app = flask.Flask(__name__)
-flask_cors.CORS(app, resources={'/api/.*': {'origins': [NAYDUCK_UI]}})
+app = flask.Flask(__name__, static_folder=None)
 
 sched = flask_apscheduler.APScheduler()
 sched.init_app(app)
 sched.start()
+
+STATIC_FILES = pathlib.Path(app.root_path).parent / 'frontend' / 'build'
 
 
 def can_gzip(request: flask.Request) -> bool:
@@ -121,7 +123,6 @@ def cancel_the_run(run_id: int) -> flask.Response:
 
 
 @app.route('/api/run/new', methods=['POST'])
-@flask_cors.cross_origin(origins=[])
 @auth.authenticated
 def new_run(login: str) -> flask.Response:
     with backend_db.BackendDB() as server:
@@ -185,6 +186,7 @@ def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
     return response
 
 
+@app.route('/login', defaults={'mode': 'web'}, methods=['GET'])
 @app.route('/login/<any("cli","web"):mode>', methods=['GET'])
 def login_redirect(mode: str) -> werkzeug.wrappers.Response:
     try:
@@ -230,6 +232,58 @@ pre {{ display: block; margin: 1em 0; font-size: 0.8em;\
         response.content_type = 'text/html; charset=utf-8'
     auth.add_cookie(response, code)
     return response
+
+
+class StaticFile:
+
+    def __init__(self, filename: str) -> None:
+        self._path = STATIC_FILES / filename
+        self._mtime = self._path.stat().st_mtime
+        self._data = self._load(self._path)
+
+    @classmethod
+    def _load(cls, path: pathlib.Path) -> typing.Tuple[bytes, bytes]:
+        contents = path.read_bytes()
+        compressed = gzip.compress(contents, 9)
+        return contents, compressed
+
+    def get(self, compressed: bool) -> typing.Tuple[bytes, int, str]:
+        mtime = self._path.stat().st_mtime
+        if mtime != self._mtime:
+            self._data = self._load(self._path)
+        etag = (int(self._mtime).to_bytes(4, 'little') +
+                len(self._data[0]).to_bytes(4, 'little')).hex()
+        return self._data[int(compressed)], int(self._mtime), etag
+
+
+INDEX_HTML = StaticFile('index.html')
+
+
+@app.route('/', defaults={'path': 'index.html'}, methods=['GET'])
+@app.route('/<path:path>', methods=['GET'])
+def serve_static(path: str) -> werkzeug.wrappers.Response:
+    if path != 'index.html':
+        return flask.send_from_directory(str(STATIC_FILES),
+                                         path,
+                                         max_age=24 * 3600)
+
+    # Handle index.html individually to support gzip compression.  Since we’re
+    # bundling everything in the index.html file it’s by far the largest so the
+    # compression does matter.
+    compressed = can_gzip(flask.request)
+    body, mtime, etag = INDEX_HTML.get(compressed)
+    res = flask.Response(body, 200)
+    res.set_etag(etag)
+    res.cache_control.max_age = 3600
+    res.content_length = len(body)
+    res.content_type = 'text/html; charset=utf-8'
+    res.expires = int(time.time() + 3600)
+    res.last_modified = mtime
+    res.vary = 'accept-encoding'
+    if compressed:
+        res.content_encoding = 'gzip'
+    return typing.cast(werkzeug.wrappers.Response,
+                       res.make_conditional(flask.request))
 
 
 if __name__ == '__main__':

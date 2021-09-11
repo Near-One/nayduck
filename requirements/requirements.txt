@@ -1,7 +1,6 @@
 Flask-APScheduler
 azure-storage-blob
 flask
-flask_cors
 google-cloud-storage
 mysql-connector-python
 psutil

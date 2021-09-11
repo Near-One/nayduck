@@ -35,13 +35,8 @@ export function renderHistoryCell(history, branch) {
 }
 
 
-export function apiBaseHref() {
-    return process.env.REACT_APP_BACKEND_HREF;
-}
-
-
 export function fetchAPI(path, post=false) {
-    const url = apiBaseHref() + '/api' + path;
+    const url = '/api' + path;
     const opts = {
         headers: { 'Accept': 'application/json' },
         method: post ? 'POST' : 'GET',
@@ -83,13 +78,9 @@ function formatSize(size) {
 function logLink(log, test_id=null) {
     const className = log.stack_trace ? 'log-failed' : 'log-normal';
     const size = <small>({formatSize(log.size)})</small>;
-    let href = log.storage;
-    if (href.startsWith('/')) {
-        href = apiBaseHref() + href;
-    }
     const link = <>{
-        href ? <a className={className} href={href}>{log.type}</a>
-             : <span className={className}>{log.type}</span>
+        log.storage ? <a className={className} href={log.storage}>{log.type}</a>
+                    : <span className={className}>{log.type}</span>
     } {size}</>;
     const key = test_id ? ('log/' + test_id + '/' + log.type) : null;
     return key ? <React.Fragment key={key}>• {link} </React.Fragment> : link;

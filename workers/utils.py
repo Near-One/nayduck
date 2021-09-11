@@ -258,10 +258,6 @@ def setup_environ() -> None:
     """Configures environment variables for workers and masters."""
     home = pathlib.Path.home()
 
-    # Clean up various NayDuck configuration variables and other junk
-    for var in (b'BACKEND_HREF', b'NAYDUCK_UI', b'OLDPWD'):
-        os.environb.pop(var, None)
-
     # Set up Go and NVM variables
     script = '''
         set -eu

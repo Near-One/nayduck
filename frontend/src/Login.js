@@ -35,7 +35,7 @@ export function LoginBar(props) {
 
     const userInfo = () => {
         if (!authState.username) {
-            return <a href={common.apiBaseHref() + '/login/web'}>Log In</a>;
+            return <a href="/login">Log In</a>;
         }
         const avatarLink =
               `https://github.com/${authState.username}.png?size=64`;
