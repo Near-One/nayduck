@@ -8,7 +8,7 @@ import subprocess
 import traceback
 import typing
 
-from . import ui_db
+from . import backend_db
 
 NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
@@ -169,7 +169,7 @@ class Request(typing.NamedTuple):
                    is_nightly=False)
 
     def schedule(self,
-                 server: ui_db.UIDB,
+                 server: backend_db.BackendDB,
                  commit: typing.Optional[CommitInfo] = None) -> int:
         """Saves given run requests to the database.
 
@@ -184,20 +184,22 @@ class Request(typing.NamedTuple):
             Failure: on any kind of error.
         """
         commit = commit or CommitInfo.for_commit(_update_repo(), self.sha)
-        builds: typing.Dict[typing.Tuple[bool, str], ui_db.UIDB.BuildSpec] = {}
-        tests: typing.List[ui_db.UIDB.TestSpec] = []
+        builds: typing.Dict[typing.Tuple[bool, str],
+                            backend_db.BackendDB.BuildSpec] = {}
+        tests: typing.List[backend_db.BackendDB.TestSpec] = []
         for test in self.tests:
             is_release = '--release' in test
             pos = test.find('--features')
             features = '' if pos < 0 else test[pos:]
             build = builds.setdefault(
                 (is_release, features),
-                ui_db.UIDB.BuildSpec(is_release=is_release, features=features))
+                backend_db.BackendDB.BuildSpec(is_release=is_release,
+                                               features=features))
             build.add_test(has_non_mocknet=not test.startswith('mocknet '))
             tests.append(
-                ui_db.UIDB.TestSpec(name=test,
-                                    build=build,
-                                    is_remote='--remote' in test))
+                backend_db.BackendDB.TestSpec(name=test,
+                                              build=build,
+                                              is_remote='--remote' in test))
 
         # Sort builds by number of dependent tests so that when masters choose
         # what to do they start with builds which unlock the largest number of
@@ -349,7 +351,7 @@ class Request(typing.NamedTuple):
 
 def schedule_nightly_run() -> datetime.timedelta:
     """Schedules a new nightly run if last one was over 24 hours ago."""
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         try:
             return _schedule_nightly_impl(server)
         except Exception:
@@ -401,7 +403,7 @@ def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
     return Request.verify_tests(typing.cast(typing.Iterable[str], lines))
 
 
-def _schedule_nightly_impl(server: ui_db.UIDB) -> datetime.timedelta:
+def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
     """Implementation of schedule_nightly_run."""
     last = server.last_nightly_run()
     if last:

@@ -13,7 +13,7 @@ import werkzeug.wrappers
 
 from . import auth
 from . import scheduler
-from . import ui_db
+from . import backend_db
 
 NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
               'http://nayduck.eastus.cloudapp.azure.com:3000')
@@ -61,49 +61,49 @@ def jsonify(data: typing.Any) -> flask.Response:
 
 @app.route('/api/runs', methods=['GET'])
 def get_runs() -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         all_runs = server.get_all_runs()
     return jsonify(all_runs)
 
 
 @app.route('/api/run/<int:run_id>', methods=['GET'])
 def get_a_run(run_id: int) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         a_run = server.get_one_run(run_id)
     return jsonify(a_run)
 
 
 @app.route('/api/test/<int:test_id>', methods=['GET'])
 def get_a_test(test_id: int) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         a_test = server.get_one_test(test_id)
     return jsonify(a_test)
 
 
 @app.route('/api/build/<int:build_id>', methods=['GET'])
 def get_build_info(build_id: int) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         a_test = server.get_build_info(build_id)
     return jsonify(a_test)
 
 
 @app.route('/api/test/<int:test_id>/history', methods=['GET'])
 def test_history(test_id: int) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         history = server.get_test_history_by_id(test_id)
     return jsonify(history)
 
 
 @app.route('/api/test/<int:test_id>/history/<path:branch>', methods=['GET'])
 def branch_history(test_id: int, branch: str) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         history = server.get_histoty_for_base_branch(test_id, branch)
     return jsonify(history)
 
 
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
 def cancel_the_run(run_id: int) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         count = server.cancel_the_run(run_id)
     return jsonify(count)
 
@@ -112,7 +112,7 @@ def cancel_the_run(run_id: int) -> flask.Response:
 @flask_cors.cross_origin(origins=[])
 @auth.authenticated
 def new_run(login: str) -> flask.Response:
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         try:
             run_id = scheduler.Request.from_json(
                 flask.request.get_json(force=True),
@@ -154,7 +154,7 @@ def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
         getter = lambda db, gzip_ok: db.get_build_log(obj_id, log_type, gzip_ok)
     else:
         flask.abort(404)
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         try:
             blob, compressed = getter(server, gzip_ok)  # type: ignore
         except KeyError:

@@ -12,7 +12,7 @@ import werkzeug.exceptions
 import werkzeug.wrappers
 
 from lib import config
-from . import ui_db
+from . import backend_db
 
 CODE_KEY = 'nay-code'
 
@@ -291,7 +291,7 @@ def generate_redirect(mode: str) -> str:
     state, _ = _encrypt(_KIND_GITHUB, b'', nonce=nonce)
     url = ('https://github.com/login/oauth/authorize'
            f'?scope=read:org&client_id={__CLIENT_ID}&state={state}')
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         server.add_auth_cookie(timestamp, cookie)
     return url
 
@@ -335,7 +335,7 @@ def get_code(state: typing.Optional[str],
         print(f'Expired: {timestamp}')
         raise AuthFailed('Request expired')
 
-    with ui_db.UIDB() as server:
+    with backend_db.BackendDB() as server:
         if not server.verify_auth_cookie(timestamp, cookie):
             print('Nonce not in database')
             raise AuthFailed('Invalid request')

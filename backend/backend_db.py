@@ -24,7 +24,7 @@ def _update_true(dictionary: _Dict, **kw: typing.Any) -> None:
             dictionary[key] = value
 
 
-class UIDB(common_db.DB):
+class BackendDB(common_db.DB):
 
     def cancel_the_run(self, run_id: int, status: str = 'CANCELED') -> int:
         sql = '''UPDATE tests
@@ -254,7 +254,7 @@ class UIDB(common_db.DB):
             has_non_mocknet: Whether any non-mocknet test depends on this build.
                 At the moment, mocknet tests don't need a build so a build with
                 no non-mocknet tests becomes a no-op.
-            build_id: A build_id filled in by UIDB.schedule_a_run when the build
+            build_id: A build_id filled in by BackendDB.schedule_a_run when the build
                 is inserted into the database.
             test_count: Number of tests depending on this build.
         """
@@ -282,7 +282,7 @@ class UIDB(common_db.DB):
         """
 
         def __init__(self, *, name: str, is_remote: bool,
-                     build: 'UIDB.BuildSpec') -> None:
+                     build: 'BackendDB.BuildSpec') -> None:
             self.name = name
             self.is_release = build.is_release
             self.is_remote = is_remote
@@ -291,9 +291,9 @@ class UIDB(common_db.DB):
         category = property(lambda self: self.name.split()[0])
 
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
-                       builds: typing.Sequence['UIDB.BuildSpec'],
-                       tests: typing.Sequence['UIDB.TestSpec'], requester: str,
-                       is_nightly: bool) -> int:
+                       builds: typing.Sequence['BackendDB.BuildSpec'],
+                       tests: typing.Sequence['BackendDB.TestSpec'],
+                       requester: str, is_nightly: bool) -> int:
         """Schedules a run with given set of pending tests to the database.
 
         Adds a run comprising of all specified tests as well as all builds the
@@ -327,9 +327,9 @@ class UIDB(common_db.DB):
                                     is_nightly=is_nightly)
 
     def __do_schedule(self, *, branch: str, sha: str, title: str,
-                      builds: typing.Sequence['UIDB.BuildSpec'],
-                      tests: typing.Sequence['UIDB.TestSpec'], requester: str,
-                      is_nightly: bool) -> int:
+                      builds: typing.Sequence['BackendDB.BuildSpec'],
+                      tests: typing.Sequence['BackendDB.TestSpec'],
+                      requester: str, is_nightly: bool) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
         # Into Runs
         run_id = self._insert('runs',
@@ -363,14 +363,14 @@ class UIDB(common_db.DB):
         timestamp: datetime.datetime
         sha: str
 
-    def last_nightly_run(self) -> typing.Optional['UIDB.LastNightlyRun']:
+    def last_nightly_run(self) -> typing.Optional['BackendDB.LastNightlyRun']:
         """Returns the last nightly run."""
         row = self._exec('''SELECT timestamp, sha
                               FROM runs
                              WHERE is_nightly
                              ORDER BY timestamp DESC
                              LIMIT 1''').first()
-        return typing.cast(typing.Optional[UIDB.LastNightlyRun], row)
+        return typing.cast(typing.Optional[BackendDB.LastNightlyRun], row)
 
     def add_auth_cookie(self, timestamp: int, cookie: int) -> None:
         """Adds an authentication cookie to the database.
