@@ -387,7 +387,9 @@ def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
         if not path.is_dir():
             runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
             utils.mkdirs(path)
-        runner(('scp', src, dst), cwd=utils.REPO_DIR, check=True)
+        runner(('scp', '-o', 'StrictHostKeyChecking=no', src, dst),
+               cwd=utils.REPO_DIR,
+               check=True)
 
     if _LAST_COPIED_BUILD_ID != build_id:
         _LAST_COPIED_BUILD_ID = None

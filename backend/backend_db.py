@@ -267,6 +267,12 @@ class BackendDB(common_db.DB):
             self.has_non_mocknet = self.has_non_mocknet or has_non_mocknet
             self.test_count += 1
 
+        @property
+        def initial_status(self) -> str:
+            if self.has_non_mocknet:
+                return 'PENDING'
+            return 'SKIPPED'
+
     class TestSpec:
         """Specification for a test.
 
@@ -285,7 +291,9 @@ class BackendDB(common_db.DB):
             self.is_remote = is_remote
             self.build = build
 
-        category = property(lambda self: self.name.split()[0])
+        @property
+        def category(self) -> str:
+            return self.name.split()[0]
 
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
                        builds: typing.Sequence['BackendDB.BuildSpec'],
@@ -338,19 +346,18 @@ class BackendDB(common_db.DB):
         rows = self._multi_insert(
             'builds',
             ('run_id', 'status', 'features', 'is_release', 'low_priority'),
-            [(run_id, 'PENDING' if build.has_non_mocknet else 'SKIPPED',
-              build.features, build.is_release, requester == 'NayDuck')
-             for build in builds],
+            [(run_id, build.initial_status, build.features, build.is_release,
+              requester == 'NayDuck') for build in builds],
             returning=('build_id', 'features', 'is_release'))
         for row in rows:
             key = (row['is_release'], row['features'])
             builds_dict[key].build_id = row['build_id']
 
-        # Into Tests
+        # Into Tests.
         columns = ('run_id', 'build_id', 'name', 'category', 'remote')
-        self._multi_insert('tests', columns,
-                           [(run_id, test.build.build_id, test.name,
-                             test.category, test.is_remote) for test in tests])
+        new_rows = sorted((run_id, test.build.build_id, test.name,
+                           test.category, test.is_remote) for test in tests)
+        self._multi_insert('tests', columns, new_rows)
 
         return run_id
 
