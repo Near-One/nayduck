@@ -215,21 +215,19 @@ def _login_response(code: str, is_web: bool) -> werkzeug.wrappers.Response:
 <style>
 html, body {{ width: 100%; height: 100%; padding: 0; margin: 0; }}
 body {{ display: flex; align-items: center; justify-content: center;\
- font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif; }}
-div {{ width: auto; padding: 2em; margin: 0; }}
-span {{ display: block; margin: 1em 0; font-size: 0.8em;\
- font-family: DejaVu Sans Mono, Source Code Pro, Liberation Mono, Courier New, monospace; }}
+ font-family: Inter, Roboto, Fira Sans, Helvetica Neue, Helvetica, sans-serif; }}
+section {{ width: auto; padding: 2em; margin: 0; }}
+pre {{ display: block; margin: 1em 0; font-size: 0.8em;\
+ font-family: Source Code Pro, DejaVu Sans Mono, Courier New, monospace; }}
 </style>
-<div>
-  Your NayDuck authorisation code is:
-  <span>{code}</span>
-  Copy it (including the user name at the front) and paste into the nayduck tool
-  prompt.
-</div>'''
-        response = flask.Response(text,
-                                  200,
-                                  mimetype='text/html',
-                                  headers=(('Content-Language', 'en'),))
+<section>
+  <p>Your NayDuck authorisation code is:
+  <pre>{code}</pre>
+  <p>Copy it (including the user name at the front) and paste into the nayduck
+  tool prompt.
+</section>'''
+        response = flask.Response(text, 200)
+        response.content_type = 'text/html; charset=utf-8'
     auth.add_cookie(response, code)
     return response
 
