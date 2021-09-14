@@ -10,9 +10,6 @@ import typing
 
 from . import backend_db
 
-NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
-              'http://nayduck.eastus.cloudapp.azure.com:3000')
-
 
 class Failure(Exception):
     """An exception indicating failure of the request_a_run request."""
@@ -430,6 +427,5 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
                   tests=tests,
                   is_nightly=True)
     run_id = req.schedule(server, commit)
-    url = f'Success. {NAYDUCK_UI}/#/run/{run_id}'
-    print(f'Scheduled new nightly run: {url}')
+    print(f'Scheduled new nightly run: /#/run/{run_id}')
     return datetime.timedelta(hours=24)

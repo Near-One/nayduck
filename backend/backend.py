@@ -1,7 +1,6 @@
 import datetime
 import gzip
 import json
-import os
 import pathlib
 import time
 import traceback
@@ -16,9 +15,6 @@ import werkzeug.wrappers
 from . import auth
 from . import scheduler
 from . import backend_db
-
-NAYDUCK_UI = (os.getenv('NAYDUCK_UI') or
-              'http://nayduck.eastus.cloudapp.azure.com:3000')
 
 app = flask.Flask(__name__, static_folder=None)
 
@@ -130,7 +126,7 @@ def new_run(login: str) -> flask.Response:
             run_id = scheduler.Request.from_json(
                 flask.request.get_json(force=True),
                 requester=login).schedule(server)
-            url = f'Success. {NAYDUCK_UI}/#/run/{run_id}'
+            url = f'Success.  {flask.request.url_root}#/run/{run_id}'
             response: typing.Dict[str, typing.Any] = {
                 'code': 0,
                 'response': f'Success. {url}'
@@ -210,7 +206,7 @@ def login_code() -> werkzeug.wrappers.Response:
 
 def _login_response(code: str, is_web: bool) -> werkzeug.wrappers.Response:
     if is_web:
-        response = flask.redirect(NAYDUCK_UI)
+        response = flask.redirect('/')
     else:
         text = f'''<!DOCTYPE html><html lang=en>
 <title>NayDuck Authorisation Code</title>
