@@ -35,11 +35,11 @@ CREATE TABLE `builds` (
   `features` varchar(250) NOT NULL DEFAULT '',
   `is_release` tinyint(1) NOT NULL DEFAULT '0',
   `priority` tinyint(4) NOT NULL DEFAULT '0',
-  `master_ip` int(10) unsigned NOT NULL DEFAULT '0',
+  `builder_ip` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`build_id`),
   KEY `builds_ibfk_1` (`run_id`),
   KEY `builds_status` (`status`),
-  KEY `builds_ip` (`master_ip`),
+  KEY `builds_ip` (`builder_ip`),
   CONSTRAINT `builds_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

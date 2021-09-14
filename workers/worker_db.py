@@ -8,7 +8,7 @@ class Test:
     test_id: int
     build_id: int
     name: str
-    master_ip: int
+    builder_ip: int
     sha: str
 
 
@@ -60,7 +60,7 @@ class WorkerDB(common_db.DB):
         res = self._exec(sql, ip=self._ipv4, now=int(time.time()))
         if res.rowcount == 0:
             return None
-        sql = '''SELECT t.test_id, t.build_id, t.name, b.master_ip, r.sha
+        sql = '''SELECT t.test_id, t.build_id, t.name, b.builder_ip, r.sha
                    FROM tests t
                    JOIN runs r ON (r.id = t.run_id)
                    JOIN builds b USING (build_id)

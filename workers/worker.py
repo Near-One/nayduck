@@ -376,17 +376,17 @@ _LAST_COPIED_BUILD_ID: typing.Optional[int] = None
 _COPIED_EXPENSIVE_DEPS: typing.List[str] = []
 
 
-def scp_build(build_id: int, master_ip: int, test: _Test, build_type: str,
+def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
               runner: utils.Runner) -> None:
     global _LAST_COPIED_BUILD_ID
 
     if test[0] == 'mocknet':
         return
 
-    master_auth = utils.int_to_ip(master_ip)
+    builder_addr = utils.int_to_ip(builder_ip)
 
     def scp(src: str, dst: str) -> None:
-        src = f'{master_auth}:{utils.BUILDS_DIR}/{build_id}/{src}'
+        src = f'{builder_addr}:{utils.BUILDS_DIR}/{build_id}/{src}'
         path = utils.REPO_DIR / dst
         if not path.is_dir():
             runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
@@ -483,7 +483,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
 
     status = None
     try:
-        scp_build(test.build_id, test.master_ip, tokens,
+        scp_build(test.build_id, test.builder_ip, tokens,
                   'release' if release else 'debug', runner)
     except (OSError, subprocess.SubprocessError):
         runner.log_traceback()

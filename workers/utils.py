@@ -255,7 +255,7 @@ def int_to_ip(addr: int) -> str:
 
 
 def setup_environ() -> None:
-    """Configures environment variables for workers and masters."""
+    """Configures environment variables for workers and builders."""
     home = pathlib.Path.home()
 
     # Set up Go and NVM variables

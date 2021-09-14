@@ -198,7 +198,7 @@ class Request(typing.NamedTuple):
                                               build=build,
                                               is_remote='--remote' in test))
 
-        # Sort builds by number of dependent tests so that when masters choose
+        # Sort builds by number of dependent tests so that when builders choose
         # what to do they start with builds which unlock the largest number of
         # tests.
         return server.schedule_a_run(branch=self.branch,

@@ -11,15 +11,15 @@ class Build:
     expensive: int
 
 
-class MasterDB(common_db.DB):
+class BuilderDB(common_db.DB):
 
     def __init__(self, ipv4: int) -> None:
         """Initialises the connection.
 
         Args:
-            ipv4: IP address of the master (as an integer).  This will be stored
-                in a database when marking builds "owned" by the master and also
-                used to query builds "owned" by the master.
+            ipv4: IP address of the builder (as an integer).  This will be
+                stored in a database when marking builds "owned" by the builder
+                and also used to query builds "owned" by the builder.
         """
         super().__init__()
         self._ipv4 = ipv4
@@ -38,7 +38,7 @@ class MasterDB(common_db.DB):
                     SET started = NOW(),
                         finished = NULL,
                         status = 'BUILDING',
-                        master_ip = :ip,
+                        builder_ip = :ip,
                         build_id = (@build_id := build_id)
                   WHERE status = 'PENDING'
                   ORDER BY priority, build_id
@@ -99,22 +99,22 @@ class MasterDB(common_db.DB):
         sql = '''UPDATE builds
                     SET started = null,
                         status = 'PENDING',
-                        master_ip = 0
+                        builder_ip = 0
                   WHERE status = 'BUILDING'
-                    AND master_ip = :ip'''
+                    AND builder_ip = :ip'''
         self._exec(sql, ip=self._ipv4)
 
     def builds_without_pending_tests(self) -> typing.Sequence[int]:
-        """Returns IDs of builds assigned to this master w/no pending tests."""
+        """Returns IDs of builds assigned to this builder w/no pending tests."""
         sql = '''SELECT build_id
                    FROM builds LEFT JOIN tests USING (build_id)
-                  WHERE master_ip = :ip
+                  WHERE builder_ip = :ip
                   GROUP BY 1
                  HAVING SUM(tests.status IN ('PENDING', 'RUNNING')) = 0'''
         scalars = self._exec(sql, ip=self._ipv4).scalars()
         return tuple(int(bid) for bid in scalars)
 
     def unassign_builds(self, ids: typing.Sequence[int]) -> None:
-        """Unassigns given builds from any master."""
-        sql = 'UPDATE builds SET master_ip = 0 WHERE build_id IN ({})'
+        """Unassigns given builds from any builder."""
+        sql = 'UPDATE builds SET builder_ip = 0 WHERE build_id IN ({})'
         self._exec(sql.format(', '.join(str(int(bid)) for bid in ids)))

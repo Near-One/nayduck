@@ -8,7 +8,7 @@ import typing
 
 import psutil
 
-from . import master_db
+from . import builder_db
 from . import utils
 
 
@@ -22,7 +22,7 @@ class BuildSpec(typing.NamedTuple):
     is_expensive: bool
 
     @classmethod
-    def from_row(cls, data: master_db.Build) -> 'BuildSpec':
+    def from_row(cls, data: builder_db.Build) -> 'BuildSpec':
         build_id = int(data.build_id)
         return cls(build_id=build_id,
                    build_dir=utils.BUILDS_DIR / str(build_id),
@@ -128,7 +128,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
          ])
 
 
-def wait_for_free_space(server: master_db.MasterDB) -> None:
+def wait_for_free_space(server: builder_db.BuilderDB) -> None:
     """Wait until there's at least 20% free space on /datadrive.
 
     If there's less than 50GB of free space on /datadrive file system, delete
@@ -167,7 +167,7 @@ def wait_for_free_space(server: master_db.MasterDB) -> None:
     print('Got enough free space; continuing')
 
 
-def handle_build(server: master_db.MasterDB, spec: BuildSpec) -> None:
+def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
     """Handles a single build request."""
     print(spec)
     with utils.Runner() as runner:
@@ -192,10 +192,10 @@ def handle_build(server: master_db.MasterDB, spec: BuildSpec) -> None:
 
 def keep_pulling() -> None:
     ipv4 = utils.get_ip()
-    print('Starting master at {} ({})'.format(socket.gethostname(),
-                                              utils.int_to_ip(ipv4)))
+    print('Starting builder at {} ({})'.format(socket.gethostname(),
+                                               utils.int_to_ip(ipv4)))
 
-    with master_db.MasterDB(ipv4) as server:
+    with builder_db.BuilderDB(ipv4) as server:
         server.handle_restart()
         while True:
             wait_for_free_space(server)
