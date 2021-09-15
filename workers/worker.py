@@ -86,7 +86,7 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
         stdout: Test's standard output opened as binary file.
         stderr: Test's standard error output opened as binary file.
     Returns:
-        Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE' or 'IGNORED'.
+        Tests outcome as one of: 'PASSED', 'FAILED' or 'IGNORED'.
     """
 
     def get_last_line(rd: typing.BinaryIO) -> bytes:
@@ -116,9 +116,6 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
             return 'IGNORED'
         return 'PASSED'
 
-    if ret == 13:
-        return 'POSTPONE'
-
     if ret != 0:
         if b'1 passed; 0 failed;' in get_last_line(stdout):
             return 'PASSED'
@@ -144,8 +141,7 @@ def execute_test_command(test: _Test, envb: _EnvB, timeout: int,
         runner: Runner whose standard output and error files output of the
             command will be redirected into.
     Returns:
-        Tests outcome as one of: 'PASSED', 'FAILED', 'POSTPONE', 'IGNORED' or
-        'TIMEOUT'.
+        Tests outcome as one of: 'PASSED', 'FAILED', 'IGNORED' or 'TIMEOUT'.
     """
     print('[RUNNING] ' + ' '.join(test), file=sys.stderr)
     stdout_start = runner.stdout.tell()
@@ -183,7 +179,7 @@ def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
         outcome = execute_test_command(test, envb, timeout, runner)
         print('[{:<7}] {}'.format(outcome, ' '.join(test)))
 
-        if outcome != 'POSTPONE' and test[0] == 'pytest':
+        if test[0] == 'pytest':
             for node_dir in utils.list_test_node_dirs():
                 shutil.copytree(node_dir, outdir / PurePath(node_dir).name)
     except Exception:
@@ -495,11 +491,8 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
         server.test_started(test.test_id)
         status = run_test(outdir, tokens, remote, envb, runner)
 
-    if status == 'POSTPONE':
-        server.remark_test_pending(test.test_id)
-    else:
-        server.update_test_status(status, test.test_id)
-        save_logs(server, test.test_id, outdir)
+    server.update_test_status(status, test.test_id)
+    save_logs(server, test.test_id, outdir)
 
 
 def main() -> None:

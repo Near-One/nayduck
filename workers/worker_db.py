@@ -1,4 +1,3 @@
-import time
 import typing
 
 from lib import common_db
@@ -52,12 +51,11 @@ class WorkerDB(common_db.DB):
                                        FROM builds
                                       WHERE status IN ('BUILD DONE', 'SKIPPED'))
                     {where}
-                    AND select_after < :now
                   ORDER BY {order_by} priority, test_id
                   LIMIT 1'''.format(
             where='' if mocknet else 'AND category != "mocknet"',
             order_by='category != "mocknet", ' if mocknet else '')
-        res = self._exec(sql, ip=self._ipv4, now=int(time.time()))
+        res = self._exec(sql, ip=self._ipv4)
         if res.rowcount == 0:
             return None
         sql = '''SELECT t.test_id, t.build_id, t.name, b.builder_ip, r.sha
@@ -88,15 +86,6 @@ class WorkerDB(common_db.DB):
                 log.data or b''), log.url or '', log.stack_trace)
              for log in logs],
             replace=True)
-
-    def remark_test_pending(self, test_id: int, delay: int = 3 * 60) -> None:
-        sql = '''UPDATE tests
-                    SET started = NULL,
-                        worker_ip = NULL,
-                        status = 'PENDING',
-                        select_after = :tm
-                  WHERE test_id = :id'''
-        self._exec(sql, tm=int(time.time()) + delay, id=test_id)
 
     def handle_restart(self) -> None:
         sql = '''UPDATE tests

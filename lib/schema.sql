@@ -52,7 +52,6 @@ CREATE TABLE `tests` (
   `name` varchar(200) NOT NULL,
   `started` timestamp NULL DEFAULT NULL,
   `finished` timestamp NULL DEFAULT NULL,
-  `select_after` int(11) NOT NULL DEFAULT '0',
   `priority` tinyint(4) NOT NULL,
   `remote` tinyint(1) NOT NULL,
   `worker_ip` int(10) unsigned NOT NULL DEFAULT '0',
@@ -60,7 +59,7 @@ CREATE TABLE `tests` (
   PRIMARY KEY (`test_id`),
   KEY `run_id` (`run_id`),
   KEY `name` (`name`),
-  KEY `tests_pick` (`status`,`select_after`,`build_id`,`category`),
+  KEY `tests_pick` (`status`,`build_id`,`category`),
   KEY `build_status` (`build_id`,`status`),
   CONSTRAINT `tests_ibfk_1` FOREIGN KEY (`run_id`) REFERENCES `runs` (`id`) ON DELETE CASCADE,
   CONSTRAINT `tests_ibfk_2` FOREIGN KEY (`build_id`) REFERENCES `builds` (`build_id`) ON DELETE CASCADE
