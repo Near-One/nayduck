@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 import typing
 
@@ -41,6 +42,20 @@ def list_test_node_dirs() -> typing.List[pathlib.Path]:
         for entry in os.listdir(directory)
         if entry.startswith('test')
     ]
+
+
+def format_duration(seconds: float) -> str:
+    """Returns duration (given in seconds) in human-readable format."""
+    if seconds < 1:
+        return f'{int(seconds * 1000)} milliseconds'
+    if seconds < 10:
+        return f'{seconds:.1} seconds'
+    num = int(seconds)
+    if num < 60:
+        return f'{int(num)} seconds'
+    if num < 3600:
+        return f'{num // 60}:{num % 60:02}'
+    return f'{num // 3600}:{num // 60 % 60:02}:{num % 60:02}'
 
 
 def _kill_process_tree(pid: int) -> None:
@@ -140,12 +155,19 @@ class Runner:
                               stdout=self.stdout,
                               stderr=self.stderr,
                               **kw) as proc:
+            duration = time.monotonic()
             try:
                 ret = proc.wait(timeout)
             except subprocess.TimeoutExpired:
+                self.stderr.write(b'# Command timed out\n')
                 _kill_process_tree(proc.pid)
                 raise
+            duration = time.monotonic() - duration
 
+        if ret or duration >= 30:
+            dur = format_duration(seconds=duration)
+            self.stderr.write((f'# command finished with exit code {ret} '
+                               f'after {dur}\n').encode('utf-8'))
         if check and ret:
             raise subprocess.CalledProcessError(ret, cmd)
         return ret
