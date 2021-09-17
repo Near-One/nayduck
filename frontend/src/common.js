@@ -80,7 +80,7 @@ function formatSize(size) {
 }
 
 
-export function logLink(log, test_id=null) {
+function logLink(log, test_id=null) {
     const className = log.stack_trace ? 'log-failed' : 'log-normal';
     const size = <small>({formatSize(log.size)})</small>;
     let href = log.storage;
@@ -101,7 +101,7 @@ export function allLogLinks(logs, test_id) {
 }
 
 
-export function logBlob(log) {
+function logBlob(log) {
     if (!log.log) {
         return <small className="blob">{
             log.size ? '(binary file)' : '(empty)'
@@ -136,6 +136,12 @@ export function logBlob(log) {
     }</div> : <div className="blob">{
         formatBlob(log.log)
     }</div>;
+}
+
+
+export function logRow(log) {
+    const key = log.type;
+    return <tr key={key}><td>{logLink(log)}</td><td>{logBlob(log)}</td></tr>;
 }
 
 

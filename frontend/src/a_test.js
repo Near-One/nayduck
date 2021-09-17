@@ -48,11 +48,7 @@ function ATest (props) {
           <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>
           {aTest.logs ? <>
              <tr><th colSpan="2">Logs</th></tr>
-             {aTest.logs.map(log =>
-               <tr key={aTest.test_id + '/' + log.type}>
-                 <td>{common.logLink(log)}</td>
-                 <td>{common.logBlob(log)}</td></tr>
-             )}
+             {aTest.logs.map(common.logRow)}
            </> : null}
         </tbody></table>
       </>

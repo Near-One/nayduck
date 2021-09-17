@@ -17,20 +17,24 @@ function Build (props) {
         common.statusClassName('text', BuildInfo.status)
     }>{BuildInfo.status}</td> : <td></td>;
 
-    const logRow = name => {
+    const logRow = (name, blob) => {
         const id = (0 | props.match.params.build_id);
-        const blob = BuildInfo[name] || '';
-        const log = {
+        return blob ? common.logRow({
             storage: '/logs/build/' + id + '/' + name,
             log: blob,
             size: blob.length,
             type: name
-        };
-        return <tr><td>{
-            common.logLink(log)
-        }</td><td>{
-            common.logBlob(log)
-        }</td></tr>;
+        }) : null;
+    };
+
+    const logRows = () => {
+        const stderr = BuildInfo.stderr;
+        const stdout = BuildInfo.stdout;
+        return stderr || stdout ? <>
+            <tr><th colSpan="2">Logs</th></tr>
+            {logRow('stderr', stderr)}
+            {logRow('stdout', stdout)}
+        </> : null;
     };
 
     return <>
@@ -52,9 +56,7 @@ function Build (props) {
         <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
         <tr><td>Started</td><td>{timeStats.started}</td></tr>
         <tr><td>Status</td>{statusCell}</tr>
-        <tr><th colSpan="2">Logs</th></tr>
-        {logRow('stderr')}
-        {logRow('stdout')}
+        {logRows()}
       </tbody></table>
     </>;
 }
