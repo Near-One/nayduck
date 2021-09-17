@@ -5,6 +5,7 @@ import pathlib
 import time
 import traceback
 import typing
+import zlib
 
 import flask
 import flask.json
@@ -156,7 +157,8 @@ def schedule_nightly_run_check(delta: datetime.timedelta) -> None:
 
 
 @app.route('/logs/<any("test","build"):kind>/<int:obj_id>/<log_type>')
-def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
+def get_test_log(kind: str, obj_id: int,
+                 log_type: str) -> werkzeug.wrappers.Response:
     gzip_ok = can_gzip(flask.request)
     if kind == 'test':
         getter = lambda db, gzip_ok: db.get_test_log(obj_id, log_type, gzip_ok)
@@ -166,21 +168,30 @@ def get_test_log(kind: str, obj_id: int, log_type: str) -> flask.Response:
         flask.abort(404)
     with backend_db.BackendDB() as server:
         try:
-            blob, compressed = getter(server, gzip_ok)  # type: ignore
+            blob, ctime, compressed = getter(server, gzip_ok)  # type: ignore
         except KeyError:
             flask.abort(404)
-    response = flask.make_response(blob, 200)
-    response.headers['vary'] = 'Accept-Encoding'
-    response.headers['cache-control'] = (
-        f'public, max-age={365 * 24 * 3600}, immutable')
+
+    response = flask.Response(blob, 200)
     if log_type.endswith('.gz'):
-        content_type = 'application/gzip'
+        response.content_type = 'application/gzip'
     else:
-        content_type = 'text/plain; charset=utf-8'
-    response.headers['content-type'] = content_type
+        response.content_type = 'text/plain; charset=utf-8'
+
+    response.headers['cache-control'] = f'max-age={365 * 24 * 3600}, immutable'
+    etag = (zlib.adler32(blob).to_bytes(4, 'little') +
+            (len(blob) & 0xffffffff).to_bytes(4, 'little'))
+    if ctime:
+        etag += (int(ctime.timestamp()) & 0xffffffff).to_bytes(4, 'little')
+        response.last_modified = ctime
+    response.set_etag(etag.hex())
+
+    response.vary = 'accept-encoding'
     if compressed:
-        response.headers['content-encoding'] = 'gzip'
-    return response
+        response.content_encoding = 'gzip'
+
+    return typing.cast(werkzeug.wrappers.Response,
+                       response.make_conditional(flask.request))
 
 
 @app.route('/login', defaults={'mode': 'web'}, methods=['GET'])

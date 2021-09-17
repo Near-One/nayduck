@@ -413,8 +413,9 @@ class BackendDB(common_db.DB):
                    tm=int(time.time()) - 600)
         return found
 
-    def get_test_log(self, test_id: int, log_type: str,
-                     gzip_ok: bool) -> typing.Tuple[bytes, bool]:
+    def get_test_log(
+        self, test_id: int, log_type: str, gzip_ok: bool
+    ) -> typing.Tuple[bytes, typing.Optional[datetime.datetime], bool]:
         """Returns given test log.
 
         Args:
@@ -424,18 +425,22 @@ class BackendDB(common_db.DB):
                 returns the log as such.  If False will always return
                 decompressed log.
         Returns:
-            A (contents, is_compressed) tuple where the first element is
-            contents of the log and second says whether the contents is
-            compressed or not.  Second element is always False if gzip_ok
-            argument is False.
+            A (contents, ctime, is_compressed) tuple where the first element is
+            contents of the log, second is time the file was created and third
+            says whether the contents is compressed or not.  Third element is
+            always False if gzip_ok argument is False.
         Raises:
             KeyError: if given log does not exist.
         """
-        sql = 'SELECT log FROM logs WHERE test_id = :id AND type = :tp LIMIT 1'
+        sql = '''SELECT finished, log
+                   FROM logs JOIN tests USING (test_id)
+                  WHERE test_id = :id AND type = :tp
+                  LIMIT 1'''
         return self._get_log_impl(sql, id=test_id, tp=log_type, gzip_ok=gzip_ok)
 
-    def get_build_log(self, build_id: int, log_type: str,
-                      gzip_ok: bool) -> typing.Tuple[bytes, bool]:
+    def get_build_log(
+        self, build_id: int, log_type: str, gzip_ok: bool
+    ) -> typing.Tuple[bytes, typing.Optional[datetime.datetime], bool]:
         """Returns given build log.
 
         Args:
@@ -446,46 +451,45 @@ class BackendDB(common_db.DB):
                 returns the log as such.  If False will always return
                 decompressed log.
         Returns:
-            A (contents, is_compressed) tuple where the first element is
-            contents of the log and second says whether the contents is
-            compressed or not.  Second element is always False if gzip_ok
-            argument is False.
+            A (contents, ctime, is_compressed) tuple where the first element is
+            contents of the log, second is time the file was created and third
+            says whether the contents is compressed or not.  Third element is
+            always False if gzip_ok argument is False.
         Raises:
             KeyError: if given log does not exist.
             AssertionError: if log_type is not 'stderr' or 'stdout'.
         """
         assert log_type in ('stderr', 'stdout')
-        sql = f'SELECT {log_type} FROM builds WHERE build_id = :id LIMIT 1'
+        sql = f'SELECT finished, {log_type} FROM builds WHERE build_id = :id'
         return self._get_log_impl(sql, id=build_id, gzip_ok=gzip_ok)
 
-    def _get_log_impl(self, sql: str, gzip_ok: bool,
-                      **kw: typing.Any) -> typing.Tuple[bytes, bool]:
+    def _get_log_impl(
+        self, sql: str, gzip_ok: bool, **kw: typing.Any
+    ) -> typing.Tuple[bytes, typing.Optional[datetime.datetime], bool]:
         """Returns a log from the database.
 
         Args:
-            sql: The SQL query to execute to fetch the log.  The query should
-                return one row with a single column whose value is the log
+            sql: The SQL query to execute to fetch the log.  The query must
+                return at most one with two columns.  First column is
+                a timestamp the log was created and the second is the log
                 contents.
             gzip_ok: If True and the log is stored compressed in the database
                 returns the log as such.  If False will always return
                 decompressed log.
             kw: Arguments to use in placeholders of the query.
         Returns:
-            A (contents, is_compressed) tuple where the first element is
-            contents of the log and second says whether the contents is
-            compressed or not.  Second element is always False if gzip_ok
-            argument is False.
+            A (contents, ctime, is_compressed).
         Raises:
             KeyError: if given SQL query returned no rows.
         """
         row = self._exec(sql, **kw).first()
         if not row:
             raise KeyError()
-        blob = row[0]
+        ctime, blob = row
         is_compressed = bytes(blob[:2]) == b'\x1f\x8b'
         if is_compressed and not gzip_ok:
             blob = gzip.decompress(blob)
             is_compressed = False
         else:
             blob = bytes(blob)
-        return blob, is_compressed
+        return blob, ctime, is_compressed
