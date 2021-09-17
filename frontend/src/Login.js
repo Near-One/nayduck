@@ -2,7 +2,6 @@ import React, { useContext } from 'react';
 import Cookies from 'universal-cookie';
 
 import * as App from './App';
-import * as common from './common';
 
 
 const cookies = new Cookies();
