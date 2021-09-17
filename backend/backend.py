@@ -112,6 +112,7 @@ def branch_history(test_id: int, branch: str) -> flask.Response:
 
 
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
+@auth.authorised
 def cancel_the_run(run_id: int) -> flask.Response:
     with backend_db.BackendDB() as server:
         count = server.cancel_the_run(run_id)
@@ -119,7 +120,7 @@ def cancel_the_run(run_id: int) -> flask.Response:
 
 
 @app.route('/api/run/new', methods=['POST'])
-@auth.authenticated
+@auth.authorised
 def new_run(login: str) -> flask.Response:
     with backend_db.BackendDB() as server:
         try:

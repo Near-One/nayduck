@@ -1,4 +1,5 @@
 import base64
+import functools
 import secrets
 import time
 import traceback
@@ -372,7 +373,7 @@ def add_cookie(response: werkzeug.wrappers.Response, code: str) -> None:
     response.headers['cache-control'] = 'private, max-age=0'
 
 
-def authenticated(
+def authorised(
     handler: typing.Callable[..., flask.Response]
 ) -> typing.Callable[..., flask.Response]:
     """A decorator around Flask handler which check if user is authorised.
@@ -382,6 +383,7 @@ def authenticated(
     with additional positional argument at the front: login of the user.
     """
 
+    @functools.wraps(handler)
     def decorated(*args: typing.Any, **kw: typing.Any) -> flask.Response:
         code = AuthCode.from_request(flask.request)
         old_code_str = code.code
