@@ -1,6 +1,7 @@
 import gzip
 import time
 import typing
+import sys
 
 import sqlalchemy
 
@@ -107,7 +108,7 @@ class DB:
                             isinstance(ex, sqlalchemy.exc.DBAPIError) and
                             ex.connection_invalidated):  # pylint: disable=no-member
                         raise
-                    print(f'Got {ex}; retrying')
+                    print(f'Got {ex}; retrying', file=sys.stderr)
                     time.sleep(1 + retry * 4)
                     retry += 1
                     self.__conn = _ENGINE.connect()

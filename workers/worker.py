@@ -177,7 +177,7 @@ def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
             utils.mkdirs(Path.home() / '.near')
 
         outcome = execute_test_command(test, envb, timeout, runner)
-        print('[{:<7}] {}'.format(outcome, ' '.join(test)))
+        print('[{:<7}] {}'.format(outcome, ' '.join(test)), file=sys.stderr)
 
         if test[0] == 'pytest':
             for node_dir in utils.list_test_node_dirs():
@@ -439,7 +439,7 @@ def temp_dir() -> typing.Generator[Path, None, None]:
 
 
 def handle_test(server: worker_db.WorkerDB, test: worker_db.Test) -> None:
-    print(test)
+    print(test, file=sys.stderr)
     with temp_dir() as tmpdir:
         outdir = tmpdir / 'output'
         utils.mkdirs(outdir)
@@ -500,7 +500,8 @@ def __handle_test(server: worker_db.WorkerDB, outdir: Path,
 def main() -> None:
     ipv4 = utils.get_ip()
     hostname = socket.gethostname()
-    print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)))
+    print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)),
+          file=sys.stderr)
 
     mocknet = 'mocknet' in hostname
     with worker_db.WorkerDB(ipv4) as server:
@@ -513,7 +514,7 @@ def main() -> None:
                 else:
                     time.sleep(10)
             except KeyboardInterrupt:
-                print('Got SIGINT; terminating')
+                print('Got SIGINT; terminating', file=sys.stderr)
                 break
             except Exception:
                 traceback.print_exc()

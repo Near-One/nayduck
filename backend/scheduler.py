@@ -5,6 +5,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import traceback
 import typing
 
@@ -70,7 +71,7 @@ def _update_repo() -> pathlib.Path:
             _run('git', 'remote', 'update', cwd=repo_dir)
             return repo_dir
         except Failure as ex:
-            print(ex.args[0])
+            print(ex.args[0], file=sys.stderr)
 
     if repo_dir.exists():
         shutil.rmtree(repo_dir)
@@ -387,7 +388,7 @@ def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
     def reader(path: pathlib.Path) -> str:
         filename = os.path.normpath(path)
         if filename.startswith('..') or not filename.endswith('.txt'):
-            print(f'Refusing to load tests from {path}')
+            print(f'Refusing to load tests from {path}', file=sys.stderr)
             return ''
         return get_repo_file(filename)
 
@@ -408,7 +409,8 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
         need_new_run = delta >= datetime.timedelta(hours=24)
         print('Last nightly at {}; {} ago; sha={}{}'.format(
             last.timestamp, delta, last.sha,
-            '' if need_new_run else '; no need for a new run'))
+            '' if need_new_run else '; no need for a new run'),
+              file=sys.stderr)
         if not need_new_run:
             return datetime.timedelta(hours=24) - delta
 
@@ -416,7 +418,8 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
         commit = CommitInfo.for_commit(repo_dir, 'master')
         need_new_run = last.sha != commit.sha
         print('master sha={}{}'.format(
-            commit.sha, '' if need_new_run else '; no need for a new run'))
+            commit.sha, '' if need_new_run else '; no need for a new run'),
+              file=sys.stderr)
         if not need_new_run:
             return datetime.timedelta(hours=24)
 
@@ -426,5 +429,5 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
                   requester='NayDuck',
                   tests=tests)
     run_id = req.schedule(server, commit)
-    print(f'Scheduled new nightly run: /#/run/{run_id}')
+    print(f'Scheduled new nightly run: /#/run/{run_id}', file=sys.stderr)
     return datetime.timedelta(hours=24)

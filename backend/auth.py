@@ -3,6 +3,7 @@ import functools
 import secrets
 import time
 import traceback
+import sys
 import typing
 
 import cryptography.hazmat.primitives.ciphers.aead
@@ -333,12 +334,10 @@ def get_code(state: typing.Optional[str],
     cookie = int.from_bytes(nonce[4:], 'little', signed=True)
 
     if timestamp < time.time() - 600:
-        print(f'Expired: {timestamp}')
         raise AuthFailed('Request expired')
 
     with backend_db.BackendDB() as server:
         if not server.verify_auth_cookie(timestamp, cookie):
-            print('Nonce not in database')
             raise AuthFailed('Invalid request')
 
     params = {
@@ -350,7 +349,8 @@ def get_code(state: typing.Optional[str],
                         params=params,
                         headers={'accept': 'application/json'})
     if res.status_code != 200:
-        print(f'GitHub replied with {res.status_code}:\n{res.text}')
+        print(f'GitHub replied with {res.status_code}:\n{res.text}',
+              file=sys.stderr)
         raise AuthFailed(f'GitHub rejected the request ({res.status_code})')
 
     try:

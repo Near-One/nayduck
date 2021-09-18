@@ -4,6 +4,7 @@ import socket
 import stat
 import time
 import traceback
+import sys
 import typing
 
 import psutil
@@ -62,7 +63,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     Raises:
         BuildFailure: if build fails
     """
-    print('Building {}target'.format('expensive ' if spec.is_expensive else ''))
+    print('Building {}target'.format('expensive ' if spec.is_expensive else ''),
+          file=sys.stderr)
 
     def cargo(*args: typing.Union[str, Path],
               add_features: bool = True) -> None:
@@ -158,18 +160,20 @@ def wait_for_free_space(server: builder_db.BuilderDB) -> None:
     if enough_space():
         return
 
-    print('Not enough free space; '
-          'waiting for tests to finish to clean up more builds')
+    print(
+        'Not enough free space; '
+        'waiting for tests to finish to clean up more builds',
+        file=sys.stderr)
     while True:
         time.sleep(5)
         if clean_finished():
             break
-    print('Got enough free space; continuing')
+    print('Got enough free space; continuing', file=sys.stderr)
 
 
 def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
     """Handles a single build request."""
-    print(spec)
+    print(spec, file=sys.stderr)
     with utils.Runner() as runner:
         success = False
         try:
@@ -182,7 +186,8 @@ def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
             runner.log_traceback()
 
         print('Build #{} {}'.format(spec.build_id,
-                                    'succeeded' if success else 'failed'))
+                                    'succeeded' if success else 'failed'),
+              file=sys.stderr)
         runner.stdout.seek(0)
         stdout = runner.stdout.read()
         runner.stderr.seek(0)
@@ -193,7 +198,8 @@ def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
 def keep_pulling() -> None:
     ipv4 = utils.get_ip()
     print('Starting builder at {} ({})'.format(socket.gethostname(),
-                                               utils.int_to_ip(ipv4)))
+                                               utils.int_to_ip(ipv4)),
+          file=sys.stderr)
 
     with builder_db.BuilderDB(ipv4) as server:
         server.handle_restart()

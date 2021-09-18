@@ -78,11 +78,12 @@ def _kill_process_tree(pid: int) -> None:
 
     proc = psutil.Process(pid)
     procs = proc.children(recursive=True) + [proc]
-    print('Sending SIGTERM to {} process tree'.format(pid))
+    print('Sending SIGTERM to {} process tree'.format(pid), file=sys.stderr)
     send_to_all(procs, signal.SIGTERM)
     _, procs = psutil.wait_procs(procs, timeout=5)
     if procs:
-        print('Sending SIGKILL to {} remaining processes'.format(len(procs)))
+        print('Sending SIGKILL to {} remaining processes'.format(len(procs)),
+              file=sys.stderr)
         send_to_all(procs, signal.SIGKILL)
 
 
