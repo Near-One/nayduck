@@ -9,6 +9,8 @@ if [ "$(id -u)" != 0 ]; then
 	exit 1
 fi
 
+basedir=$PWD
+
 type=
 is_mocknet=false
 for arg; do
@@ -50,13 +52,21 @@ apt-get -y install git python3-pip libpq-dev lld libclang-dev
 grep -q ^nayduck: /etc/passwd ||
 	adduser --disabled-login --gecos NayDuck nayduck
 if ! [ -d /datadrive ]; then
-	mkdir -m 700 -p /datadrive
+	mkdir -m 700 /datadrive
 	chown nayduck:nayduck /datadrive
 fi
 
 sudo -u nayduck git config --global advice.detachedHead false
 
 cd /home/nayduck
+if [ -e "$basedir/setup.tar.gz" ]; then
+	# shellcheck disable=SC2024
+	sudo -u nayduck tar zvx <"$basedir/setup.tar.gz"
+	rm -- "$basedir/setup.tar.gz"
+else
+	echo "$0: no setup.tar.xz; not initialising /home/nayduck"
+fi
+
 rm -rf nayduck
 sudo -u nayduck git clone https://github.com/near/nayduck.git
 sudo -u nayduck python3 -m pip install --user -U --no-warn-script-location pip
@@ -70,10 +80,19 @@ if [ "$type" = frontend ]; then
 		sudo -u nayduck npm install
 		sudo -u nayduck npm run build
 	)
-	# dev=ens4
-	# iptables -A PREROUTING -t nat -i ${dev?} -p tcp --dport 80 -j REDIRECT --to-port 5005
+	# At the moment back end is configured to listen on port 5005 (because
+	# it’s run as unprivileged user and I haven’t figured out yet how to
+	# pass an open listening socket from systemd to Flask) which means that
+	# to listen to have the front end available on port 80 a redirection is
+	# necessary:
+	#     dev=ens4
+	#     iptables -A PREROUTING -t nat -i ${dev?} -p tcp --dport 80 -j REDIRECT --to-port 5005
+	# This isn’t automated because the device name may potentially be
+	# different on different machines so this needs to be done manually.
+	# This also needs to be added as a service to systemd so it’s run on
+	# each boot.
 else
-	curl https://sh.rustup.rs -sSf | sudo -u nayduck sh
+	curl https://sh.rustup.rs -sSf | sudo -u nayduck sh -s -- -y
 	sudo -u nayduck .cargo/bin/rustup target add wasm32-unknown-unknown
 	if $is_mocknet; then
 		sudo -u nayduck .cargo/bin/cargo install cargo-fuzz
@@ -82,10 +101,12 @@ fi
 
 service=$type
 if [ "$type" = frontend ]; then
-	serviec=ui
+	service=ui
 fi
 cp -nvt /etc/systemd/system/ -- \
    "/home/nayduck/nayduck/systemd/nayduck-$service.service"
 systemctl enable "nayduck-$service"
 
-#/sbin/reboot
+rm -- "$basedir/setup-host.sh"
+
+/sbin/reboot
