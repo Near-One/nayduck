@@ -71,7 +71,7 @@ rm -rf nayduck
 sudo -u nayduck git clone https://github.com/near/nayduck.git
 sudo -u nayduck python3 -m pip install --user -U --no-warn-script-location pip
 sudo -u nayduck python3 -m pip install --user -U --no-warn-script-location \
-     -r nayduck/requirements/requirements.txt
+     -r nayduck/requirements.txt
 
 if [ "$type" = frontend ]; then
 	apt-get -y install nodejs npm postgresql-client
