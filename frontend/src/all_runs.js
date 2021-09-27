@@ -17,8 +17,8 @@ function AllRuns () {
         });
     };
 
-    const cancelRun = id => event => {
-        common.fetchAPI('/run/' + (0 | id) + '/cancel', true).then(data => {
+    const cancelOrRetryRun = (id, action) => event => {
+        common.fetchAPI('/run/' + (0 | id) + '/' + action, true).then(data => {
             console.log(data)
             if (data) {
                 loadAllRuns();
@@ -80,9 +80,22 @@ function AllRuns () {
 
     const cancelButton = a_run => {
         const canCancel = a_run.builds.some(
-            build => build.status == 'PENDING' || build.tests['pending']);
+            build => build.status === 'PENDING' || build.tests['pending']);
         return canCancel
-            ? <button onClick={cancelRun(a_run.run_id)}>×</button>
+            ? <button onClick={cancelOrRetryRun(a_run.run_id, 'cancel')}>×</button>
+            : null;
+    };
+
+    const retryButton = a_run => {
+        const canRetry = a_run.builds.some(build => {
+            if (build.status !== 'BUILD DONE' && build.status !== 'SKIPPED') {
+                return false;
+            }
+            const {timeout, failed, build_failed} = build.tests;
+            return !!(timeout || ((failed || 0) - (build_failed || 0)));
+        });
+        return canRetry
+            ? <button onClick={cancelOrRetryRun(a_run.run_id, 'retry')}>↺</button>
             : null;
     };
 
@@ -110,7 +123,10 @@ function AllRuns () {
           </div>
         </div>)
       }</td>
-      {isAuthorised ? <td>{cancelButton(a_run)}</td> : null}
+      {isAuthorised ? <td>
+         {cancelButton(a_run)}
+         {retryButton(a_run)}
+       </td> : null}
     </tr>;
 
     return <table className="big list">

@@ -26,12 +26,72 @@ def _update_true(dictionary: _Dict, **kw: typing.Any) -> None:
 
 class BackendDB(common_db.DB):
 
-    def cancel_the_run(self, run_id: int, status: str = 'CANCELED') -> int:
-        sql = '''UPDATE tests
-                    SET finished = NOW(), status = :status
-                  WHERE status = 'PENDING' AND run_id = :id'''
-        rowcount = self._exec(sql, status=status, id=run_id).rowcount
-        return typing.cast(int, rowcount or 0)
+    def cancel_the_run(self, run_id: int) -> int:
+        """Cancels all the pending tests and builds in the run.
+
+        Builds and tests which are already running are not affected.  Tests are
+        put into CANCELED state while builds into SKIPPED state.
+
+        Args:
+            run_id: Run to cancel.
+        Returns:
+            Number of affected tests and builds.
+        """
+
+        def execute() -> int:
+            sql = '''UPDATE tests
+                        SET finished = NOW(), status = 'CANCELED'
+                      WHERE status = 'PENDING' AND run_id = :id'''
+            rowcount = typing.cast(int,
+                                   self._exec(sql, id=run_id).rowcount or 0)
+            sql = '''UPDATE builds
+                        SET finished = NOW(), status = 'SKIPPED'
+                      WHERE status = 'PENDING' AND run_id = :id'''
+            rowcount += typing.cast(int,
+                                    self._exec(sql, id=run_id).rowcount or 0)
+            return rowcount
+
+        return self._in_transaction(execute)
+
+    def retry_the_run(self, run_id: int) -> int:
+        """Retry any failed tests in the run.
+
+        Only tests with status FAILED or TIMEOUT are affected.
+
+        Args:
+            run_id: Run to cancel.
+        Returns:
+            Number of affected tests.
+        """
+
+        def execute() -> int:
+            self._exec('BEGIN ISOLATION LEVEL SERIALIZABLE')
+            sql = f'''UPDATE tests
+                         SET started = NULL,
+                             finished = NULL,
+                             status = 'PENDING'
+                       WHERE status IN ('FAILED', 'TIMEOUT')
+                         AND run_id = {int(run_id)}
+                   RETURNING test_id, build_id'''
+            rows = tuple(self._exec(sql))
+            if not rows:
+                return 0
+            self._exec('DELETE FROM logs WHERE test_id IN ({})'.format(','.join(
+                str(int(row[0])) for row in rows)))
+            self._exec('''UPDATE builds
+                             SET started = NULL,
+                                 finished = NULL,
+                                 stderr = ''::bytea,
+                                 stdout = ''::bytea,
+                                 status = 'PENDING'
+                           WHERE build_id IN ({})
+                             AND (status = 'BUILD FAILED' OR
+                                  (status = 'BUILD DONE' AND
+                                   builder_ip = 0))'''.format(','.join(
+                str(int(row[1])) for row in rows)))
+            return len(rows)
+
+        return self._in_transaction(execute)
 
     _STATUS_CATEGORIES = ('pending', 'running', 'passed', 'ignored',
                           'build_failed', 'canceled', 'timeout')
