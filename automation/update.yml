@@ -1,0 +1,6 @@
+- name: Update code on all hosts from upstream
+  hosts:
+    - nayduck_worker
+  tasks:
+    - name: Run the update.sh script
+      ansible.builtin.script: update.sh
