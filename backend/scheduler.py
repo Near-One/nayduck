@@ -322,6 +322,10 @@ class Request(typing.NamedTuple):
                 break
         if want_features:
             raise Failure(f'Invalid features arguments in: {test}')
+        # ‘adversarial’ is always enabled so remove it from the set if user
+        # explicitly enabled it.  If we don’t do that, we may end up doing an
+        # unnecessary build.
+        features.discard('adversarial')
         for feature in features:
             if not _VALID_FEATURE.search(feature):
                 raise Failure(f'Invalid feature "{feature}" in: {test}')
