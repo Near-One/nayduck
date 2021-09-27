@@ -78,6 +78,14 @@ function AllRuns () {
             : null;
     };
 
+    const cancelButton = a_run => {
+        const canCancel = a_run.builds.some(
+            build => build.status == 'PENDING' || build.tests['pending']);
+        return canCancel
+            ? <button onClick={cancelRun(a_run.run_id)}>×</button>
+            : null;
+    };
+
     const formatRow = a_run => <tr key={a_run.run_id}>
       <td>{common.commitLink(a_run)}</td>
       <td><NavLink to={'/run/' + a_run.run_id}>{a_run.title}</NavLink></td>
@@ -102,9 +110,7 @@ function AllRuns () {
           </div>
         </div>)
       }</td>
-      {isAuthorised
-           ? <td><button onClick={cancelRun(a_run.run_id)}>×</button></td>
-           : null}
+      {isAuthorised ? <td>{cancelButton(a_run)}</td> : null}
     </tr>;
 
     return <table className="big list">
