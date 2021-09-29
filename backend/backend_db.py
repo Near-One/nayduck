@@ -422,17 +422,48 @@ class BackendDB(common_db.DB):
         return run_id
 
     class LastNightlyRun:
+        run_id: int
         timestamp: datetime.datetime
         sha: str
 
     def last_nightly_run(self) -> typing.Optional['BackendDB.LastNightlyRun']:
         """Returns the last nightly run."""
-        row = self._exec('''SELECT timestamp, encode(sha, 'hex') AS sha
+        row = self._exec('''SELECT run_id, timestamp, encode(sha, 'hex') AS sha
                               FROM runs
                              WHERE requester = 'NayDuck'
                              ORDER BY timestamp DESC
                              LIMIT 1''').first()
         return typing.cast(typing.Optional[BackendDB.LastNightlyRun], row)
+
+    class NayDuckMetrics(typing.NamedTuple):
+        run_id: int
+        start: datetime.datetime
+        finish: typing.Optional[datetime.datetime]
+        test_statuses: typing.List[typing.Tuple[int, str, str]]
+        build_statuses: typing.List[typing.Tuple[int, str]]
+
+    def get_metrics(self) -> typing.Optional['BackendDB.NayDuckMetrics']:
+        """Returns metrics to export via Prometheus metrics reporting."""
+        nightly = self.last_nightly_run()
+        if not nightly:
+            return None
+        run_id = int(nightly.run_id)
+        finished = self._exec(f'''SELECT MAX(finished)
+                                    FROM tests
+                                   WHERE run_id = {run_id}''').scalar_one()
+        tests = list(
+            self._exec(f'''SELECT test_id, name, status
+                                      FROM tests
+                                     WHERE run_id = {run_id}'''))
+        builds = list(
+            self._exec(f'''SELECT build_id, features, status
+                                       FROM builds
+                                      WHERE run_id = {run_id}'''))
+        return self.NayDuckMetrics(run_id=run_id,
+                                   start=nightly.timestamp,
+                                   finish=finished,
+                                   test_statuses=tests,
+                                   build_statuses=builds)
 
     def add_auth_cookie(self, timestamp: int, cookie: int) -> None:
         """Adds an authentication cookie to the database.

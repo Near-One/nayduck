@@ -2,6 +2,8 @@ Flask-APScheduler
 azure-storage-blob
 flask
 google-cloud-storage
+prometheus-client
+prometheus-flask-exporter
 psutil
 psycopg2
 requests
