@@ -1,5 +1,7 @@
 - name: Update code on all hosts from upstream
   hosts:
+    - nayduck_builder
+    - nayduck_frontend
     - nayduck_worker
   tasks:
     - name: Run the update.sh script
