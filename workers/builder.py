@@ -92,7 +92,14 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
 
     utils.rmdirs(spec.build_dir)
 
-    cargo('build', '-pneard', '--bin', 'neard', '--features', 'adversarial')
+    if runner(('git', 'merge-base', '--is-ancestor',
+               '9786eead37abee9097015510d6d17d76f00465ef', '@'),
+              cwd=utils.REPO_DIR) == 0:
+        test_feature = 'test_features'
+    else:
+        test_feature = 'adversarial'
+
+    cargo('build', '-pneard', '--bin', 'neard', '--features', test_feature)
     cargo('build',
           '-pgenesis-populate',
           '-prestaked',
