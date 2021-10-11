@@ -369,8 +369,10 @@ small.blob {
 .build_status-skipped      { background: #ccffcc }
 .build_status-build_failed { background: #ffcccc }
 
-.text-failed       { color: #ff0000 }
+.text-failed,
+.text-scp_failed,
 .text-build_failed { color: #ff0000 }
+.text-timeout      { color: #f0a3aa }
 .text-passed       { color: #008000 }
 .text-build_done   { color: #008000 }
 .text-skipped      { color: #008000 }
