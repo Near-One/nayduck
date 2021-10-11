@@ -10,7 +10,7 @@ import typing
 from lib import config
 
 _CONTENT_TYPE = 'text/plain; charset=utf-8'
-_CACHE_CONTROL = f'max-age={365 * 24 * 3600}, immutable'
+_CACHE_CONTROL = f'max-age={365 * 24 * 3600}'
 
 
 class BlobClient:

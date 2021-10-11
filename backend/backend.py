@@ -187,7 +187,7 @@ def get_test_log(kind: str, obj_id: int,
     else:
         response.content_type = 'text/plain; charset=utf-8'
 
-    response.headers['cache-control'] = f'max-age={365 * 24 * 3600}, immutable'
+    response.headers['cache-control'] = f'max-age={365 * 24 * 3600}'
     etag = (zlib.adler32(blob).to_bytes(4, 'little') +
             (len(blob) & 0xffffffff).to_bytes(4, 'little'))
     if ctime:
