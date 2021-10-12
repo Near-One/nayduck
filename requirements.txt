@@ -1,5 +1,4 @@
 Flask-APScheduler
-azure-storage-blob
 flask
 google-cloud-storage
 prometheus-client
