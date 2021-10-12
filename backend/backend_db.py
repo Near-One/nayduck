@@ -439,31 +439,48 @@ class BackendDB(common_db.DB):
         run_id: int
         start: datetime.datetime
         finish: typing.Optional[datetime.datetime]
-        test_statuses: typing.List[typing.Tuple[int, str, str]]
-        build_statuses: typing.List[typing.Tuple[int, str]]
+        test_statuses: typing.Sequence[typing.Sequence[typing.Any]]
+        test_keys: typing.Sequence[str]
+        build_statuses: typing.List[typing.Sequence[typing.Any]]
+        build_keys: typing.Sequence[str]
 
     def get_metrics(self) -> typing.Optional['BackendDB.NayDuckMetrics']:
         """Returns metrics to export via Prometheus metrics reporting."""
         nightly = self.last_nightly_run()
         if not nightly:
             return None
+
         run_id = int(nightly.run_id)
-        finished = self._exec(f'''SELECT MAX(finished)
-                                    FROM tests
-                                   WHERE run_id = {run_id}''').scalar_one()
         tests = list(
-            self._exec(f'''SELECT test_id, name, status
-                                      FROM tests
-                                     WHERE run_id = {run_id}'''))
+            self._exec(f'''SELECT test_id, name, status, finished
+                             FROM tests
+                            WHERE run_id = {run_id}'''))
+        test_keys = ('test_id', 'name', 'status')
         builds = list(
             self._exec(f'''SELECT build_id, features, status
-                                       FROM builds
-                                      WHERE run_id = {run_id}'''))
+                             FROM builds
+                            WHERE run_id = {run_id}'''))
+        build_keys = ('build_id', 'features', 'status')
+
+        max_finished: typing.Optional[datetime.datetime] = None
+        finished = None
+        for test in tests:
+            if not test.finished:
+                break
+            if max_finished:
+                max_finished = max(max_finished, test.finished)
+            else:
+                max_finished = test.finished
+        else:
+            finished = max_finished
+
         return self.NayDuckMetrics(run_id=run_id,
                                    start=nightly.timestamp,
                                    finish=finished,
                                    test_statuses=tests,
-                                   build_statuses=builds)
+                                   test_keys=test_keys,
+                                   build_statuses=builds,
+                                   build_keys=build_keys)
 
     def add_auth_cookie(self, timestamp: int, cookie: int) -> None:
         """Adds an authentication cookie to the database.

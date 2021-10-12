@@ -3,7 +3,6 @@ import typing
 import flask
 import prometheus_client
 import prometheus_flask_exporter
-import sqlalchemy.engine
 
 from . import backend_db
 
@@ -20,13 +19,13 @@ class StatusMetric(prometheus_client.metrics.MetricWrapperBase):  # type: ignore
                          registry=registry)
         self.__samples: _Samples = ()
 
-    def set(self, statuses: typing.Iterable[sqlalchemy.engine.Row]) -> None:
+    def set(self, rows: typing.Iterable[typing.Iterable[typing.Any]],
+            keys: typing.Iterable[str]) -> None:
 
-        def asdict(row: sqlalchemy.engine.Row) -> typing.Dict[str, str]:
-            # pylint: disable=protected-access
-            return {key: str(value) for key, value in row._mapping.items()}
+        def as_dict(row: typing.Iterable[typing.Any]) -> typing.Dict[str, str]:
+            return {key: str(value) for key, value in zip(keys, row)}
 
-        self.__samples = tuple(('', asdict(status), 1) for status in statuses)
+        self.__samples = tuple(('', as_dict(row), 1) for row in rows)
 
     def _metric_init(self) -> None:
         pass
@@ -88,8 +87,9 @@ class Collector:
         self.m_nightly_start.set(metrics.start.timestamp())
         self.m_nightly_finish.set(
             metrics.finish.timestamp() if metrics.finish else float('nan'))
-        self.m_nightly_test_status.set(metrics.test_statuses)
-        self.m_nightly_build_status.set(metrics.build_statuses)
+        self.m_nightly_test_status.set(metrics.test_statuses, metrics.test_keys)
+        self.m_nightly_build_status.set(metrics.build_statuses,
+                                        metrics.build_keys)
         return [
             core_metric for metric in self._all()
             for core_metric in metric.collect()
