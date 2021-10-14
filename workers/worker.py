@@ -3,6 +3,7 @@ import contextlib
 import json
 import os
 from pathlib import Path, PurePath
+import random
 import shutil
 import socket
 import subprocess
@@ -387,9 +388,18 @@ def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
         if not path.is_dir():
             runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
             utils.mkdirs(path)
-        runner(('scp', '-o', 'StrictHostKeyChecking=no', src, dst),
-               cwd=utils.REPO_DIR,
-               check=True)
+        delay = 1 + random.random()
+        for retry in range(3):
+            if runner(
+                ('scp', '-oStrictHostKeyChecking=no', '-oControlMaster=auto',
+                 '-oControlPath=/dev/shm/.ssh.%C', '-oControlPersist=2',
+                 '-oBatchMode=yes', src, dst),
+                    print_cmd=('scp', src, dst),
+                    cwd=utils.REPO_DIR,
+                    check=retry == 2) == 0:
+                break
+            time.sleep(delay)
+            delay *= 2
 
     if _LAST_COPIED_BUILD_ID != build_id:
         _LAST_COPIED_BUILD_ID = None

@@ -87,6 +87,9 @@ def _kill_process_tree(pid: int) -> None:
         send_to_all(procs, signal.SIGKILL)
 
 
+_Command = typing.Sequence[typing.Union[str, pathlib.Path]]
+
+
 class Runner:
     """Class for running commands redirecting their output to files."""
 
@@ -115,11 +118,12 @@ class Runner:
         self.__last_cwd: typing.Optional[pathlib.Path] = None
 
     def __call__(self,
-                 cmd: typing.Sequence[typing.Union[str, pathlib.Path]],
+                 cmd: _Command,
                  *,
                  cwd: pathlib.Path,
                  check: bool = False,
                  timeout: int = 3 * 3600,
+                 print_cmd: typing.Optional[_Command] = None,
                  **kw: typing.Any) -> int:
         """Calls given command after printing it to standard error.
 
@@ -140,6 +144,8 @@ class Runner:
             timeout: Time in seconds to allow the command to run.  If the
                 command does not finish in allotted time it’s terminated and
                 subprocess.TimeoutExpired expcetion is risen.
+            print_cmd: If specified, a command to print to standard error
+                instead of cmd.
             kw: Keyword arguments passed to subprocess.run() function.
         Returns:
             Command’s exit code.
@@ -149,7 +155,7 @@ class Runner:
             subprocess.TimeoutExpired: If the command run longer that timeout
                 seconds.
         """
-        cwd = self.log_command(cmd, cwd)
+        cwd = self.log_command(print_cmd or cmd, cwd)
         with subprocess.Popen(cmd,
                               cwd=cwd,
                               stdin=subprocess.DEVNULL,
@@ -173,8 +179,7 @@ class Runner:
             raise subprocess.CalledProcessError(ret, cmd)
         return ret
 
-    def log_command(self, cmd: typing.Sequence[typing.Union[str, pathlib.Path]],
-                    cwd: pathlib.Path) -> pathlib.Path:
+    def log_command(self, cmd: _Command, cwd: pathlib.Path) -> pathlib.Path:
         """Logs information about command about to be executed.
 
         Args:
