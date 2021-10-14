@@ -4,6 +4,37 @@ import { NavLink } from "react-router-dom";
 import * as common from "./common"
 
 
+function formatTestCommand(name) {
+    const spec = name.trim().split(/\s+/);
+    const category = spec[0];
+    const pos = spec.indexOf('--features');
+    const features = pos === -1 ? '' : spec.splice(pos).join(' ');
+    let i = 1;
+    while (i < spec.length && /^--/.test(spec[i])) {
+        ++i;
+    }
+    spec.splice(0, i);
+
+    switch (category) {
+    case 'expensive':
+        if (spec.length !== 3) {
+            return null;
+        }
+        const f = features
+              ? features + ',expensive_tests'
+              : '--features expensive_tests';
+        const cmd = 'cargo test -p' + spec[0] + ' --test ' + spec[1] + ' ' + f +
+              ' -- --exact --nocapture ' + spec[2];
+        return <code>{cmd}</code>;
+    case 'pytest':
+    case 'mocknet':
+        return <code>{'cd pytest && python3 tests/' + spec.join(' ')}</code>;
+    default:
+        return null;
+    }
+}
+
+
 function ATest (props) {
     const [aTest, setATest] = useState(null);
     const [baseBranchHistory, setBaseBranchHistory] = useState(null);
@@ -26,6 +57,7 @@ function ATest (props) {
         return null;
     }
 
+    const testCommand = formatTestCommand(aTest.name);
     const timeStats = common.formatTimeStats(aTest);
     const statusCls = common.statusClassName('text', aTest.status);
     return (
@@ -42,6 +74,7 @@ function ATest (props) {
           </tr>
           <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
           <tr><td>Test</td><td>{aTest.name}</td></tr>
+          {testCommand ? <tr><td>Command</td><td>{testCommand}</td></tr> : null}
           <tr><td>Run Time</td><td>{timeStats.delta}</td></tr>
           <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
           <tr><td>Started</td><td>{timeStats.started}</td></tr>
