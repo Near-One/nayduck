@@ -49,7 +49,7 @@ def format_duration(seconds: float) -> str:
     if seconds < 1:
         return f'{int(seconds * 1000)} milliseconds'
     if seconds < 10:
-        return f'{seconds:.1} seconds'
+        return f'{seconds:.1f} seconds'
     num = int(seconds)
     if num < 60:
         return f'{int(num)} seconds'
