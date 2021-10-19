@@ -390,13 +390,12 @@ def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
             utils.mkdirs(path)
         delay = 1 + random.random()
         for retry in range(3):
-            if runner(
-                ('scp', '-oStrictHostKeyChecking=no', '-oControlMaster=auto',
-                 '-oControlPath=/dev/shm/.ssh.%C', '-oControlPersist=2',
-                 '-oBatchMode=yes', src, dst),
-                    print_cmd=('scp', src, dst),
-                    cwd=utils.REPO_DIR,
-                    check=retry == 2) == 0:
+            if runner(('scp', '-oStrictHostKeyChecking=no',
+                       '-oControlMaster=auto', '-oControlPath=/dev/shm/.ssh.%C',
+                       '-oControlPersist=2', '-oBatchMode=yes', src, dst),
+                      print_cmd=('scp', src, dst),
+                      cwd=utils.REPO_DIR,
+                      check=retry == 2) == 0:
                 break
             time.sleep(delay)
             delay *= 2
