@@ -206,3 +206,14 @@ export function formatTimeStats(object) {
         delta: delta === null ? null : formatTimeDelta(delta)
     };
 }
+
+
+export function formatTimeStatsRows(object) {
+    const stats = formatTimeStats(object);
+    const delta = stats.delta + (stats.finished ? '' : ' …');
+    return <>
+        <tr><td>Run Time</td><td>{delta}</td></tr>
+        <tr><td>Started</td><td>{stats.started}</td></tr>
+        {stats.finished && <tr><td>Finished</td><td>{stats.finished}</td></tr>}
+    </>;
+}

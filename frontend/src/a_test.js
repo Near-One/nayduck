@@ -58,7 +58,6 @@ function ATest (props) {
     }
 
     const testCommand = formatTestCommand(aTest.name);
-    const timeStats = common.formatTimeStats(aTest);
     const statusCls = common.statusClassName('text', aTest.status);
     return (
       <>
@@ -74,10 +73,8 @@ function ATest (props) {
           </tr>
           <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
           <tr><td>Test</td><td>{aTest.name}</td></tr>
-          {testCommand ? <tr><td>Command</td><td>{testCommand}</td></tr> : null}
-          <tr><td>Run Time</td><td>{timeStats.delta}</td></tr>
-          <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
-          <tr><td>Started</td><td>{timeStats.started}</td></tr>
+          {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
+          {common.formatTimeStatsRows(aTest)}
           <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>
           {aTest.logs ? <>
              <tr><th colSpan="2">Logs</th></tr>

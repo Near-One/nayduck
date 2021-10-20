@@ -194,18 +194,24 @@ class BackendDB(common_db.DB):
             self._populate_test_logs(tests, blob=False)
         return tests
 
-    def get_one_run(self, run_id: int) -> typing.Sequence[_Dict]:
-        sql = '''SELECT test_id, status, name, started, finished, branch
+    def get_one_run(self, run_id: int) -> typing.Optional[_Dict]:
+        sql = '''SELECT branch, encode(sha, 'hex') AS sha, timestamp, title,
+                        requester
+                   FROM runs
+                  WHERE run_id = :run_id'''
+        run = self._fetch_one(sql, run_id=run_id)
+        if not run:
+            return None
+
+        sql = '''SELECT test_id, status, name, started, finished
                    FROM tests JOIN runs USING (run_id)
-                  WHERE run_id = :id
+                  WHERE run_id = :run_id
                   ORDER BY status, started'''
-        tests = self._fetch_all(sql, id=run_id)
-        if tests:
-            branch = tests[0]['branch']
-            for test in tests:
-                test.pop('branch')
-            self._populate_data_about_tests(tests, branch, blob=False)
-        return tests
+        tests = self._fetch_all(sql, run_id=run_id)
+        self._populate_data_about_tests(tests, run['branch'], blob=False)
+
+        run['tests'] = tests
+        return run
 
     def _populate_test_logs(self,
                             tests: typing.Collection[_Dict],
