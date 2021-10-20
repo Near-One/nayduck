@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
 
 import * as common from "./common";
 
@@ -38,9 +37,8 @@ function Build (props) {
     };
 
     return <>
-      <table className="nav"><tbody>
-        <tr><td><NavLink to="/">« Back to all runs</NavLink></td></tr>
-      </tbody></table>
+      {common.renderBreadCrumbs({runId: BuildInfo.run_id})}
+
       <table className="big"><tbody>
         <tr>
             <td>Commit</td>

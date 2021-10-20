@@ -10,28 +10,20 @@ export function statusClassName(base, status) {
 }
 
 
-export function renderHistory(a_test, branch = null) {
+export function renderHistory(a_test, branch=null) {
     const statuses = ['PASSED', 'OTHER', 'FAILED'];
+    const keyPrefix = '' + a_test.test_id + '/' + (branch || '') + '/';
     const history = <ul>{a_test.history.map((count, index) => {
         const status = statuses[index];
-        return status
-            ? <li key={branch + '/history/' + index} className={
-                      statusClassName('text', status)
-              }>{branch ? status : status.substr(0, 1)}:{count}</li>
-            : null;
+        return status && <li key={keyPrefix + index} className={
+            statusClassName('text', status)
+        }>{branch ? status : status.substr(0, 1)}:{count}</li>;
     })}</ul>;
     const inner = branch
-          ? <>This test history for branch <b>{branch}</b>: {history}</>
+          ? <>History on <b>{branch}</b>: {history}</>
           : <small>{history}</small>;
     return <NavLink to={"/test_history/" + a_test.test_id}
                     className="history">{inner}</NavLink>
-}
-
-
-export function renderHistoryCell(history, branch) {
-    return history
-        ? <td>{renderHistory(history, branch)}</td>
-        :  null;
 }
 
 
@@ -216,4 +208,23 @@ export function formatTimeStatsRows(object) {
         <tr><td>Started</td><td>{stats.started}</td></tr>
         {stats.finished && <tr><td>Finished</td><td>{stats.finished}</td></tr>}
     </>;
+}
+
+
+export function renderBreadCrumbs(ids={}, history=[]) {
+    const { runId, buildId, testId } = ids;
+    const allLink = <td><NavLink to="/">« all runs</NavLink></td>;
+    const runLink = runId &&
+        <td><NavLink to={'/run/' + (runId | 0)}>« run #{runId}</NavLink></td>;
+    const buildLink = buildId &&
+        <td><NavLink to={'/build/' + (buildId | 0)}>« build #{buildId}</NavLink></td>;
+    const testLink = testId &&
+        <td><NavLink to={'/testId/' + (testId | 0)}>« test #{testId}</NavLink></td>;
+    const historyCells = history.map((entry, idx) => {
+        const [hist, branch] = entry;
+        return hist && <td key={idx}>{renderHistory(hist, branch, '' + idx)}</td>
+    });
+    return <table id="nav"><tbody><tr>
+        {allLink}{runLink}{buildLink}{testLink}{historyCells}
+    </tr></tbody></table>;
 }

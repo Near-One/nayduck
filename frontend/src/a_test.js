@@ -1,5 +1,4 @@
 import React, { useState, useEffect  } from "react";
-import { NavLink } from "react-router-dom";
 
 import * as common from "./common"
 
@@ -59,13 +58,14 @@ function ATest (props) {
 
     const testCommand = formatTestCommand(aTest.name);
     const statusCls = common.statusClassName('text', aTest.status);
-    return (
-      <>
-        <table claass="nav"><tbody><tr>
-          <td><NavLink to={"/run/" + aTest.run_id}>« Back to the run</NavLink></td>
-          {common.renderHistoryCell(aTest, aTest.branch)}
-          {common.renderHistoryCell(baseBranchHistory, baseBranch)}
-        </tr></tbody></table>
+    return <>
+        {common.renderBreadCrumbs({
+            runId: aTest.run_id,
+            buildId: aTest.build_id,
+        }, [
+            [aTest, aTest.branch],
+            [baseBranchHistory, baseBranch],
+        ])}
         <table className="big"><tbody>
           <tr>
             <td>Commit</td>
@@ -81,8 +81,7 @@ function ATest (props) {
              {aTest.logs.map(common.logRow)}
            </> : null}
         </tbody></table>
-      </>
-    );
+    </>
 }
 
 export default ATest;

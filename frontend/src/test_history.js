@@ -51,11 +51,10 @@ function TestHistory (props) {
     }
 
     return history ? <>
-      <table className="nav"><tbody><tr>
-        <td><NavLink to={"/test/" + (0 | props.match.params.test_id)}>« Back to the test</NavLink></td>
-        {common.renderHistoryCell(currentBranchHistory, currentBranch)}
-        {common.renderHistoryCell(baseBranchHistory, baseBranch)}
-      </tr></tbody></table>
+      {common.renderBreadCrumbs({testId: props.match.params.test_id}, [
+          [currentBranchHistory, currentBranch],
+          [baseBranchHistory, baseBranch],
+      ])}
       <table className="big list"><thead>
         <tr>
           <th>Commit</th>

@@ -165,9 +165,7 @@ function ARun (props) {
     };
 
     return <>
-      <table className="nav"><tbody>
-        <tr><td><NavLink to="/">« Back to all runs</NavLink></td></tr>
-      </tbody></table>
+      {common.renderBreadCrumbs()}
 
       <table className="big"><tbody>
         <tr>
