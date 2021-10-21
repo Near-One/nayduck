@@ -2,9 +2,8 @@ import concurrent.futures
 import contextlib
 import json
 import os
-from pathlib import Path, PurePath
+import pathlib
 import random
-import shutil
 import socket
 import subprocess
 import sys
@@ -20,11 +19,11 @@ from . import utils
 DEFAULT_TIMEOUT = 180
 
 _Test = typing.List[str]
-_Cmd = typing.Sequence[typing.Union[str, Path]]
+_Cmd = typing.Sequence[typing.Union[str, pathlib.Path]]
 _EnvB = typing.MutableMapping[bytes, bytes]
 
 
-def get_test_command(test: _Test) -> typing.Tuple[Path, _Cmd]:
+def get_test_command(test: _Test) -> typing.Tuple[pathlib.Path, _Cmd]:
     """Returns working directory and command to execute for given test.
 
     Assumes that the repository from which the test should be run is located in
@@ -162,7 +161,7 @@ def execute_test_command(test: _Test, envb: _EnvB, timeout: int,
         runner.stderr.seek(0, 2)
 
 
-def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
+def run_test(outdir: pathlib.Path, test: _Test, remote: bool, envb: _EnvB,
              runner: utils.Runner) -> str:
     outcome = 'FAILED'
     try:
@@ -173,16 +172,21 @@ def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
         if remote:
             timeout += 60 * 15
 
-        if test[0] == 'pytest':
-            utils.rmdirs(*utils.list_test_node_dirs())
-            utils.mkdirs(Path.home() / '.near')
+        dot_near = pathlib.Path.home() / '.near'
+        utils.rmdirs(dot_near)
+        utils.mkdirs(dot_near)
 
         outcome = execute_test_command(test, envb, timeout, runner)
         print('[{:<7}] {}'.format(outcome, ' '.join(test)), file=sys.stderr)
 
-        if test[0] == 'pytest':
-            for node_dir in utils.list_test_node_dirs():
-                shutil.copytree(node_dir, outdir / PurePath(node_dir).name)
+        dirs = [
+            name for name in os.listdir(dot_near) if name.startswith('test')
+        ]
+        if dirs:
+            dirs.sort()
+            runner(('du', '-sh', '--', *dirs), cwd=dot_near)
+            for name in dirs:
+                (outdir / name).symlink_to(dot_near / name)
     except Exception:
         runner.log_traceback()
     return outcome
@@ -190,7 +194,10 @@ def run_test(outdir: Path, test: _Test, remote: bool, envb: _EnvB,
 
 class LogFile:
 
-    def __init__(self, name: str, path: Path, binary: bool = False) -> None:
+    def __init__(self,
+                 name: str,
+                 path: pathlib.Path,
+                 binary: bool = False) -> None:
         self.name = name
         self.path = path
         self.stack_trace = False
@@ -200,7 +207,7 @@ class LogFile:
         self.binary = binary
 
 
-def generate_artifacts_file(directory: Path, name: str) -> None:
+def generate_artifacts_file(directory: pathlib.Path, name: str) -> None:
     """Generates a tar archive with fuzz crash artefacts if any are availabe."""
     artdir = utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts'
     subdir = 'runtime-fuzzer'
@@ -213,15 +220,15 @@ def generate_artifacts_file(directory: Path, name: str) -> None:
         return
 
     outfile = directory / name
-    cmd: typing.Sequence[typing.Union[str, Path]] = ('tar', 'cf', outfile, '-I',
-                                                     'gzip -9', '--', *files)
+    cmd: typing.Sequence[typing.Union[str, pathlib.Path]]
+    cmd = ('tar', 'cf', outfile, '-I', 'gzip -9', '--', *files)
     print('+ ' + ' '.join(str(arg) for arg in cmd), file=sys.stderr)
     returncode = subprocess.run(cmd, check=False, cwd=artdir).returncode
     if returncode != 0 and outfile.exists():
         outfile.unlink()
 
 
-def list_logs(directory: Path) -> typing.Sequence[LogFile]:
+def list_logs(directory: pathlib.Path) -> typing.Sequence[LogFile]:
     """Lists all log files to be saved."""
     crashes_file_name = 'crashes.tar.gz'
     generate_artifacts_file(directory, crashes_file_name)
@@ -244,7 +251,7 @@ def list_logs(directory: Path) -> typing.Sequence[LogFile]:
                         directory / entry,
                         binary=entry == 'crashes.tar.gz'))
 
-    rainbow_logs = Path.home() / '.rainbow' / 'logs'
+    rainbow_logs = pathlib.Path.home() / '.rainbow' / 'logs'
     if rainbow_logs.is_dir():
         for folder in os.listdir(rainbow_logs):
             for entry in os.listdir(rainbow_logs / folder):
@@ -341,7 +348,7 @@ def read_short_log(  # pylint: disable=too-many-branches
 
 
 def save_logs(server: worker_db.WorkerDB, test_id: int,
-              directory: Path) -> None:
+              directory: pathlib.Path) -> None:
     logs = list_logs(directory)
     if not logs:
         return
@@ -420,7 +427,7 @@ def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
 
 
 @contextlib.contextmanager
-def temp_dir() -> typing.Generator[Path, None, None]:
+def temp_dir() -> typing.Generator[pathlib.Path, None, None]:
     """A context manager setting a new temporary directory.
 
     Create a new temporary directory and sets it as tempfile.tempdir as well as
@@ -437,7 +444,7 @@ def temp_dir() -> typing.Generator[Path, None, None]:
         for var in old_env:
             os.environb[var] = os.fsencode(tmpdir)
         try:
-            yield Path(tmpdir)
+            yield pathlib.Path(tmpdir)
         finally:
             tempfile.tempdir = old_tempdir
             for var, old_value in old_env.items():
@@ -456,13 +463,13 @@ def handle_test(server: worker_db.WorkerDB, test: worker_db.Test) -> None:
             __handle_test(server, outdir, runner, test)
 
 
-def __handle_test(server: worker_db.WorkerDB, outdir: Path,
+def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
                   runner: utils.Runner, test: worker_db.Test) -> None:
     if not utils.checkout(test.sha, runner):
         server.update_test_status('CHECKOUT FAILED', test.test_id)
         return
 
-    utils.rmdirs(Path.home() / '.rainbow',
+    utils.rmdirs(pathlib.Path.home() / '.rainbow',
                  utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts')
 
     config_override: typing.Dict[str, typing.Any] = {}
