@@ -36,10 +36,7 @@ function TestHistory (props) {
             setCurrentBranchHistory(data);
             if (data.branch !== baseBranch) {
                 common.fetchAPI(basePath + '/history/' + baseBranch)
-                    .then(data => {
-                        data.test_id = (0 | props.match.params.test_id);
-                        setBaseBranchHistory(data)
-                    });
+                    .then(data => void setBaseBranchHistory(data));
             } else {
                 setBaseBranchHistory(null);
             }

@@ -32,8 +32,10 @@ export function renderHistory(a_test, branch=null) {
     const inner = branch
           ? <>History on <b>{branch}</b>: {history}</>
           : <small>{history}</small>;
-    return <NavLink to={"/test_history/" + a_test.test_id}
-                    className="history">{inner}</NavLink>
+    return a_test.test_id
+        ? <NavLink to={"/test_history/" + (0 | a_test.test_id)}
+                   className="history">{inner}</NavLink>
+        : inner;
 }
 
 
