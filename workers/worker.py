@@ -251,15 +251,6 @@ def list_logs(directory: pathlib.Path) -> typing.Sequence[LogFile]:
                         directory / entry,
                         binary=entry == 'crashes.tar.gz'))
 
-    rainbow_logs = pathlib.Path.home() / '.rainbow' / 'logs'
-    if rainbow_logs.is_dir():
-        for folder in os.listdir(rainbow_logs):
-            for entry in os.listdir(rainbow_logs / folder):
-                for suffix in ('err', 'out'):
-                    if suffix in entry:
-                        path = rainbow_logs / folder / entry
-                        files.append(LogFile(f'{folder}_{suffix}', path))
-
     return files
 
 
