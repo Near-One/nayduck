@@ -5,25 +5,19 @@ import * as common from "./common";
 
 
 function TestHistory (props) {
-    const [history, setHistory] = useState(null);
-    const [baseBranchHistory, setBaseBranchHistory] = useState(null);
     const [currentBranchHistory, setCurrentBranchHistory] = useState(null);
+    const [baseBranchHistory, setBaseBranchHistory] = useState(null);
     const baseBranch = "master";
-    const [currentBranch, setCurrentBranch] = useState("");
 
     useEffect(() => {
         const basePath = '/test/' + (0 | props.match.params.test_id);
         common.fetchAPI(basePath + '/history').then(data => {
             if (!data) {
-                setHistory(null);
-                setCurrentBranch('');
                 setCurrentBranchHistory(null);
                 setBaseBranchHistory(null);
                 return;
             }
             data.test_id = (0 | props.match.params.test_id);
-            setHistory(data.tests);
-            setCurrentBranch(data.branch);
             setCurrentBranchHistory(data);
             if (data.branch !== baseBranch) {
                 common.fetchAPI(basePath + '/history/' + baseBranch)
@@ -50,7 +44,13 @@ function TestHistory (props) {
         </tr>;
     }
 
-    return history ? <>
+    if (!currentBranchHistory) {
+        return null;
+    }
+
+    const currentBranch = currentBranchHistory.branch;
+    const tests = currentBranchHistory.tests;
+    return <>
       {common.renderBreadCrumbs({testId: props.match.params.test_id}, [
           [currentBranchHistory, currentBranch],
           [baseBranchHistory, baseBranch],
@@ -66,9 +66,9 @@ function TestHistory (props) {
           <th>Finished</th>
         </tr>
       </thead><tbody>
-       {history.map(formatRow)}
+       {tests.map(formatRow)}
       </tbody></table>
-    </> : null;
+    </>;
 }
 
 export default TestHistory;
