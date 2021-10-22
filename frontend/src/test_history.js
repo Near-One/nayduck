@@ -2,12 +2,27 @@ import React , { useState, useEffect  } from "react";
 import { NavLink } from "react-router-dom";
 
 import * as common from "./common";
+import {parseTestName} from "./a_test";
+
+
+const baseBranch = 'master';
+
+
+/** Formats page title base on data returned by the back end. */
+function formatTitle(data, testId) {
+    let title = parseTestName(data && data.name).testBaseName;
+    title = title || ('Test #' + testId);
+    title += ' (history';
+    if (data && data.branch !== baseBranch) {
+        title += ' on branch ' + data.branch;
+    }
+    return title + ')';
+};
 
 
 function TestHistory (props) {
     const [currentBranchHistory, setCurrentBranchHistory] = useState(null);
     const [baseBranchHistory, setBaseBranchHistory] = useState(null);
-    const baseBranch = "master";
 
     useEffect(() => {
         const basePath = '/test/' + (0 | props.match.params.test_id);
@@ -42,17 +57,13 @@ function TestHistory (props) {
           <td>{timeStats.started}</td>
           <td>{timeStats.finished}</td>
         </tr>;
-    }
+    };
 
-    if (!currentBranchHistory) {
-        return null;
-    }
-
-    const currentBranch = currentBranchHistory.branch;
-    const tests = currentBranchHistory.tests;
-    return <>
+    common.useTitle(formatTitle(currentBranchHistory,
+                                props.match.params.test_id));
+    return currentBranchHistory && <>
       {common.renderBreadCrumbs({testId: props.match.params.test_id}, [
-          [currentBranchHistory, currentBranch],
+          [currentBranchHistory, currentBranchHistory.branch],
           [baseBranchHistory, baseBranch],
       ])}
       <table className="big list"><thead>
@@ -66,7 +77,7 @@ function TestHistory (props) {
           <th>Finished</th>
         </tr>
       </thead><tbody>
-       {tests.map(formatRow)}
+       {currentBranchHistory.tests.map(formatRow)}
       </tbody></table>
     </>;
 }

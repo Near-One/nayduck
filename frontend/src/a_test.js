@@ -3,34 +3,47 @@ import React, { useState, useEffect  } from "react";
 import * as common from "./common"
 
 
-function formatTestCommand(name) {
-    const spec = name.trim().split(/\s+/);
-    const category = spec[0];
-    const pos = spec.indexOf('--features');
-    const features = pos === -1 ? '' : spec.splice(pos).join(' ');
-    let i = 1;
-    while (i < spec.length && /^--/.test(spec[i])) {
-        ++i;
-    }
-    spec.splice(0, i);
+export function parseTestName(name) {
+    let baseName = null;
+    let command = null;
 
-    switch (category) {
-    case 'expensive':
-        if (spec.length !== 3) {
-            return null;
+    if (name) {
+        const spec = name.trim().split(/\s+/);
+        const category = spec[0];
+        const pos = spec.indexOf('--features');
+        const features = pos === -1 ? '' : spec.splice(pos).join(' ');
+        let i = 1;
+        while (i < spec.length && /^--/.test(spec[i])) {
+            ++i;
         }
-        const f = features
-              ? features + ',expensive_tests'
-              : '--features expensive_tests';
-        const cmd = 'cargo test -p' + spec[0] + ' --test ' + spec[1] + ' ' + f +
-              ' -- --exact --nocapture ' + spec[2];
-        return <code>{cmd}</code>;
-    case 'pytest':
-    case 'mocknet':
-        return <code>{'cd pytest && python3 tests/' + spec.join(' ')}</code>;
-    default:
-        return null;
+        spec.splice(0, i);
+
+        switch (category) {
+        case 'expensive':
+            if (spec.length === 3) {
+                baseName = spec[2];
+                const f = features
+                      ? features + ',expensive_tests'
+                      : '--features expensive_tests';
+                command = 'cargo test -p' + spec[0] + ' --test ' + spec[1] +
+                      ' ' + f + ' -- --exact --nocapture ' + spec[2];
+            }
+            break;
+        case 'pytest':
+        case 'mocknet':
+            baseName = spec[0];
+            command = 'cd pytest && python3 tests/' + spec.join(' ');
+            break;
+        default:
+            baseName = spec.join(' ');
+            break;
+        }
     }
+
+    return {
+        testBaseName: baseName,
+        testCommand: command && <code>{command}</code>,
+    };
 }
 
 
@@ -52,13 +65,10 @@ function ATest (props) {
         });
     }, [props.match.params.test_id]);
 
-    if (!aTest) {
-        return null;
-    }
-
-    const testCommand = formatTestCommand(aTest.name);
-    const statusCls = common.statusClassName('text', aTest.status);
-    return <>
+    const {testBaseName, testCommand} = parseTestName(aTest && aTest.name);
+    common.useTitle(aTest && (testBaseName + ' (run #' + aTest.run_id + ')'));
+    const statusCls = aTest && common.statusClassName('text', aTest.status);
+    return aTest && <>
         {common.renderBreadCrumbs({
             runId: aTest.run_id,
             buildId: aTest.build_id,
@@ -81,7 +91,7 @@ function ATest (props) {
              {aTest.logs.map(common.logRow)}
            </> : null}
         </tbody></table>
-    </>
+    </>;
 }
 
 export default ATest;

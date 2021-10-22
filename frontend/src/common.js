@@ -1,8 +1,18 @@
-import React from "react";
-import {
-    NavLink,
-  } from "react-router-dom";
+import React, { useEffect } from "react";
+import { NavLink } from "react-router-dom";
 import * as ansicolor from "ansicolor";
+
+
+export function useTitle(title) {
+    useEffect(() => {
+        if (!title) {
+            return () => void 0;
+        }
+        const prev = document.title;
+        document.title = title ? title + ' — NayDuck' : 'NayDuck';
+        return () => void(document.title = prev);
+    });
+}
 
 
 export function statusClassName(base, status) {

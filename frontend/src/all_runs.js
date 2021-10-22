@@ -129,6 +129,7 @@ function AllRuns () {
        </td> : null}
     </tr>;
 
+    common.useTitle('Recent runs');
     return <table className="big list">
       <thead>
         <tr>

@@ -129,6 +129,19 @@ const formatStatusRow = statuses => {
 };
 
 
+/** Formats page title for the run. */
+const formatTitle = (aRun, runId) => {
+    if (aRun.requester === 'NayDuck') {
+        return 'Nightly ' + common.formatDateTime(aRun.started).substr(0, 10);
+    }
+    let title = 'Run #' + runId;
+    if (aRun.branch !== 'master') {
+        title += ' on ' + aRun.branch;
+    }
+    return title + ' by ' + aRun.requester;
+};
+
+
 function ARun (props) {
     const [orderDescTestTime, setOrderDescTestTime] = useState(true);
     const [aRun, setARun] = useState(null);
@@ -145,10 +158,6 @@ function ARun (props) {
             });
     }, [props.match.params.run_id]);
 
-    if (!aRun) {
-        return null;
-    }
-
     const filterByAll = event => {
         setFilteredRuns(filterTests(aRun.tests));
     }
@@ -164,7 +173,8 @@ function ARun (props) {
         setOrderDescTestTime(!orderDescTestTime);
     };
 
-    return <>
+    common.useTitle(aRun && formatTitle(aRun, props.match.params.run_id));
+    return aRun && <>
       {common.renderBreadCrumbs()}
 
       <table className="big"><tbody>

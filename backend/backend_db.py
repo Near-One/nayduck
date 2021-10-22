@@ -173,6 +173,7 @@ class BackendDB(common_db.DB):
                                       row.branch,
                                       interested_in_logs=True)
         return {
+            'name': row.name,
             'branch': row.branch,
             'tests': tests,
             'history': self.history_stats(tests),

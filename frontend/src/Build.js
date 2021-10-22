@@ -36,6 +36,8 @@ function Build (props) {
         </> : null;
     };
 
+    common.useTitle((BuildInfo.is_release ? 'Release' : 'Dev') + ' build #' +
+                    props.match.params.build_id);
     return <>
       {common.renderBreadCrumbs({runId: BuildInfo.run_id})}
 
