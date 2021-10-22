@@ -61,10 +61,13 @@ CREATE TABLE "tests" (
   "finished"    timestamptz,
   "remote"      boolean         NOT NULL DEFAULT FALSE,
   "worker_ip"   integer         NOT NULL DEFAULT 0,
+  -- Denormalised duplicate of runs.branch to speed up history search queries.
+  "branch"      varchar         NOT NULL DEFAULT '',
   PRIMARY KEY ("test_id")
 );
 CREATE INDEX ON "tests" ("run_id");
-CREATE INDEX ON "tests" ("name");
+-- Used by BackendDB.get_test_history and BackendDB.get_full_test_history
+CREATE INDEX ON "tests" ("branch", "name", "test_id", "status");
 -- Used by WorkerDB.get_pending_test
 CREATE INDEX ON "tests" ("build_id", ("category" != 'mocknet'))
  WHERE "status" = 'PENDING';
@@ -75,6 +78,16 @@ CREATE INDEX ON "tests" ("build_id", "status")
 -- Used by MasterDB.get_new_build
 CREATE INDEX ON "tests" ("build_id")
  WHERE "status" = 'PENDING' AND "category" = 'expensive';
+
+CREATE OR REPLACE VIEW "tests_history" (name, branch, status, count)
+AS SELECT name, branch, status, count(*)
+     FROM tests AS t
+     JOIN (SELECT status
+             FROM tests
+            WHERE t.name = tests.name AND t.branch = tests.branch
+            ORDER BY test_id
+            LIMIT 30) AS statuses USING (name, branch)
+    GROUP BY 1, 2, 3;
 
 CREATE TABLE "logs" (
   "test_id"     integer         NOT NULL REFERENCES "tests" ("test_id")

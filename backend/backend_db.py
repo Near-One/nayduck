@@ -162,16 +162,11 @@ class BackendDB(common_db.DB):
         return statuses
 
     def get_test_history_by_id(self, test_id: int) -> typing.Optional[_Dict]:
-        sql = '''SELECT name, branch
-                   FROM tests JOIN runs USING (run_id)
-                  WHERE test_id = :id
-                  LIMIT 1'''
+        sql = 'SELECT name, branch FROM tests WHERE test_id = :id LIMIT 1'
         row = self._exec(sql, id=test_id).first()
         if not row:
             return None
-        tests = self.get_test_history(row.name,
-                                      row.branch,
-                                      interested_in_logs=True)
+        tests = self.get_full_test_history(row.name, row.branch)
         return {
             'name': row.name,
             'branch': row.branch,
@@ -179,19 +174,31 @@ class BackendDB(common_db.DB):
             'history': self.history_stats(tests),
         }
 
-    def get_test_history(
-            self,
-            test_name: str,
-            branch: str,
-            interested_in_logs: bool = False) -> typing.Sequence[_Dict]:
-        sql = '''SELECT test_id, requester, title, status, started, finished,
-                        branch, encode(sha, 'hex') AS sha
+    def get_full_test_history(self, test_name: str,
+                              branch: str) -> typing.Sequence[_Dict]:
+        sql = '''SELECT test_id, status, requester, title, status, started,
+                        finished, encode(sha, 'hex') AS sha
                    FROM tests JOIN runs USING (run_id)
-                  WHERE name = :name AND branch = :branch
+                  WHERE name = :name
+                    AND tests.branch = :branch
                   ORDER BY test_id DESC
                   LIMIT 30'''
         tests = self._fetch_all(sql, name=test_name, branch=branch)
-        if interested_in_logs:
+        self._populate_test_logs(tests, blob=False)
+        return tests
+
+    def get_test_history(self,
+                         test_name: str,
+                         branch: str,
+                         full: bool = False) -> typing.Sequence[_Dict]:
+        sql = '''SELECT test_id, status
+                   FROM tests
+                  WHERE name = :name
+                    AND tests.branch = :branch
+                  ORDER BY test_id DESC
+                  LIMIT 30'''
+        tests = self._fetch_all(sql, name=test_name, branch=branch)
+        if full:
             self._populate_test_logs(tests, blob=False)
         return tests
 
@@ -205,7 +212,7 @@ class BackendDB(common_db.DB):
             return None
 
         sql = '''SELECT test_id, status, name, started, finished
-                   FROM tests JOIN runs USING (run_id)
+                   FROM tests
                   WHERE run_id = :run_id
                   ORDER BY status, started'''
         tests = self._fetch_all(sql, run_id=run_id)
@@ -214,9 +221,8 @@ class BackendDB(common_db.DB):
         run['tests'] = tests
         return run
 
-    def _populate_test_logs(self,
-                            tests: typing.Collection[_Dict],
-                            blob: bool = False) -> None:
+    def _populate_test_logs(self, tests: typing.Collection[_Dict], *,
+                            blob: bool) -> None:
         if not tests:
             return
 
@@ -244,10 +250,8 @@ class BackendDB(common_db.DB):
                 self._exec(sql), lambda row: typing.cast(int, row.test_id)):
             tests_by_id[test_id]['logs'] = [process_log(row) for row in rows]
 
-    def _populate_data_about_tests(self,
-                                   tests: typing.Collection[_Dict],
-                                   branch: str,
-                                   blob: bool = False) -> None:
+    def _populate_data_about_tests(self, tests: typing.Collection[_Dict],
+                                   branch: str, *, blob: bool) -> None:
         self._populate_test_logs(tests, blob=blob)
         for test in tests:
             history = self.get_test_history(test['name'], branch)
@@ -267,8 +271,8 @@ class BackendDB(common_db.DB):
             _pop_falsy(build, 'stdout', 'stderr')
         return build
 
-    def get_histoty_for_base_branch(self, test_id: int,
-                                    branch: str) -> typing.Optional[_Row]:
+    def get_histoty_for_branch(self, test_id: int,
+                               branch: str) -> typing.Optional[_Row]:
         sql = 'SELECT name FROM tests WHERE test_id = :id LIMIT 1'
         test = self._fetch_one(sql, id=test_id)
         if not test:
@@ -299,8 +303,8 @@ class BackendDB(common_db.DB):
 
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, started,
-                        finished, branch, encode(sha, 'hex') AS sha, title,
-                        requester
+                        finished, runs.branch, encode(sha, 'hex') AS sha,
+                        title, requester
                    FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
                   LIMIT 1'''
@@ -421,9 +425,10 @@ class BackendDB(common_db.DB):
             builds_dict[key].build_id = row['build_id']
 
         # Into Tests.
-        columns = ('run_id', 'build_id', 'name', 'category', 'remote')
+        columns = ('run_id', 'build_id', 'name', 'category', 'remote', 'branch')
         new_rows = sorted((run_id, test.build.build_id, test.name,
-                           test.category, test.is_remote) for test in tests)
+                           test.category, test.is_remote, branch)
+                          for test in tests)
         self._multi_insert('tests', columns, new_rows)
 
         return run_id
