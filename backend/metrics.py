@@ -6,7 +6,8 @@ import prometheus_flask_exporter
 
 from . import backend_db
 
-_Samples = typing.Sequence[typing.Tuple[str, typing.Mapping[str, str], int]]
+_Samples = typing.Sequence[typing.Tuple[str, typing.Mapping[str, str], int,
+                                        None, None]]
 
 
 class StatusMetric(prometheus_client.metrics.MetricWrapperBase):  # type: ignore
@@ -25,7 +26,8 @@ class StatusMetric(prometheus_client.metrics.MetricWrapperBase):  # type: ignore
         def as_dict(row: typing.Iterable[typing.Any]) -> typing.Dict[str, str]:
             return {key: str(value) for key, value in zip(keys, row)}
 
-        self.__samples = tuple(('', as_dict(row), 1) for row in rows)
+        self.__samples = tuple(
+            ('', as_dict(row), 1, None, None) for row in rows)
 
     def _metric_init(self) -> None:
         pass
