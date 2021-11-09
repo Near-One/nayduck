@@ -52,13 +52,14 @@ export function fetchAPI(path, post=false) {
 
 
 export function commitLink(object) {
-    if (!object.branch || !object.sha) {
+    if (!object.sha) {
         return null;
     }
     const branch = object.branch;
     const sha = object.sha.substr(0, 7);
     const href = 'https://github.com/near/nearcore/commit/' + sha;
-    return <>{branch} <small>(<a href={href}>{sha}</a>)</small></>;
+    const link = <a href={href}>{sha}</a>;
+    return branch ? <>{branch} <small>({link})</small></> : link;
 }
 
 
