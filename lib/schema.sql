@@ -60,7 +60,6 @@ CREATE TABLE "tests" (
   "name"        varchar         NOT NULL,
   "started"     timestamptz,
   "finished"    timestamptz,
-  "remote"      boolean         NOT NULL DEFAULT FALSE,
   "worker_ip"   integer         NOT NULL DEFAULT 0,
   -- Denormalised duplicate of runs.branch to speed up history search queries.
   "branch"      varchar         NOT NULL,

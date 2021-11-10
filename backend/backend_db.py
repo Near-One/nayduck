@@ -351,16 +351,13 @@ class BackendDB(common_db.DB):
         Attributes:
             name: Name of the tests which also describes the command to be
                 executed.
-            is_remote: Whether the test is remote.
             build: A BuildSpec this test depends on.  This is used to get the
                 build_id.
         """
 
-        def __init__(self, *, name: str, is_remote: bool,
-                     build: 'BackendDB.BuildSpec') -> None:
+        def __init__(self, *, name: str, build: 'BackendDB.BuildSpec') -> None:
             self.name = name
             self.is_release = build.is_release
-            self.is_remote = is_remote
             self.build = build
 
         @property
@@ -428,11 +425,10 @@ class BackendDB(common_db.DB):
             builds_dict[key].build_id = row['build_id']
 
         # Into Tests.
-        columns = ('run_id', 'build_id', 'name', 'category', 'remote', 'branch',
+        columns = ('run_id', 'build_id', 'name', 'category', 'branch',
                    'is_nightly')
         new_rows = sorted((run_id, test.build.build_id, test.name,
-                           test.category, test.is_remote, branch, is_nightly)
-                          for test in tests)
+                           test.category, branch, is_nightly) for test in tests)
         self._multi_insert('tests', columns, new_rows)
 
         return run_id

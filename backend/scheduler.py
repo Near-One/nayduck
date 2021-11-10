@@ -194,10 +194,7 @@ class Request(typing.NamedTuple):
                 backend_db.BackendDB.BuildSpec(is_release=is_release,
                                                features=features))
             build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-            tests.append(
-                backend_db.BackendDB.TestSpec(name=test,
-                                              build=build,
-                                              is_remote='--remote' in test))
+            tests.append(backend_db.BackendDB.TestSpec(name=test, build=build))
 
         # Sort builds by number of dependent tests so that when builders choose
         # what to do they start with builds which unlock the largest number of
