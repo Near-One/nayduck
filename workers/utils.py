@@ -66,11 +66,11 @@ def _kill_process_tree(pid: int) -> None:
 
     proc = psutil.Process(pid)
     procs = proc.children(recursive=True) + [proc]
-    print('Sending SIGTERM to {} process tree'.format(pid), file=sys.stderr)
+    print(f'Sending SIGTERM to {pid} process tree', file=sys.stderr)
     send_to_all(procs, signal.SIGTERM)
     _, procs = psutil.wait_procs(procs, timeout=5)
     if procs:
-        print('Sending SIGKILL to {} remaining processes'.format(len(procs)),
+        print(f'Sending SIGKILL to {len(procs)} remaining processes',
               file=sys.stderr)
         send_to_all(procs, signal.SIGKILL)
 
@@ -241,11 +241,12 @@ def checkout(sha: str, runner: Runner) -> bool:
             runner(('git', 'checkout', '-f', sha), cwd=REPO_DIR) == 0)
 
 
-def get_ip() -> int:
+def get_ip() -> typing.Tuple[int, str]:
     """Returns private IPv4 address of the current host as an integer.
 
     Returns:
-        A string with the hosts private IP address.
+        An (ip_int, ip_str) pair where first element is IP as a 32-bit unsigned
+        integer and the second is string representation of the IP.
     Raises:
         SystemExit: if no private IP address could be found for the host.
     """
@@ -261,7 +262,7 @@ def get_ip() -> int:
             if ((ip_addr & 0xFF000000) == 0x0A000000 or  # 10.0.0.0/8
                 (ip_addr & 0xFFF00000) == 0x0C100000 or  # 172.16.0.0/12
                 (ip_addr & 0xFFFF0000) == 0xC0A80000):  # 192.168.0.0/16bbb
-                return ip_addr
+                return ip_addr, addr.address
     raise SystemExit('Unable to determine private IP address')
 
 

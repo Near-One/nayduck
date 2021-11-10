@@ -76,19 +76,19 @@ class BackendDB(common_db.DB):
             rows = tuple(self._exec(sql))
             if not rows:
                 return 0
-            self._exec('DELETE FROM logs WHERE test_id IN ({})'.format(','.join(
-                str(int(row[0])) for row in rows)))
-            self._exec('''UPDATE builds
-                             SET started = NULL,
-                                 finished = NULL,
-                                 stderr = ''::bytea,
-                                 stdout = ''::bytea,
-                                 status = 'PENDING'
-                           WHERE build_id IN ({})
-                             AND (status = 'BUILD FAILED' OR
-                                  (status = 'BUILD DONE' AND
-                                   builder_ip = 0))'''.format(','.join(
-                str(int(row[1])) for row in rows)))
+            test_ids = ','.join(str(int(row[0])) for row in rows)
+            self._exec(f'DELETE FROM logs WHERE test_id IN ({test_ids})')
+            build_ids = ','.join(str(int(row[1])) for row in rows)
+            self._exec(f'''UPDATE builds
+                              SET started = NULL,
+                                  finished = NULL,
+                                  stderr = ''::bytea,
+                                  stdout = ''::bytea,
+                                  status = 'PENDING'
+                            WHERE build_id IN ({build_ids})
+                              AND (status = 'BUILD FAILED' OR
+                                   (status = 'BUILD DONE' AND
+                                    builder_ip = 0))''')
             return len(rows)
 
         return self._in_transaction(execute)
@@ -240,12 +240,13 @@ class BackendDB(common_db.DB):
             return ret
 
         tests_by_id = {int(test['test_id']): test for test in tests}
-        sql = '''SELECT test_id, type, size, storage, stack_trace {log_column}
-                   FROM logs
-                  WHERE test_id IN ({ids})
-                  ORDER BY test_id, type'''.format(
-            log_column=', log' if blob else '',
-            ids=','.join(str(test_id) for test_id in tests_by_id))
+        columns = 'test_id, type, size, storage, stack_trace'
+        if blob:
+            columns += ', log'
+        test_ids = ','.join(str(test_id) for test_id in tests_by_id)
+        sql = f'''SELECT {columns} FROM logs
+                   WHERE test_id IN ({test_ids})
+                   ORDER BY test_id, type'''
         for test_id, rows in itertools.groupby(
                 self._exec(sql), lambda row: typing.cast(int, row.test_id)):
             tests_by_id[test_id]['logs'] = [process_log(row) for row in rows]

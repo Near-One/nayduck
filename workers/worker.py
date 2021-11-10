@@ -177,7 +177,7 @@ def run_test(outdir: pathlib.Path, test: _Test, remote: bool, envb: _EnvB,
         utils.mkdirs(dot_near)
 
         outcome = execute_test_command(test, envb, timeout, runner)
-        print('[{:<7}] {}'.format(outcome, ' '.join(test)), file=sys.stderr)
+        print(f'[{outcome:<7}] ' + ' '.join(test), file=sys.stderr)
 
         dirs = [
             name for name in os.listdir(dot_near) if name.startswith('test')
@@ -505,10 +505,10 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
 
 
 def main() -> None:
-    ipv4 = utils.get_ip()
-    hostname = socket.gethostname()
-    print('Starting worker at {} ({})'.format(hostname, utils.int_to_ip(ipv4)),
+    ipv4, ip_str = utils.get_ip()
+    print(f'Starting worker @ {socket.gethostname()} ({ip_str} / {ipv4})',
           file=sys.stderr)
+    hostname = socket.gethostname()
 
     mocknet = 'mocknet' in hostname
     with worker_db.WorkerDB(ipv4) as server:

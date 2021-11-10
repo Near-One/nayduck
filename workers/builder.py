@@ -63,8 +63,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     Raises:
         BuildFailure: if build fails
     """
-    print('Building {}target'.format('expensive ' if spec.is_expensive else ''),
-          file=sys.stderr)
+    msg = 'expensive ' if spec.is_expensive else ''
+    print(f'Building {msg}target', file=sys.stderr)
 
     def cargo(*args: typing.Union[str, Path],
               add_features: bool = True) -> None:
@@ -192,9 +192,8 @@ def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
         except Exception:
             runner.log_traceback()
 
-        print('Build #{} {}'.format(spec.build_id,
-                                    'succeeded' if success else 'failed'),
-              file=sys.stderr)
+        result = 'succeeded' if success else 'failed'
+        print(f'Build #{spec.build_id} {result}', file=sys.stderr)
         runner.stdout.seek(0)
         stdout = runner.stdout.read()
         runner.stderr.seek(0)
@@ -203,9 +202,8 @@ def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
 
 
 def keep_pulling() -> None:
-    ipv4 = utils.get_ip()
-    print('Starting builder at {} ({})'.format(socket.gethostname(),
-                                               utils.int_to_ip(ipv4)),
+    ipv4, ip_str = utils.get_ip()
+    print(f'Starting builder @ {socket.gethostname()} ({ip_str} / {ipv4})',
           file=sys.stderr)
 
     with builder_db.BuilderDB(ipv4) as server:

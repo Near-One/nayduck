@@ -18,7 +18,7 @@ class Failure(Exception):
     """An exception indicating failure of the request_a_run request."""
 
     def __init__(self, response: typing.Any) -> None:
-        super().__init__('Failure. {}'.format(response))
+        super().__init__(f'Failure. {response}')
 
     def to_response(self) -> typing.Dict[str, typing.Union[int, str]]:
         """Returns a JSON object intended to return to the caller on failure."""
@@ -44,8 +44,8 @@ def _run(*cmd: typing.Union[str, pathlib.Path],
     except subprocess.CalledProcessError as ex:
         command = ' '.join(shlex.quote(str(arg)) for arg in cmd)
         stderr = ex.stderr.decode('utf-8', 'replace')
-        raise Failure('Command <{}> terminated with exit code {}:\n{}'.format(
-            command, ex.returncode, stderr)) from ex
+        raise Failure(f'Command <{command}> terminated with exit code '
+                      f'{ex.returncode}:\n{stderr}') from ex
 
 
 def _update_repo() -> pathlib.Path:
@@ -85,7 +85,7 @@ def _update_repo() -> pathlib.Path:
     # probably could include them and offer possibility to run tests on a commit
     # from a pull request. For now, I’m leaving the configuration without that.
     _run('git', 'init', '--bare', repo_dir)
-    with open(repo_dir / 'config', 'a') as wr:
+    with open(repo_dir / 'config', 'a', encoding='utf-8') as wr:
         wr.write('''[remote "origin"]
 	url = https://github.com/near/nearcore
 	fetch = +refs/heads/*:refs/heads/*
@@ -411,9 +411,8 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
         now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
         delta = now - last.timestamp
         need_new_run = delta >= datetime.timedelta(hours=24)
-        print('Last nightly at {}; {} ago; sha={}{}'.format(
-            last.timestamp, delta, last.sha,
-            '' if need_new_run else '; no need for a new run'),
+        print(f'Last nightly at {last.timestamp}; {delta} ago; sha={last.sha}' +
+              ('' if need_new_run else '; no need for a new run'),
               file=sys.stderr)
         if not need_new_run:
             return datetime.timedelta(hours=24) - delta
@@ -421,8 +420,8 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
         repo_dir = _update_repo()
         commit = CommitInfo.for_commit(repo_dir, 'master')
         need_new_run = last.sha != commit.sha
-        print('master sha={}{}'.format(
-            commit.sha, '' if need_new_run else '; no need for a new run'),
+        print(f'master sha={commit.sha}' +
+              ('' if need_new_run else '; no need for a new run'),
               file=sys.stderr)
         if not need_new_run:
             return datetime.timedelta(hours=24)

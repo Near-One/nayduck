@@ -85,7 +85,7 @@ def load(name: str) -> Config:
     """
     path = CONFIG_DIR / f'{name}.json'
     try:
-        with open(path) as rd:
+        with open(path, encoding='utf-8') as rd:
             value = json.load(rd)
     except OSError as ex:
         raise SystemExit(f'{path}: {ex.strerror}') from ex

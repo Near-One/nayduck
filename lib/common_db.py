@@ -134,10 +134,10 @@ class DB:
         Returns:
             Id of the inserted row.
         """
-        sql = 'INSERT INTO {} ("{}") VALUES ({})'.format(
-            table, '", "'.join(kw), ', '.join(f':{col}' for col in kw))
+        sql = f'''INSERT INTO {table} ("{'", "'.join(kw)}")
+                  VALUES ({', '.join(f':{col}' for col in kw)})'''
         if id_column:
-            sql += 'RETURNING "{}"'.format(id_column)
+            sql += f'RETURNING "{id_column}"'
             return int(self._exec(sql, **kw).first()[0])
         self._exec(sql, **kw)
         return 0
