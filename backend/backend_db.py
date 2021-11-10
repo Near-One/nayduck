@@ -458,6 +458,7 @@ class BackendDB(common_db.DB):
         test_keys: typing.Sequence[str]
         build_statuses: typing.List[typing.Sequence[typing.Any]]
         build_keys: typing.Sequence[str]
+        last_test_success: typing.Mapping[str, float]
 
     def get_metrics(self) -> typing.Optional['BackendDB.NayDuckMetrics']:
         """Returns metrics to export via Prometheus metrics reporting."""
@@ -489,13 +490,58 @@ class BackendDB(common_db.DB):
         else:
             finished = max_finished
 
+        last_test_success = {}
+        now = datetime.datetime.utcnow()
+        for test in tests:
+            timestamp: typing.Optional[datetime.datetime] = now
+            if test.status not in ('PASSED', 'IGNORED'):
+                timestamp = self.__get_last_test_success(test.name, now)
+            if timestamp:
+                last_test_success[test.name] = timestamp.timestamp()
+
         return self.NayDuckMetrics(run_id=run_id,
                                    start=nightly.timestamp,
                                    finish=finished,
                                    test_statuses=tests,
                                    test_keys=test_keys,
                                    build_statuses=builds,
-                                   build_keys=build_keys)
+                                   build_keys=build_keys,
+                                   last_test_success=last_test_success)
+
+    def __get_last_test_success(
+            self, name: str,
+            now: datetime.datetime) -> typing.Optional[datetime.datetime]:
+        """Returns timestamp when the test was last known to be successful.
+
+        Looks at 30 most recent finished nightly runs of test with given `name`.
+        If the most recent run was passing (i.e. in state PASSED or IGNORED)
+        returns `now`.  Otherwise, scans test runs backwards looking for the
+        first failed test which started current failed runs sequence and returns
+        its finished timestamp.
+
+        Args:
+            name: Name of the test to investigate.
+            now: ‘Now’ timestamp.
+        Returns:
+            None if the test did not finish any nightly runs yet otherwise
+            highest timestamp when it looked like it was passing.
+        """
+        sql = '''SELECT status, finished
+                   FROM tests
+                  WHERE name = :name
+                    AND is_nightly
+                    AND finished IS NOT NULL
+                    AND status NOT IN ('PENDING', 'RUNNING')
+                  ORDER BY finished DESC
+                  LIMIT 30'''
+        timestamp = None
+        for status, finished in self._exec(sql, name=name):
+            if timestamp is None:
+                timestamp = now
+            if status in ('PASSED', 'IGNORED'):
+                break
+            timestamp = finished
+        return timestamp
 
     def add_auth_cookie(self, timestamp: int, cookie: int) -> None:
         """Adds an authentication cookie to the database.

@@ -71,6 +71,11 @@ CREATE TABLE "tests" (
 CREATE INDEX ON "tests" ("run_id");
 -- Used by BackendDB.get_test_history and BackendDB.get_full_test_history
 CREATE INDEX ON "tests" ("branch", "name", "test_id", "status");
+-- Used by BackendDB.__get_last_test_success_timestamp
+CREATE INDEX ON "tests" ("name", "finished")
+ WHERE "is_nightly"
+   AND finished IS NOT NULL
+   AND status NOT IN ('PENDING', 'RUNNING');
 -- Used by WorkerDB.get_pending_test
 CREATE INDEX ON "tests" ("build_id", ("category" != 'mocknet'))
  WHERE "status" = 'PENDING';

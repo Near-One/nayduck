@@ -67,12 +67,21 @@ class Collector:
             'nayduck_nightly_test_status',
             'States of tests in the latest nightly run',
             registry=registry)
+        self.m_last_test_success = prometheus_client.Gauge(
+            'nayduck_nightly_last_test_success_timestamp',
+            ('Timestamp of the last time given test was successful.  If test '
+             'is currently failing this is timestamp the first time it failed; '
+             'otherwise it is current timestamp.  Cancelled tests are '
+             'treated as failures.'),
+            labelnames=('name',),
+            registry=registry)
 
     def _all(
             self
     ) -> typing.Sequence[prometheus_client.metrics.MetricWrapperBase]:
         return (self.m_nightly_id, self.m_nightly_start, self.m_nightly_finish,
-                self.m_nightly_build_status, self.m_nightly_test_status)
+                self.m_nightly_build_status, self.m_nightly_test_status,
+                self.m_last_test_success)
 
     def describe(self) -> typing.Iterable[prometheus_client.Metric]:
         return [
@@ -85,6 +94,7 @@ class Collector:
             metrics = server.get_metrics()
         if not metrics:
             return self.describe()
+
         self.m_nightly_id.set(metrics.run_id)
         self.m_nightly_start.set(metrics.start.timestamp())
         self.m_nightly_finish.set(
@@ -92,6 +102,12 @@ class Collector:
         self.m_nightly_test_status.set(metrics.test_statuses, metrics.test_keys)
         self.m_nightly_build_status.set(metrics.build_statuses,
                                         metrics.build_keys)
+
+        metric = self.m_last_test_success
+        metric.clear()
+        for name, timestamp in metrics.last_test_success.items():
+            metric.labels(name).set(timestamp)
+
         return [
             core_metric for metric in self._all()
             for core_metric in metric.collect()
