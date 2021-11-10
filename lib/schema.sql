@@ -36,6 +36,7 @@ CREATE TABLE "builds" (
   "stdout"      bytea           NOT NULL DEFAULT ''::bytea,
   "features"    varchar         NOT NULL DEFAULT '',
   "is_release"  boolean         NOT NULL DEFAULT FALSE,
+  -- This is effectively denormalised duplicate of runs.requester == 'NayDuck'.
   "low_priority" boolean        NOT NULL DEFAULT 0,
   "builder_ip"  integer         NOT NULL DEFAULT 0,
   PRIMARY KEY ("build_id")
@@ -62,7 +63,9 @@ CREATE TABLE "tests" (
   "remote"      boolean         NOT NULL DEFAULT FALSE,
   "worker_ip"   integer         NOT NULL DEFAULT 0,
   -- Denormalised duplicate of runs.branch to speed up history search queries.
-  "branch"      varchar         NOT NULL DEFAULT '',
+  "branch"      varchar         NOT NULL,
+  -- Denormalised duplicate of runs.requester == 'NayDuck'.
+  "is_nightly"  boolean         NOT NULL,
   PRIMARY KEY ("test_id")
 );
 CREATE INDEX ON "tests" ("run_id");

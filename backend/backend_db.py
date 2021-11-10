@@ -402,6 +402,8 @@ class BackendDB(common_db.DB):
                       tests: typing.Sequence['BackendDB.TestSpec'],
                       requester: str) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
+        is_nightly = requester == 'NayDuck'
+
         # Into Runs
         run_id = self._insert('runs',
                               'run_id',
@@ -418,16 +420,17 @@ class BackendDB(common_db.DB):
             'builds',
             ('run_id', 'status', 'features', 'is_release', 'low_priority'),
             [(run_id, build.initial_status, build.features, build.is_release,
-              requester == 'NayDuck') for build in builds],
+              is_nightly) for build in builds],
             returning=('build_id', 'features', 'is_release'))
         for row in rows:
             key = (row['is_release'], row['features'])
             builds_dict[key].build_id = row['build_id']
 
         # Into Tests.
-        columns = ('run_id', 'build_id', 'name', 'category', 'remote', 'branch')
+        columns = ('run_id', 'build_id', 'name', 'category', 'remote', 'branch',
+                   'is_nightly')
         new_rows = sorted((run_id, test.build.build_id, test.name,
-                           test.category, test.is_remote, branch)
+                           test.category, test.is_remote, branch, is_nightly)
                           for test in tests)
         self._multi_insert('tests', columns, new_rows)
 
