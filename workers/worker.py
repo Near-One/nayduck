@@ -12,18 +12,19 @@ import time
 import traceback
 import typing
 
+from lib import testspec
 from . import blobs
-from . import worker_db
 from . import utils
+from . import worker_db
 
 DEFAULT_TIMEOUT = 180
 
-_Test = typing.List[str]
 _Cmd = typing.Sequence[typing.Union[str, pathlib.Path]]
 _EnvB = typing.MutableMapping[bytes, bytes]
 
 
-def get_test_command(test: _Test) -> typing.Tuple[pathlib.Path, _Cmd]:
+def get_test_command(
+        test: testspec.TestSpec) -> typing.Tuple[pathlib.Path, _Cmd]:
     """Returns working directory and command to execute for given test.
 
     Assumes that the repository from which the test should be run is located in
@@ -34,18 +35,21 @@ def get_test_command(test: _Test) -> typing.Tuple[pathlib.Path, _Cmd]:
     Returns:
         A (cwd, cmd) tuple where first element is working directory in which to
         execute the command given by the second element.
-    Raises:
-        ValueError: If test specification is malformed.
     """
-    if len(test) >= 2 and test[0] in ('pytest', 'mocknet'):
-        cmd = [sys.executable, 'tests/' + test[1]] + test[2:]
-        return utils.REPO_DIR / 'pytest', cmd
-    if len(test) >= 4 and test[0] == 'expensive':
+    if test.category in ('pytest', 'mocknet'):
+        cwd = utils.REPO_DIR / 'pytest'
+        cmd = [sys.executable, 'tests/' + test.args[0]]
+        cmd.extend(test.args[1:])
+    elif test.category == 'expensive':
+        cwd = utils.REPO_DIR
+        prefix = test.args[1] + '-'
         for name in os.listdir(utils.REPO_DIR / 'target/expensive'):
-            if name.startswith(test[2] + '-'):
+            if name.startswith(prefix):
                 name = f'target/expensive/{name}'
-                return utils.REPO_DIR, (name, test[3], '--exact', '--nocapture')
-    raise ValueError('Invalid test command: ' + ' '.join(test))
+                cmd = [name, test.args[2], '--exact', '--nocapture']
+    else:
+        raise ValueError(f'Invalid test command: {test}')
+    return cwd, cmd
 
 
 _LAST_PIP_REQUIREMENTS: typing.Optional[bytes] = None
@@ -76,7 +80,8 @@ def find_backtrace_line(rd: typing.BinaryIO) -> bool:
                for line in rd)
 
 
-def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
+def analyse_test_outcome(test: testspec.TestSpec, ret: int,
+                         stdout: typing.BinaryIO,
                          stderr: typing.BinaryIO) -> str:
     """Returns test's outcome based on exit code and test's output.
 
@@ -121,13 +126,13 @@ def analyse_test_outcome(test: _Test, ret: int, stdout: typing.BinaryIO,
             return 'PASSED'
         return 'FAILED'
 
-    if test[0] == 'expensive':
+    if test.category == 'expensive':
         return analyse_rust_test()
 
     return 'PASSED'
 
 
-def execute_test_command(test: _Test, envb: _EnvB, timeout: int,
+def execute_test_command(test: testspec.TestSpec, envb: _EnvB, timeout: int,
                          runner: utils.Runner) -> str:
     """Executes a test command and returns test's outcome.
 
@@ -143,7 +148,7 @@ def execute_test_command(test: _Test, envb: _EnvB, timeout: int,
     Returns:
         Tests outcome as one of: 'PASSED', 'FAILED', 'IGNORED' or 'TIMEOUT'.
     """
-    print('[RUNNING] ' + ' '.join(test), file=sys.stderr)
+    print(f'[RUNNING] {test}', file=sys.stderr)
     stdout_start = runner.stdout.tell()
     stderr_start = runner.stderr.tell()
     envb[b'RUST_BACKTRACE'] = b'1'
@@ -161,23 +166,16 @@ def execute_test_command(test: _Test, envb: _EnvB, timeout: int,
         runner.stderr.seek(0, 2)
 
 
-def run_test(outdir: pathlib.Path, test: _Test, remote: bool, envb: _EnvB,
+def run_test(outdir: pathlib.Path, test: testspec.TestSpec, envb: _EnvB,
              runner: utils.Runner) -> str:
     outcome = 'FAILED'
     try:
-        timeout = DEFAULT_TIMEOUT
-        if len(test) > 1 and test[1].startswith('--timeout='):
-            timeout = int(test[1][10:])
-            test = [test[0]] + test[2:]
-        if remote:
-            timeout += 60 * 15
-
         dot_near = pathlib.Path.home() / '.near'
         utils.rmdirs(dot_near)
         utils.mkdirs(dot_near)
 
-        outcome = execute_test_command(test, envb, timeout, runner)
-        print(f'[{outcome:<7}] ' + ' '.join(test), file=sys.stderr)
+        outcome = execute_test_command(test, envb, test.full_timeout, runner)
+        print(f'[{outcome:<7}] {test}', file=sys.stderr)
 
         dirs = [
             name for name in os.listdir(dot_near) if name.startswith('test')
@@ -371,11 +369,11 @@ _LAST_COPIED_BUILD_ID: typing.Optional[int] = None
 _COPIED_EXPENSIVE_DEPS: typing.List[str] = []
 
 
-def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
+def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
               runner: utils.Runner) -> None:
     global _LAST_COPIED_BUILD_ID
 
-    if test[0] == 'mocknet':
+    if test.category == 'mocknet':
         return
 
     builder_addr = utils.int_to_ip(builder_ip)
@@ -406,12 +404,12 @@ def scp_build(build_id: int, builder_ip: int, test: _Test, build_type: str,
         for path in (repo_dir / 'runtime/near-test-contracts/res').iterdir():
             if path.suffix == '.wasm':
                 path.unlink()
-        scp('target/*', f'target/{build_type}')
+        scp('target/*', f'target/{test.build_dir}')
         scp('near-test-contracts/*.wasm', 'runtime/near-test-contracts/res')
         _LAST_COPIED_BUILD_ID = build_id
 
-    if test[0] == 'expensive':
-        test_name = test[2 + test[1].startswith('--')]
+    if test.category == 'expensive':
+        test_name = test.args[1]
         if test_name not in _COPIED_EXPENSIVE_DEPS:
             scp(f'expensive/{test_name}-*', 'target/expensive')
             _COPIED_EXPENSIVE_DEPS.append(test_name)
@@ -455,9 +453,9 @@ def handle_test(server: worker_db.WorkerDB, test: worker_db.Test) -> None:
 
 
 def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
-                  runner: utils.Runner, test: worker_db.Test) -> None:
-    if not utils.checkout(test.sha, runner):
-        server.update_test_status('CHECKOUT FAILED', test.test_id)
+                  runner: utils.Runner, test_row: worker_db.Test) -> None:
+    if not utils.checkout(test_row.sha, runner):
+        server.update_test_status('CHECKOUT FAILED', test_row.test_id)
         return
 
     utils.rmdirs(pathlib.Path.home() / '.rainbow',
@@ -466,18 +464,12 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
     config_override: typing.Dict[str, typing.Any] = {}
     envb: _EnvB = typing.cast(_EnvB, os.environb)
 
-    tokens = test.name.split()
-    if '--features' in tokens:
-        del tokens[tokens.index('--features'):]
+    test = testspec.TestSpec(name=test_row.name)
 
-    remote = '--remote' in tokens
-    if remote:
+    if test.is_remote:
         config_override.update(local=False, preexist=True)
-        tokens.remove('--remote')
-    release = '--release' in tokens
-    if release:
+    if test.is_release:
         config_override.update(release=True, near_root='../target/release/')
-        tokens.remove('--release')
 
     if config_override:
         fd, path = tempfile.mkstemp(prefix=b'config-', suffix=b'.json')
@@ -488,20 +480,19 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
 
     status = None
     try:
-        scp_build(test.build_id, test.builder_ip, tokens,
-                  'release' if release else 'debug', runner)
+        scp_build(test_row.build_id, test_row.builder_ip, test, runner)
     except (OSError, subprocess.SubprocessError):
         runner.log_traceback()
         status = 'SCP FAILED'
 
     if status is None:
-        if tokens[0] in ('pytest', 'mocknet'):
+        if test.category in ('pytest', 'mocknet'):
             install_new_packages(runner)
-        server.test_started(test.test_id)
-        status = run_test(outdir, tokens, remote, envb, runner)
+        server.test_started(test_row.test_id)
+        status = run_test(outdir, test, envb, runner)
 
-    server.update_test_status(status, test.test_id)
-    save_logs(server, test.test_id, outdir)
+    server.update_test_status(status, test_row.test_id)
+    save_logs(server, test_row.test_id, outdir)
 
 
 def main() -> None:
@@ -515,9 +506,9 @@ def main() -> None:
         server.handle_restart()
         while True:
             try:
-                test = server.get_pending_test(mocknet)
-                if test:
-                    handle_test(server, test)
+                test_row = server.get_pending_test(mocknet)
+                if test_row:
+                    handle_test(server, test_row)
                 else:
                     time.sleep(10)
             except KeyboardInterrupt:
