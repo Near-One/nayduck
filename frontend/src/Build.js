@@ -36,6 +36,20 @@ function Build (props) {
         </> : null;
     };
 
+    const buildType = (() => {
+        const type = BuildInfo.is_release ? 'Release' : 'Dev';
+        const features = BuildInfo.features;
+        if (!features) {
+            return type;
+        }
+        /* Historically, features included the full flag, i.e. ‘--features
+           <list-of-features>’ but that’s being changed so that the value only
+           includes the features themselves.  Handle both cases for the time
+           being before everything migrates to the new format. */
+        const sep = (features.startsWith('--features') ? ' ' : ' --features=');
+        return type + sep + features;
+    })();
+
     common.useTitle((BuildInfo.is_release ? 'Release' : 'Dev') + ' build #' +
                     props.match.params.build_id);
     return <>
@@ -47,11 +61,7 @@ function Build (props) {
             <td>{common.commitLink(BuildInfo)} {BuildInfo.title}</td>
          </tr>
         <tr><td>Requested by</td><td>{BuildInfo.requester}</td></tr>
-        <tr>
-            <td>Build Type</td>
-            <td>{BuildInfo.is_release ? 'Release' : 'Dev'}
-                {BuildInfo.features}</td>;
-        </tr>
+        <tr><td>Build Type</td><td>{buildType}</td></tr>
         <tr><td>Build Time</td><td>{timeStats.delta}</td></tr>
         <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
         <tr><td>Started</td><td>{timeStats.started}</td></tr>
