@@ -2,103 +2,56 @@ from . import testspec
 
 
 def test_testspec():
+    invalid_expensive = ('Err: expensive test category requires three '
+                         'arguments: <package> <test-executable> <test-name>')
     # yapf: disable
     tests = [
-        (
-            'pytest sanity/test.py',
-            ' 180 pytest sanity/test.py'
-        ),
-        (
-            'pytest sanity/state_sync_routed.py manytx 115',
-            ' 180 pytest sanity/state_sync_routed.py manytx 115'
-        ),
-        (
-            'pytest --timeout=180 sanity/test.py',
-            ' 180 pytest sanity/test.py'
-        ),
-        (
-            'pytest --timeout=420 sanity/test.py',
-            ' 420 pytest --timeout=420 sanity/test.py'
-        ),
-        (
-            'pytest --release sanity/test.py',
-            ' 180 pytest --release sanity/test.py'
-        ),
-        (
-            'pytest --remote sanity/test.py',
-            '1080 pytest --remote sanity/test.py'
-        ),
-        (
-            'pytest --timeout=420 --release --remote sanity/test.py',
-            '1320 pytest --timeout=420 --release --remote sanity/test.py'
-        ),
-        (
-            'pytest sanity/test.py --features foo,bar --features=baz',
-            ' 180 pytest sanity/test.py --features=bar,baz,foo'
-        ),
-        (
-            'pytest sanity/test.py --features foo,adversarial --features=foo',
-            ' 180 pytest sanity/test.py --features=foo'
-        ),
-        (
-            'pytest --timeout 420 sanity/test.py',
-            'Err: Invalid argument ‘--timeout’'
-        ),
-        (
-            'pytest --invalid-flag sanity/test.py',
-            'Err: Invalid argument ‘--invalid-flag’'
-        ),
-        (
-            'pytest',
-            'Err: Missing test argument'
-        ),
-        (
-            'pytest sanity/test.py --features=`rm-rf`',
-            'Err: Invalid feature ‘`rm-rf`’'
-        ),
-        (
-            'pytest /bin/destroy-the-world.py',
-            ' 180 pytest /bin/destroy-the-world.py'
-        ),
-        (
-            'pytest ../../bin/destroy-the-world.py',
-            'Err: Invalid test name ‘../../bin/destroy-the-world.py’'
-        ),
-        (
-            'mocknet mocknet/sanity.py',
-            ' 180 mocknet mocknet/sanity.py'
-        ),
-        (
-            'expensive nearcore test_tps test::test_highload',
-            ' 180 expensive nearcore test_tps test::test_highload'
-        ),
-        (
-            'expensive nearcore test_tps test::test_highload --features=foo',
-            ' 180 expensive nearcore test_tps test::test_highload --features=foo'
-        ),
-        (
-            'expensive nearcore /bin/destroy test::test_highload',
-            'Err: Invalid test name ‘/bin/destroy’'
-        ),
-        (
-            'expensive nearcore test_tps',
-            'Err: expensive test category requires three arguments: '
-            '<package> <test-executable> <test-name>'
-        ),
-        (
-            'expensive nearcore',
-            'Err: expensive test category requires three arguments: '
-            '<package> <test-executable> <test-name>'
-        ),
-        (
-            'expensive nearcore test_tps test::test_highload bogus',
-            'Err: expensive test category requires three arguments: '
-            '<package> <test-executable> <test-name>'
-        ),
-        (
-            'invalid-category sanity/test.py',
-            'Err: Invalid category ‘invalid-category’'
-        ),
+        ('pytest sanity/test.py',
+         ' 180 pytest sanity/test.py'),
+        ('pytest sanity/state_sync_routed.py manytx 115',
+         ' 180 pytest sanity/state_sync_routed.py manytx 115'),
+        ('pytest --timeout=180 sanity/test.py',
+         ' 180 pytest sanity/test.py'),
+        ('pytest --timeout=420 sanity/test.py',
+         ' 420 pytest --timeout=420 sanity/test.py'),
+        ('pytest --release sanity/test.py',
+         ' 180 pytest --release sanity/test.py'),
+        ('pytest --remote sanity/test.py',
+         '1080 pytest --remote sanity/test.py'),
+        ('pytest --timeout=420 --release --remote sanity/test.py',
+         '1320 pytest --timeout=420 --release --remote sanity/test.py'),
+        ('pytest sanity/test.py --features foo,bar --features=baz',
+         ' 180 pytest sanity/test.py --features=bar,baz,foo'),
+        ('pytest sanity/test.py --features foo,adversarial --features=foo',
+         ' 180 pytest sanity/test.py --features=foo'),
+        ('pytest --timeout 420 sanity/test.py',
+         'Err: Invalid argument ‘--timeout’'),
+        ('pytest --invalid-flag sanity/test.py',
+         'Err: Invalid argument ‘--invalid-flag’'),
+        ('pytest',
+         'Err: Missing test argument'),
+        ('pytest sanity/test.py --features=`rm-rf`',
+         'Err: Invalid feature ‘`rm-rf`’'),
+        ('pytest /bin/destroy-the-world.py',
+         ' 180 pytest /bin/destroy-the-world.py'),
+        ('pytest ../../bin/destroy-the-world.py',
+         'Err: Invalid test name ‘../../bin/destroy-the-world.py’'),
+        ('mocknet mocknet/sanity.py',
+         ' 180 mocknet mocknet/sanity.py'),
+        ('expensive nearcore test_tps test::test_highload',
+         ' 180 expensive nearcore test_tps test::test_highload'),
+        ('expensive nearcore test_tps test::test_highload --features=foo',
+         ' 180 expensive nearcore test_tps test::test_highload --features=foo'),
+        ('expensive nearcore /bin/destroy test::test_highload',
+         'Err: Invalid test name ‘/bin/destroy’'),
+        ('expensive nearcore test_tps',
+         invalid_expensive),
+        ('expensive nearcore',
+         invalid_expensive),
+        ('expensive nearcore test_tps test::test_highload bogus',
+         invalid_expensive),
+        ('invalid-category sanity/test.py',
+         'Err: Invalid category ‘invalid-category’'),
     ]
     # yapf: enable
     got = []
@@ -143,6 +96,28 @@ def test_testspec_with_count():
 
 def test_testspec_timeout():
     # yapf: disable
+    tests = (
+        ('pytest dir/test.py',   0,
+         'pytest dir/test.py', 180),
+        ('pytest dir/test.py', 180,
+         'pytest dir/test.py', 180),
+        ('pytest dir/test.py', 240,
+         'pytest --timeout=240 dir/test.py', 240),
+        ('pytest --timeout=240 dir/test.py',   0,
+         'pytest --timeout=240 dir/test.py', 240),
+        ('pytest --timeout=240 dir/test.py', 180,
+         'pytest dir/test.py', 180),
+        ('pytest --timeout=240 dir/test.py', 240,
+         'pytest --timeout=240 dir/test.py', 240),
+    )
+    # yapf: enable
+    for line, timeout, want_name, want_timeout in tests:
+        spec = testspec.TestSpec(line, timeout=timeout)
+        assert (want_name, want_timeout) == (spec.name(), spec.timeout)
+
+
+def test_testspec_timeout_in_name():
+    # yapf: disable
     tests = {
         'pytest sanity/test.py': (
             180,
@@ -176,11 +151,7 @@ def test_testspec_timeout():
     # yapf: enable
     for line, want in tests.items():
         spec = testspec.TestSpec(line)
-        got = (
-            spec.timeout,
-            spec.full_timeout,
-            spec.name(),
-            spec.name(include_timeout=False),
-            spec.name(include_timeout=True)
-        )
+        got = (spec.timeout, spec.full_timeout, spec.name(),
+               spec.name(include_timeout=False),
+               spec.name(include_timeout=True))
         assert want == got
