@@ -42,12 +42,7 @@ function Build (props) {
         if (!features) {
             return type;
         }
-        /* Historically, features included the full flag, i.e. ‘--features
-           <list-of-features>’ but that’s being changed so that the value only
-           includes the features themselves.  Handle both cases for the time
-           being before everything migrates to the new format. */
-        const sep = (features.startsWith('--features') ? ' ' : ' --features=');
-        return type + sep + features;
+        return type + ' --features=' + features;
     })();
 
     common.useTitle((BuildInfo.is_release ? 'Release' : 'Dev') + ' build #' +

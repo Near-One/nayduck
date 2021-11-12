@@ -48,16 +48,12 @@ export function parseTestName(name) {
 
 
 function testNameWithTimeout(test) {
-    const spec = test.name.trim().split(/\s+/);
-    if (test.timeout) {
-        const n = spec[1] && spec[1].startsWith('--timeout=') ? 1 : 0;
-        if (test.timeout !== 180) {
-            spec.splice(1, n, '--timeout=' + test.timeout);
-        } else if (n) {
-            spec.splice(1, n);
-        }
+    if (test.timeout === 180) {
+        return test.name;
     }
-    return spec.join(' ');
+    const words = test.name.trim().split(/\s+/);
+    words.splice(1, 0, '--timeout=' + test.timeout);
+    return words.join(' ');
 }
 
 

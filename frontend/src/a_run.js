@@ -36,10 +36,27 @@ const processRun = run => {
 
     run.tests.forEach(test => {
         const words = test.name.split(/ +/);
-        const pos = words.indexOf('--features');
-        test.features = pos === -1 ? '' : words.splice(pos).join(' ');
-        test.is_release = words.indexOf('--release') !== -1;
-        test.name = words.filter(word => !word.startsWith('--')).join(' ');
+
+        test.features = '';
+        let pos = words.indexOf('--features');
+        if (pos !== -1) {
+            test.features = words.splice(pos + 1).join(' ');
+            words.pop();
+        }
+
+        test.is_release = false;
+        pos = words.indexOf('--release');
+        if (pos !== -1) {
+            test.is_release = true;
+            words.splice(pos, 1);
+        }
+
+        pos = words.indexOf('--remote');
+        if (pos !== -1) {
+            words.splice(pos, 1);
+        }
+
+        test.name = words.join(' ');
 
         const status = test.status;
         statuses[test.status] = (statuses[test.status] || 0) + 1;
@@ -209,12 +226,10 @@ function ARun (props) {
           const timeStats = common.formatTimeStats(a_test);
           const statusCls = common.statusClassName(
               'text', a_test.status);
-          const features = (a_test.features || '')
-              .replace('--features ', '').replace(/,/, ',​')
           return (
             <tr key={a_test.test_id}>
               <td>{a_test.is_release ? 'Release' : 'Dev'}</td>
-              <td>{features}</td>
+              <td>{a_test.features}</td>
               <td><NavLink to={"/test/" + a_test.test_id}>{a_test.name}</NavLink></td>
               <td className={statusCls}>{a_test.status}<br/>
               {common.renderHistory(a_test)}

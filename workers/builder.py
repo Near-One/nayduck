@@ -18,24 +18,17 @@ class BuildSpec(typing.NamedTuple):
     build_id: int
     build_dir: Path
     sha: str
-    features: typing.Sequence[str]
+    features: str
     is_release: bool
     is_expensive: bool
 
     @classmethod
     def from_row(cls, data: builder_db.Build) -> 'BuildSpec':
         build_id = int(data.build_id)
-        # Historically, features column would include the flag, i.e. it’d be
-        # ‘--features list,of,features’, but this eventually changed to only
-        # include the list of features.  To handle either case, check if the
-        # value starts with a flag and if not add it.
-        features = data.features
-        if features and not features.startswith('--features'):
-            features = '--features=' + features
         return cls(build_id=build_id,
                    build_dir=utils.BUILDS_DIR / str(build_id),
                    sha=str(data.sha),
-                   features=tuple(features.split()),
+                   features=data.features,
                    is_release=bool(data.is_release),
                    is_expensive=bool(data.expensive))
 
@@ -48,7 +41,7 @@ class BuildSpec(typing.NamedTuple):
         if self.is_release:
             ret += ' --relaese'
         if self.features:
-            ret += ' ' + ' '.join(self.features)
+            ret += ' --features=' + self.features
         if self.is_expensive:
             ret += ' (inc. expensive)'
         return ret
@@ -76,8 +69,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     def cargo(*args: typing.Union[str, Path],
               add_features: bool = True) -> None:
         cmd = ['cargo', *args]
-        if add_features:
-            cmd.extend(spec.features)
+        if spec.features and add_features:
+            cmd.append('--features=' + spec.features)
         if spec.is_release:
             cmd.append('--release')
         if runner(cmd, cwd=utils.REPO_DIR) != 0:
