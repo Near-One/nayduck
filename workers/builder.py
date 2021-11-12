@@ -25,10 +25,17 @@ class BuildSpec(typing.NamedTuple):
     @classmethod
     def from_row(cls, data: builder_db.Build) -> 'BuildSpec':
         build_id = int(data.build_id)
+        # Historically, features column would include the flag, i.e. it’d be
+        # ‘--features list,of,features’, but this eventually changed to only
+        # include the list of features.  To handle either case, check if the
+        # value starts with a flag and if not add it.
+        features = data.features
+        if features and not features.startswith('--features'):
+            features = '--features=' + features
         return cls(build_id=build_id,
                    build_dir=utils.BUILDS_DIR / str(build_id),
                    sha=str(data.sha),
-                   features=tuple(data.features.split()),
+                   features=tuple(features.split()),
                    is_release=bool(data.is_release),
                    is_expensive=bool(data.expensive))
 
