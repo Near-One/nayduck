@@ -47,6 +47,20 @@ export function parseTestName(name) {
 }
 
 
+function testNameWithTimeout(test) {
+    const spec = test.name.trim().split(/\s+/);
+    if (test.timeout) {
+        const n = spec[1] && spec[1].startsWith('--timeout=') ? 1 : 0;
+        if (test.timeout !== 180) {
+            spec.splice(1, n, '--timeout=' + test.timeout);
+        } else if (n) {
+            spec.splice(1, n);
+        }
+    }
+    return spec.join(' ');
+}
+
+
 function ATest (props) {
     const [aTest, setATest] = useState(null);
     const [baseBranchHistory, setBaseBranchHistory] = useState(null);
@@ -82,7 +96,7 @@ function ATest (props) {
             <td>{common.commitLink(aTest)} {aTest.title}</td>
           </tr>
           <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
-          <tr><td>Test</td><td>{aTest.name}</td></tr>
+          <tr><td>Test</td><td>{testNameWithTimeout(aTest)}</td></tr>
           {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
           {common.formatTimeStatsRows(aTest)}
           <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>

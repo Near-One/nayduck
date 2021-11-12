@@ -7,6 +7,7 @@ class Test:
     test_id: int
     build_id: int
     name: str
+    timeout: int
     builder_ip: int
     sha: str
 
@@ -50,9 +51,9 @@ class WorkerDB(common_db.DB):
                          status = 'RUNNING',
                          worker_ip = :ip
                   WHERE test_id IN ({sql})
-               RETURNING test_id, build_id, run_id, name'''
+               RETURNING test_id, build_id, run_id, name, timeout'''
         sql = f'''WITH test AS ({sql})
-                  SELECT test_id, build_id, name, builder_ip,
+                  SELECT test_id, build_id, name, timeout, builder_ip,
                          ENCODE(sha, 'hex') AS sha
                     FROM test
                     JOIN runs USING (run_id)

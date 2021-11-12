@@ -464,7 +464,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
     config_override: typing.Dict[str, typing.Any] = {}
     envb: _EnvB = typing.cast(_EnvB, os.environb)
 
-    test = testspec.TestSpec(name=test_row.name)
+    test = testspec.TestSpec(name=test_row.name, timeout=test_row.timeout)
 
     if test.is_remote:
         config_override.update(local=False, preexist=True)

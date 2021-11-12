@@ -58,6 +58,7 @@ CREATE TABLE "tests" (
   "status"      "test_status"   NOT NULL DEFAULT 'PENDING',
   "category"    "test_category" NOT NULL,
   "name"        varchar         NOT NULL,
+  "timeout"     integer         NOT NULL,
   "started"     timestamptz,
   "finished"    timestamptz,
   "worker_ip"   integer         NOT NULL DEFAULT 0,

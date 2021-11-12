@@ -305,9 +305,9 @@ class BackendDB(common_db.DB):
         return res
 
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
-        sql = '''SELECT test_id, run_id, build_id, status, name, started,
-                        finished, runs.branch, encode(sha, 'hex') AS sha,
-                        title, requester
+        sql = '''SELECT test_id, run_id, build_id, status, name, timeout,
+                        started, finished, runs.branch,
+                        ENCODE(sha, 'hex') AS sha, title, requester
                    FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
                   LIMIT 1'''
@@ -378,12 +378,12 @@ class BackendDB(common_db.DB):
             returning=('build_id', 'is_release', 'features'))
 
         # Into Tests
-        columns = ('run_id', 'build_id', 'name', 'category', 'branch',
-                   'is_nightly')
-        new_rows = sorted(
-            (run_id, build_id, test.name(), test.category, branch, is_nightly)
-            for build_id, is_release, features in rows
-            for test in builds[(is_release, features)])
+        columns = ('run_id', 'build_id', 'name', 'category', 'timeout',
+                   'branch', 'is_nightly')
+        new_rows = sorted((run_id, build_id, test.name(include_timeout=False),
+                           test.category, test.timeout, branch, is_nightly)
+                          for build_id, is_release, features in rows
+                          for test in builds[(is_release, features)])
         self._multi_insert('tests', columns, new_rows)
 
         return run_id
