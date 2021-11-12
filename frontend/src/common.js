@@ -214,8 +214,17 @@ export function formatTimeStats(object) {
 
 
 export function formatTimeStatsRows(object) {
+    if (!object.started) {
+        return null;
+    }
     const stats = formatTimeStats(object);
-    const delta = stats.delta + (stats.finished ? '' : ' …');
+    let delta = stats.delta;
+    if (!stats.finished) {
+        delta += ' …';
+    }
+    if (object.timeout) {
+        delta += ' / ' + formatTimeDelta(object.timeout * 1000);
+    }
     return <>
         <tr><td>Run Time</td><td>{delta}</td></tr>
         <tr><td>Started</td><td>{stats.started}</td></tr>
