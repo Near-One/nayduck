@@ -153,6 +153,9 @@ def _check_args(category: str, args: typing.Sequence[str]) -> None:
         raise ValueError(f'Invalid test name ‘{name}’')
 
 
+TestSpecSequence = typing.Sequence['TestSpec']
+
+
 @dataclasses.dataclass(frozen=True)
 class TestSpec:
     """Specification for a test to be run.
@@ -263,7 +266,7 @@ class TestSpec:
             result.append('--remote')
         result.extend(self.args)
         if self.features:
-            result.append(f'--features={self.features}')
+            result.append(f'--features {self.features}')
         return ' '.join(result)
 
     def __str__(self) -> str:

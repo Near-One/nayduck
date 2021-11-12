@@ -6,9 +6,11 @@ import time
 import typing
 
 from lib import common_db
+from lib import testspec
 
 _Row = typing.Any
 _Dict = typing.Dict[str, typing.Any]
+_BuildKey = typing.Tuple[bool, str]
 
 
 def _pop_falsy(dictionary: _Dict, *keys: str) -> None:
@@ -314,59 +316,8 @@ class BackendDB(common_db.DB):
             self._populate_data_about_tests([test], test['branch'], blob=True)
         return test
 
-    class BuildSpec:
-        """Specification for a build.
-
-        Attributes:
-            is_release: Whether the build should use release build profile.
-            features: Features command line arguments to use when building.
-            has_non_mocknet: Whether any non-mocknet test depends on this build.
-                At the moment, mocknet tests don't need a build so a build with
-                no non-mocknet tests becomes a no-op.
-            build_id: A build_id filled in by BackendDB.schedule_a_run when the build
-                is inserted into the database.
-            test_count: Number of tests depending on this build.
-        """
-
-        def __init__(self, *, is_release: bool, features: str) -> None:
-            self.is_release = is_release
-            self.features = features
-            self.has_non_mocknet = False
-            self.build_id = 0
-            self.test_count = 0
-
-        def add_test(self, *, has_non_mocknet: bool) -> None:
-            self.has_non_mocknet = self.has_non_mocknet or has_non_mocknet
-            self.test_count += 1
-
-        @property
-        def initial_status(self) -> str:
-            if self.has_non_mocknet:
-                return 'PENDING'
-            return 'SKIPPED'
-
-    class TestSpec:
-        """Specification for a test.
-
-        Attributes:
-            name: Name of the tests which also describes the command to be
-                executed.
-            build: A BuildSpec this test depends on.  This is used to get the
-                build_id.
-        """
-
-        def __init__(self, *, name: str, build: 'BackendDB.BuildSpec') -> None:
-            self.name = name
-            self.is_release = build.is_release
-            self.build = build
-
-        @property
-        def category(self) -> str:
-            return self.name.split()[0]
-
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
-                       builds: typing.Sequence['BackendDB.BuildSpec'],
-                       tests: typing.Sequence['BackendDB.TestSpec'],
+                       tests: typing.Iterable[testspec.TestSpec],
                        requester: str) -> int:
         """Schedules a run with given set of pending tests to the database.
 
@@ -380,24 +331,24 @@ class BackendDB(common_db.DB):
                 for.
             sha: Commit sha to run the tests on.
             title: Subject of the commit.
-            builds: A sequence of builds necessary for the tests to run.  The
-                builds are modified in place by having their build_id set.
-            tests: A sequence of tests to add as a sequence of TestSpec objects.
+            tests: A sequence of tests to schedule.
             requester: User who requested the tests.
         Returns:
             Id of the scheduled run.
         """
+        builds = collections.defaultdict(list)
+        for test in tests:
+            builds[(test.is_release, test.features)].append(test)
         return self._in_transaction(self.__do_schedule,
                                     branch=branch,
                                     sha=sha,
                                     title=title,
                                     builds=builds,
-                                    tests=tests,
                                     requester=requester)
 
     def __do_schedule(self, *, branch: str, sha: str, title: str,
-                      builds: typing.Sequence['BackendDB.BuildSpec'],
-                      tests: typing.Sequence['BackendDB.TestSpec'],
+                      builds: typing.Mapping[_BuildKey,
+                                             testspec.TestSpecSequence],
                       requester: str) -> int:
         """Implementation for schedule_a_run executed in a transaction."""
         is_nightly = requester == 'NayDuck'
@@ -411,24 +362,28 @@ class BackendDB(common_db.DB):
                               requester=requester)
 
         # Into Builds
-        builds_dict = {
-            (build.is_release, build.features): build for build in builds
-        }
+        def builds_row(
+            item: typing.Tuple[_BuildKey, testspec.TestSpecSequence]
+        ) -> typing.Tuple[int, str, bool, str, bool]:
+            (is_release, features), tests = item
+            all_mocknet = all(test.category == 'mocknet' for test in tests)
+            status = 'SKIPPED' if all_mocknet else 'PENDING'
+            return (run_id, status, is_release, features, is_nightly)
+
+        build_items = sorted(builds.items(), key=lambda item: -len(item[1]))
         rows = self._multi_insert(
             'builds',
-            ('run_id', 'status', 'features', 'is_release', 'low_priority'),
-            [(run_id, build.initial_status, build.features, build.is_release,
-              is_nightly) for build in builds],
-            returning=('build_id', 'features', 'is_release'))
-        for row in rows:
-            key = (row['is_release'], row['features'])
-            builds_dict[key].build_id = row['build_id']
+            ('run_id', 'status', 'is_release', 'features', 'low_priority'),
+            [builds_row(itm) for itm in build_items],
+            returning=('build_id', 'is_release', 'features'))
 
-        # Into Tests.
+        # Into Tests
         columns = ('run_id', 'build_id', 'name', 'category', 'branch',
                    'is_nightly')
-        new_rows = sorted((run_id, test.build.build_id, test.name,
-                           test.category, branch, is_nightly) for test in tests)
+        new_rows = sorted(
+            (run_id, build_id, test.name(), test.category, branch, is_nightly)
+            for build_id, is_release, features in rows
+            for test in builds[(is_release, features)])
         self._multi_insert('tests', columns, new_rows)
 
         return run_id

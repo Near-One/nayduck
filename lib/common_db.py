@@ -138,17 +138,16 @@ class DB:
                   VALUES ({', '.join(f':{col}' for col in kw)})'''
         if id_column:
             sql += f'RETURNING "{id_column}"'
-            return int(self._exec(sql, **kw).first()[0])
-        self._exec(sql, **kw)
-        return 0
+        return int(self._exec(sql, **kw).scalar() or 0)
 
-    def _multi_insert(self,
-                      table: str,
-                      columns: typing.Sequence[str],
-                      rows: typing.Sequence[typing.Sequence[typing.Any]],
-                      *,
-                      returning: typing.Optional[typing.Sequence[str]] = None,
-                      on_conflict: str = '') -> typing.Sequence[_Dict]:
+    def _multi_insert(
+            self,
+            table: str,
+            columns: typing.Sequence[str],
+            rows: typing.Sequence[typing.Sequence[typing.Any]],
+            *,
+            returning: typing.Optional[typing.Sequence[str]] = None,
+            on_conflict: str = '') -> sqlalchemy.engine.cursor.CursorResult:
         """Executes an INSERT statement adding multiple rows at once.
 
         Args:
@@ -160,7 +159,10 @@ class DB:
             returning: If present, list of columns to return for each inserted
                 row.
             id_columns: If non-empty, body of the ‘ON CONFLICT’ phrase of the
-                query.'.
+                query.
+        Returns:
+            A cursor result which can be used to retrieve returned columns if
+            returning columns were specified.
         """
         names = '", "'.join(columns)
         sql = ', '.join(':r{i}c' + str(i) for i in range(len(columns)))
@@ -175,11 +177,7 @@ class DB:
             f'r{rno}c{cno}': value for rno, row in enumerate(rows)
             for cno, value in enumerate(row)
         }
-
-        result = self._exec(sql, **values)
-        if returning:
-            return tuple(self._to_dict(row) for row in result)
-        return ()
+        return self._exec(sql, **values)
 
     @classmethod
     def _to_dict(cls, row: _Row) -> typing.Dict[str, typing.Any]:

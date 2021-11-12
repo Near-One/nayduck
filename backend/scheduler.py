@@ -11,6 +11,7 @@ import typing
 
 import pytz
 
+from lib import testspec
 from . import backend_db
 
 
@@ -143,7 +144,7 @@ class Request(typing.NamedTuple):
     branch: str
     sha: str
     requester: str
-    tests: typing.List[str]
+    tests: typing.List[testspec.TestSpec]
 
     @classmethod
     def from_json(cls, request_json: typing.Any, requester: str) -> 'Request':
@@ -164,7 +165,7 @@ class Request(typing.NamedTuple):
         return cls(branch=branch,
                    sha=sha,
                    requester=requester,
-                   tests=cls.verify_tests(tests))
+                   tests=cls.parse_tests(tests))
 
     def schedule(self,
                  server: backend_db.BackendDB,
@@ -182,54 +183,43 @@ class Request(typing.NamedTuple):
             Failure: on any kind of error.
         """
         commit = commit or CommitInfo.for_commit(_update_repo(), self.sha)
-        builds: typing.Dict[typing.Tuple[bool, str],
-                            backend_db.BackendDB.BuildSpec] = {}
-        tests: typing.List[backend_db.BackendDB.TestSpec] = []
-        for test in self.tests:
-            is_release = '--release' in test
-            pos = test.find('--features')
-            features = '' if pos < 0 else test[pos:]
-            build = builds.setdefault(
-                (is_release, features),
-                backend_db.BackendDB.BuildSpec(is_release=is_release,
-                                               features=features))
-            build.add_test(has_non_mocknet=not test.startswith('mocknet '))
-            tests.append(backend_db.BackendDB.TestSpec(name=test, build=build))
-
-        # Sort builds by number of dependent tests so that when builders choose
-        # what to do they start with builds which unlock the largest number of
-        # tests.
         return server.schedule_a_run(branch=self.branch,
                                      sha=commit.sha,
                                      title=commit.title,
                                      requester=self.requester,
-                                     tests=tests,
-                                     builds=sorted(
-                                         builds.values(),
-                                         key=lambda build: -build.test_count))
+                                     tests=self.tests)
 
     @classmethod
-    def verify_tests(cls,
-                     tests: typing.Iterable[typing.Any]) -> typing.List[str]:
-        """Verifies that requested tests are valid.
+    def parse_tests(
+            cls, tests: typing.Iterable[typing.Any]
+    ) -> typing.List[testspec.TestSpec]:
+        """Parses test lines.
 
-        See Request._verify_single_test for description of what it means for
-        a single test to be valid.  Apart from checks on individual tests, this
-        method also verifies that there was at least one test and no more than
-        _TEST_COUNT_LIMIT in the request.  This takes into account that tests
-        can be multiplied by having count in front of them.
+        See testspec.TestSpec.from_name_with_count for description of how the
+        test lines are parsed and verified.  Apart from checks on individual
+        tests, this method also verifies that there was at least one test and no
+        more than _TEST_COUNT_LIMIT in the request.  This takes into account
+        that tests can be multiplied by having count in front of them.
 
         Args:
             tests: Tests as given in the JSON request.
         Returns:
-            List of tests to schedule.
+            List of test specifications to schedule.
         Raises:
             Failure: if any of the test is not valid, there are no tests given
                 or there are too many tests given.
         """
-        result: typing.List[str] = []
-        for test in tests:
-            count, test = cls._verify_single_test(test)
+        result: typing.List[testspec.TestSpec] = []
+        for line in tests:
+            if not isinstance(line, str):
+                raise Failure(f'Invalid test: {line}; expected string')
+            line = line.lstrip()
+            if not line or line[0] == '#':
+                continue
+            try:
+                count, test = testspec.TestSpec.from_name_with_count(line)
+            except ValueError as ex:
+                raise Failure(str(ex)) from ex
             if count + len(result) > _TEST_COUNT_LIMIT:
                 raise Failure('Invalid request object: too many tests; '
                               f'max {_TEST_COUNT_LIMIT} allowed')
@@ -237,114 +227,6 @@ class Request(typing.NamedTuple):
         if not result:
             raise Failure('Invalid request object: no tests specified')
         return result
-
-    @classmethod
-    def _verify_single_test(cls, test: typing.Any) -> typing.Tuple[int, str]:
-        """Verifies a single test line.
-
-        Checks that the test is a string and verifies that the --features (if
-        any) arguments are correct.  That is, if there's a --features switch in
-        the test, everything that follows it must be features and more
-        --features switches.  Furthermore, all features must have valid names.
-
-        Note that many things about the test are not checked.  Features are
-        checked because they are passed somewhat verbatim to cargo commands and
-        we want to control what goes there.  We are less concerned about
-        arguments to tests.
-
-        Args:
-            test: The test to verify.
-        Returns:
-            A (count, test) tuple.  The count specifies how many time given test
-            should be scheduled and test is the test after some normalisation.
-        Raises:
-            Failure: if the test is not valid.
-        """
-        if not isinstance(test, str):
-            raise Failure(f'Invalid test: {test}; expected string')
-        test = test.strip()
-        if not test or test[0] == '#':
-            return (0, '')
-
-        words, features = cls._extract_features(test)
-        count = int(words.pop(0)) if words and words[0].isnumeric() else 1
-        cls._check_test_name(test, words)
-        if features:
-            words.extend(('--features', ','.join(sorted(features))))
-        return count, ' '.join(words)
-
-    @classmethod
-    def _extract_features(
-            cls, test: str) -> typing.Tuple[typing.List[str], typing.Set[str]]:
-        """Extracts feature names from test.
-
-        A test can specify features it requires the binaries to be built with.
-        For example:
-
-            pytest sanity/proxy_simple.py --features nightly_protocol
-
-        This method extracts those features from test name and the test name
-        without the features.
-
-        Args:
-            test: The test being parsed.
-        Returns:
-            A (words, features) tuple where words is the test name sans features
-            split into words and features is a set of features present in the
-            test (or None if there were no features).  For the aforementioned
-            example, the method returns:
-
-                (['pytest', 'sanity/proxy_simple.py'],
-                 set(['nightly_protocol']))
-        Raises:
-            Failure: if the --features have invalid format or any of the
-                features have invalid names.
-        """
-        pos = test.find('--features')
-        if pos == -1:
-            return test.split(), set()
-
-        features = set()
-        want_features = False
-        for arg in test[pos:].split():
-            if want_features:
-                features.update(arg.split(','))
-                want_features = False
-            elif arg == '--features':
-                want_features = True
-            elif arg.startswith('--features='):
-                features.update(arg[11:].split(','))
-            else:
-                want_features = True
-                break
-        if want_features:
-            raise Failure(f'Invalid features arguments in: {test}')
-        # ‘adversarial’ is always enabled so remove it from the set if user
-        # explicitly enabled it.  If we don’t do that, we may end up doing an
-        # unnecessary build.
-        features.discard('adversarial')
-        for feature in features:
-            if not _VALID_FEATURE.search(feature):
-                raise Failure(f'Invalid feature "{feature}" in: {test}')
-        return test[:pos].split(), features
-
-    @classmethod
-    def _check_test_name(cls, test: str, words: typing.List[str]) -> None:
-        """Checks whether the test name is valid; raises Failure if not."""
-        try:
-            idx = 1 + words[1].startswith('--timeout')
-            if words[0] in ('pytest', 'mocknet'):
-                pattern = r'^[-_a-zA-Z0-9/]+\.py$'
-            elif words[0] == 'expensive':
-                idx += 1
-                pattern = '^[-_a-zA-Z0-9]+$'
-            else:
-                raise Failure(f'Invalid test category "{words[0]}" in: {test}')
-            name = words[idx]
-        except ValueError as ex:
-            raise Failure(f'Missing test name in: {test}') from ex
-        if not re.search(pattern, name):
-            raise Failure(f'Invalid test name "{name}" in: {test}')
 
 
 def schedule_nightly_run() -> datetime.timedelta:
@@ -357,7 +239,8 @@ def schedule_nightly_run() -> datetime.timedelta:
             return datetime.timedelta(hours=1)
 
 
-def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
+def _read_tests(repo_dir: pathlib.Path,
+                sha: str) -> typing.List[testspec.TestSpec]:
     """Reads tests from the repository nightly/nightly.txt file.
 
     Reads the `nightly/nightly.txt` file in the repository to get the list of
@@ -398,7 +281,7 @@ def _read_tests(repo_dir: pathlib.Path, sha: str) -> typing.List[str]:
     read_tests_from_file = typing.cast(typing.Any, mod['read_tests_from_file'])
     lines = read_tests_from_file(pathlib.Path(mod['DEFAULT_TEST_FILE']),
                                  reader=reader)
-    return Request.verify_tests(typing.cast(typing.Iterable[str], lines))
+    return Request.parse_tests(typing.cast(typing.Iterable[str], lines))
 
 
 def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
