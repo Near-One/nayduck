@@ -33,17 +33,16 @@ class WorkerDB(common_db.DB):
         Returns:
             A build to process or None if none are present.
         """
-        # pylint: disable=invalid-string-quote
-        build_is_ready = '''builds.status = 'SKIPPED'
-                        OR (builds.status = 'BUILD DONE' AND builder_ip != 0)'''
-        mocknet_filter = 'TRUE' if include_mocknet else "category != 'mocknet'"
+        build_is_ready = '''builds.status = 'BUILD DONE' AND builder_ip != 0'''
+        if include_mocknet:
+            tests_filter = f'''(({build_is_ready}) OR category = 'mocknet')'''
+        else:
+            tests_filter = f'''(({build_is_ready}) AND category != 'mocknet')'''
         sql = f'''SELECT test_id
                     FROM tests
                     JOIN builds USING (build_id)
-                   WHERE ({build_is_ready})
-                     AND tests.status = 'PENDING'
-                     AND {mocknet_filter}
-                   ORDER BY category != 'mocknet', low_priority, test_id
+                   WHERE tests.status = 'PENDING' AND {tests_filter}
+                   ORDER BY category != 'mocknet', low_priority
                    LIMIT 1'''
         sql = f'''UPDATE tests
                      SET started = NOW(),

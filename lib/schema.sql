@@ -43,9 +43,6 @@ CREATE TABLE "builds" (
 );
 -- Used by MasterDB.get_new_build
 CREATE INDEX ON "builds" ("low_priority", "build_id") WHERE status = 'PENDING';
--- Used by WorkerDB.get_pending_test
-CREATE INDEX ON "builds" ("build_id")
- WHERE "status" = 'SKIPPED' OR ("status" = 'BUILD DONE' AND "builder_ip" != 0);
 CREATE INDEX ON "builds" ("run_id");
 CREATE INDEX ON "builds" ("builder_ip") WHERE builder_ip != 0;
 
