@@ -369,7 +369,6 @@ small.blob {
 .build_status-pending      { background: #ff99ff }
 .build_status-building     { background: #9999ff }
 .build_status-build_done   { background: #ccffcc }
-.build_status-skipped      { background: #ccffcc }
 .build_status-build_failed { background: #ffcccc }
 
 .text-failed,
@@ -378,7 +377,6 @@ small.blob {
 .text-timeout      { color: #f0a3aa }
 .text-passed       { color: #008000 }
 .text-build_done   { color: #008000 }
-.text-skipped      { color: #008000 }
 .text-running      { color: #0000FF }
 .text-building     { color: #0000FF }
 .text-other        { color: #808080 }

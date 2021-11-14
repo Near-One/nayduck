@@ -88,7 +88,7 @@ function AllRuns () {
 
     const retryButton = a_run => {
         const canRetry = a_run.builds.some(build => {
-            if (build.status !== 'BUILD DONE' && build.status !== 'SKIPPED') {
+            if (build.status !== 'BUILD DONE') {
                 return false;
             }
             const {timeout, failed, build_failed} = build.tests;

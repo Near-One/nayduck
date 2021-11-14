@@ -32,7 +32,7 @@ class BackendDB(common_db.DB):
         """Cancels all the pending tests and builds in the run.
 
         Builds and tests which are already running are not affected.  Tests are
-        put into CANCELED state while builds into SKIPPED state.
+        put into CANCELED state while builds into BUILD DONE state.
 
         Args:
             run_id: Run to cancel.
@@ -44,13 +44,11 @@ class BackendDB(common_db.DB):
             sql = '''UPDATE tests
                         SET finished = NOW(), status = 'CANCELED'
                       WHERE status = 'PENDING' AND run_id = :id'''
-            rowcount = typing.cast(int,
-                                   self._exec(sql, id=run_id).rowcount or 0)
+            rowcount = int(self._exec(sql, id=run_id).rowcount or 0)
             sql = '''UPDATE builds
-                        SET finished = NOW(), status = 'SKIPPED'
+                        SET finished = NOW(), status = 'BUILD DONE'
                       WHERE status = 'PENDING' AND run_id = :id'''
-            rowcount += typing.cast(int,
-                                    self._exec(sql, id=run_id).rowcount or 0)
+            rowcount += int(self._exec(sql, id=run_id).rowcount or 0)
             return rowcount
 
         return self._in_transaction(execute)
@@ -74,23 +72,27 @@ class BackendDB(common_db.DB):
                              status = 'PENDING'
                        WHERE status IN ('FAILED', 'TIMEOUT')
                          AND run_id = {int(run_id)}
-                   RETURNING test_id, build_id'''
+                   RETURNING test_id, build_id, category'''
             rows = tuple(self._exec(sql))
             if not rows:
                 return 0
             test_ids = ','.join(str(int(row[0])) for row in rows)
             self._exec(f'DELETE FROM logs WHERE test_id IN ({test_ids})')
-            build_ids = ','.join(str(int(row[1])) for row in rows)
-            self._exec(f'''UPDATE builds
-                              SET started = NULL,
-                                  finished = NULL,
-                                  stderr = ''::bytea,
-                                  stdout = ''::bytea,
-                                  status = 'PENDING'
-                            WHERE build_id IN ({build_ids})
-                              AND (status = 'BUILD FAILED' OR
-                                   (status = 'BUILD DONE' AND
-                                    builder_ip = 0))''')
+            build_ids = set(
+                str(int(build_id))
+                for _, build_id, category in rows
+                if category != 'mocknet')
+            if build_ids:
+                self._exec(f'''UPDATE builds
+                                  SET started = NULL,
+                                      finished = NULL,
+                                      stderr = ''::bytea,
+                                      stdout = ''::bytea,
+                                      status = 'PENDING'
+                                WHERE build_id IN ({','.join(build_ids)})
+                                  AND (status = 'BUILD FAILED' OR
+                                       (status = 'BUILD DONE' AND
+                                        builder_ip = 0))''')
             return len(rows)
 
         return self._in_transaction(execute)
@@ -367,7 +369,7 @@ class BackendDB(common_db.DB):
         ) -> typing.Tuple[int, str, bool, str, bool]:
             (is_release, features), tests = item
             all_mocknet = all(test.category == 'mocknet' for test in tests)
-            status = 'SKIPPED' if all_mocknet else 'PENDING'
+            status = 'BUILD DONE' if all_mocknet else 'PENDING'
             return (run_id, status, is_release, features, is_nightly)
 
         build_items = sorted(builds.items(), key=lambda item: -len(item[1]))

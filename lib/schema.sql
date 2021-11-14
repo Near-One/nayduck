@@ -1,7 +1,7 @@
 --                                      -*- mode: sql sql-dialect: postgres; -*-
 
 CREATE TYPE "build_status"
-    AS ENUM('PENDING', 'BUILDING', 'BUILD DONE', 'BUILD FAILED', 'SKIPPED');
+    AS ENUM('PENDING', 'BUILDING', 'BUILD DONE', 'BUILD FAILED');
 CREATE TYPE "test_status"
     AS ENUM('FAILED', 'CHECKOUT FAILED', 'SCP FAILED', 'TIMEOUT', 'PASSED',
             'IGNORED', 'CANCELED', 'RUNNING', 'PENDING');
