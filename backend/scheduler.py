@@ -304,7 +304,7 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
               ('' if need_new_run else '; no need for a new run'),
               file=sys.stderr)
         if not need_new_run:
-            return datetime.timedelta(hours=24)
+            return datetime.timedelta(hours=1)
 
     tests = _read_tests(repo_dir, commit.sha)
     req = Request(branch='master',
