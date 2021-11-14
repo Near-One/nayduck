@@ -248,15 +248,16 @@ export function formatTimeStatsRows(object) {
         return null;
     }
     const stats = formatTimeStats(object);
-    let delta = stats.delta;
+    let runTime = stats.delta;
     if (!stats.finished) {
-        delta += ' …';
+        runTime = <span className="run-time-pending">{runTime}</span>;
     }
     if (object.timeout) {
-        delta += ' / ' + formatTimeDelta(object.timeout * 1000);
+        const timeout = formatTimeDelta(object.timeout * 1000);
+        runTime = <>{runTime} / {timeout}</>;
     }
     return <>
-        <tr><td>Run Time</td><td>{delta}</td></tr>
+        <tr><td>Run Time</td><td>{runTime}</td></tr>
         <tr><td>Started</td><td>{stats.started}</td></tr>
         {stats.finished && <tr><td>Finished</td><td>{stats.finished}</td></tr>}
     </>;
