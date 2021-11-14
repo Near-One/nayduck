@@ -100,8 +100,8 @@ function AllRuns () {
     };
 
     const formatRow = a_run => <tr key={a_run.run_id}>
-      <td>{common.commitLink(a_run)}</td>
-      <td><NavLink to={'/run/' + a_run.run_id}>{a_run.title}</NavLink></td>
+      <td>{common.branchLink(a_run)}</td>
+      <td>{common.commitNavLink('/run/' + a_run.run_id, a_run.title)}</td>
       <td>{a_run.requester}<br/><small>{
         common.formatDateTime(a_run.timestamp)
       }</small></td>

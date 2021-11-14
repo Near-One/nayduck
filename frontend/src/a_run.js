@@ -195,10 +195,7 @@ function ARun (props) {
       {common.renderBreadCrumbs()}
 
       <table className="big"><tbody>
-        <tr>
-          <td>Commit</td>
-          <td>{common.commitLink(aRun)} {aRun.title}</td>
-        </tr>
+        {common.commitRow(aRun)}
         <tr><td>Requested by</td><td>{aRun.requester}</td></tr>
         {common.formatTimeStatsRows(aRun)}
         {formatStatusRow(aRun.statuses)}

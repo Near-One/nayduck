@@ -51,10 +51,7 @@ function Build (props) {
       {common.renderBreadCrumbs({runId: BuildInfo.run_id})}
 
       <table className="big"><tbody>
-        <tr>
-            <td>Commit</td>
-            <td>{common.commitLink(BuildInfo)} {BuildInfo.title}</td>
-         </tr>
+        {common.commitRow(BuildInfo)}
         <tr><td>Requested by</td><td>{BuildInfo.requester}</td></tr>
         <tr><td>Build Type</td><td>{buildType}</td></tr>
         <tr><td>Build Time</td><td>{timeStats.delta}</td></tr>

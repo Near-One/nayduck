@@ -51,7 +51,7 @@ export function fetchAPI(path, post=false) {
 }
 
 
-export function commitLink(object) {
+export function branchLink(object) {
     if (!object.sha) {
         return null;
     }
@@ -60,6 +60,36 @@ export function commitLink(object) {
     const href = 'https://github.com/near/nearcore/commit/' + sha;
     const link = <a href={href}>{sha}</a>;
     return branch ? <>{branch} <small>({link})</small></> : link;
+}
+
+
+function parseCommitSubject(title) {
+    const m = /\s*\(#([0-9]{4,})\)\s*$/.exec(title || '');
+    if (!m) {
+        return [title, null];
+    }
+    const href = 'https://github.com/near/nearcore/pull/' + m[1];
+    return [
+        title.substr(0, m.index).trim(),
+        <small>(<a href={href}>#{m[1]}</a>)</small>
+    ];
+}
+
+
+export function commitNavLink(to, subject) {
+    const [title, prLink] = parseCommitSubject(subject || '');
+    const link = <NavLink to={to}>{title}</NavLink>;
+    return prLink ? <>{link} {prLink}</> : link;
+}
+
+
+export function commitRow(object) {
+    const branch = branchLink(object);
+    let [title, prLink] = parseCommitSubject(object.title || '');
+    if (prLink) {
+        title = <>{title} {prLink}</>;
+    }
+    return <tr><td>Commit</td><td>{branch} {title}</td></tr>;
 }
 
 

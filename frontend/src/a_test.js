@@ -87,10 +87,7 @@ function ATest (props) {
             [baseBranchHistory, baseBranch],
         ])}
         <table className="big"><tbody>
-          <tr>
-            <td>Commit</td>
-            <td>{common.commitLink(aTest)} {aTest.title}</td>
-          </tr>
+          {common.commitRow(aTest)}
           <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
           <tr><td>Test</td><td>{testNameWithTimeout(aTest)}</td></tr>
           {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
