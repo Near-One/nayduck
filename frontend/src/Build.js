@@ -11,7 +11,6 @@ function Build (props) {
             .then(data => setBuildInfo(data));
     }, [props.match.params.build_id]);
 
-    const timeStats = common.formatTimeStats(BuildInfo);
     const statusCell = BuildInfo.status ? <td className={
         common.statusClassName('text', BuildInfo.status)
     }>{BuildInfo.status}</td> : <td></td>;
@@ -54,9 +53,7 @@ function Build (props) {
         {common.commitRow(BuildInfo)}
         <tr><td>Requested by</td><td>{BuildInfo.requester}</td></tr>
         <tr><td>Build Type</td><td>{buildType}</td></tr>
-        <tr><td>Build Time</td><td>{timeStats.delta}</td></tr>
-        <tr><td>Finished</td><td>{timeStats.finished}</td></tr>
-        <tr><td>Started</td><td>{timeStats.started}</td></tr>
+        {common.formatTimeStatsRows('Build Time', BuildInfo)}
         <tr><td>Status</td>{statusCell}</tr>
         {logRows()}
       </tbody></table>

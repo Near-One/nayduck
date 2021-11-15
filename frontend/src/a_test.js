@@ -91,7 +91,7 @@ function ATest (props) {
           <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
           <tr><td>Test</td><td>{testNameWithTimeout(aTest)}</td></tr>
           {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
-          {common.formatTimeStatsRows(aTest)}
+          {common.formatTimeStatsRows('Run Time', aTest)}
           <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>
           {aTest.logs ? <>
              <tr><th colSpan="2">Logs</th></tr>
