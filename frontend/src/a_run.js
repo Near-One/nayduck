@@ -196,7 +196,10 @@ function ARun (props) {
 
       <table className="big"><tbody>
         {common.commitRow(aRun)}
-        <tr><td>Requested by</td><td>{aRun.requester}</td></tr>
+        <tr>
+          <td>Requested by</td>
+          <td>{common.formatRequester(aRun.requester)}</td>
+        </tr>
         {common.formatTimeStatsRows('Run Time', aRun)}
         {formatStatusRow(aRun.statuses)}
       </tbody></table>

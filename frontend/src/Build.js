@@ -51,7 +51,10 @@ function Build (props) {
 
       <table className="big"><tbody>
         {common.commitRow(BuildInfo)}
-        <tr><td>Requested by</td><td>{BuildInfo.requester}</td></tr>
+        <tr>
+          <td>Requested by</td>
+          <td>{common.formatRequester(BuildInfo.requester)}</td>
+        </tr>
         <tr><td>Build Type</td><td>{buildType}</td></tr>
         {common.formatTimeStatsRows('Build Time', BuildInfo)}
         <tr><td>Status</td>{statusCell}</tr>

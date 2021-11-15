@@ -93,6 +93,17 @@ export function commitRow(object) {
 }
 
 
+export function formatRequester(requester) {
+    if (!requester) {
+        return null;
+    } else if (requester === 'NayDuck') {
+        return <span className="nightly">NayDuck</span>;
+    } else {
+        return requester;
+    }
+}
+
+
 function formatSize(size) {
     if (size < 1000) {
         return '' + size;

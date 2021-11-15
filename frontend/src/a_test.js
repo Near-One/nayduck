@@ -88,7 +88,10 @@ function ATest (props) {
         ])}
         <table className="big"><tbody>
           {common.commitRow(aTest)}
-          <tr><td>Requested by</td><td>{aTest.requester}</td></tr>
+          <tr>
+            <td>Requested by</td>
+            <td>{common.formatRequester(aTest.requester)}</td>
+          </tr>
           <tr><td>Test</td><td>{testNameWithTimeout(aTest)}</td></tr>
           {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
           {common.formatTimeStatsRows('Run Time', aTest)}

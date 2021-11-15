@@ -400,6 +400,10 @@ small.blob {
   font-variant: small-caps;
 }
 
+.nightly::after {
+  content: ' 🌃';
+}
+
 .run-time-pending::after {
   animation: spin 4s linear infinite;
   content: ' …';
