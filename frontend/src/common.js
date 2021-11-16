@@ -93,13 +93,15 @@ export function commitRow(object) {
 }
 
 
-export function formatRequester(requester) {
+export function formatRequester(requester, makeDiv) {
     if (!requester) {
         return null;
-    } else if (requester === 'NayDuck') {
-        return <span className="nightly">NayDuck</span>;
+    } else if (requester !== 'NayDuck') {
+        return makeDiv ? <div>{requester}</div> : requester;
+    } else if (makeDiv) {
+        return <div className="nightly">NayDuck</div>;
     } else {
-        return requester;
+        return <span className="nightly">NayDuck</span>;
     }
 }
 

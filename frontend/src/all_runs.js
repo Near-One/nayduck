@@ -102,7 +102,7 @@ function AllRuns () {
     const formatRow = a_run => <tr key={a_run.run_id}>
       <td>{common.branchLink(a_run)}</td>
       <td>{common.commitNavLink('/run/' + a_run.run_id, a_run.title)}</td>
-      <td>{a_run.requester}<br/><small>{
+      <td>{common.formatRequester(a_run.requester, true)}<small>{
         common.formatDateTime(a_run.timestamp)
       }</small></td>
       <td>{
