@@ -13,13 +13,13 @@ def test_testspec():
         ('pytest --timeout=180 sanity/test.py',
          ' 180 pytest sanity/test.py'),
         ('pytest --timeout=420 sanity/test.py',
-         ' 420 pytest --timeout=420 sanity/test.py'),
+         ' 420 pytest --timeout=7m sanity/test.py'),
         ('pytest --release sanity/test.py',
          ' 180 pytest --release sanity/test.py'),
         ('pytest --remote sanity/test.py',
          '1080 pytest --remote sanity/test.py'),
         ('pytest --timeout=420 --release --remote sanity/test.py',
-         '1320 pytest --timeout=420 --release --remote sanity/test.py'),
+         '1320 pytest --timeout=7m --release --remote sanity/test.py'),
         ('pytest sanity/test.py --features foo,bar --features=baz',
          ' 180 pytest sanity/test.py --features bar,baz,foo'),
         ('pytest sanity/test.py --features foo,adversarial --features=foo',
@@ -102,13 +102,25 @@ def test_testspec_timeout():
         ('pytest dir/test.py', 180,
          'pytest dir/test.py', 180),
         ('pytest dir/test.py', 240,
-         'pytest --timeout=240 dir/test.py', 240),
+         'pytest --timeout=4m dir/test.py', 240),
         ('pytest --timeout=240 dir/test.py',   0,
-         'pytest --timeout=240 dir/test.py', 240),
+         'pytest --timeout=4m dir/test.py', 240),
         ('pytest --timeout=240 dir/test.py', 180,
          'pytest dir/test.py', 180),
         ('pytest --timeout=240 dir/test.py', 240,
-         'pytest --timeout=240 dir/test.py', 240),
+         'pytest --timeout=4m dir/test.py', 240),
+        ('pytest --timeout=200 dir/test.py',   0,
+         'pytest --timeout=200 dir/test.py', 200),
+        ('pytest --timeout=200s dir/test.py',   0,
+         'pytest --timeout=200 dir/test.py', 200),
+        ('pytest --timeout=3600 dir/test.py',   0,
+         'pytest --timeout=1h dir/test.py', 3600),
+        ('pytest --timeout=60m dir/test.py',   0,
+         'pytest --timeout=1h dir/test.py', 3600),
+        ('pytest --timeout=1h dir/test.py',   0,
+         'pytest --timeout=1h dir/test.py', 3600),
+        ('pytest --timeout=4200 dir/test.py',   0,
+         'pytest --timeout=70m dir/test.py', 4200),
     )
     # yapf: enable
     for line, timeout, want_name, want_timeout in tests:
@@ -124,28 +136,28 @@ def test_testspec_timeout_in_name():
             180,
             'pytest sanity/test.py',
             'pytest sanity/test.py',
-            'pytest --timeout=180 sanity/test.py'
+            'pytest --timeout=3m sanity/test.py'
         ),
         'pytest --timeout=180 sanity/test.py': (
             180,
             180,
             'pytest sanity/test.py',
             'pytest sanity/test.py',
-            'pytest --timeout=180 sanity/test.py'
+            'pytest --timeout=3m sanity/test.py'
         ),
         'pytest --timeout=240 sanity/test.py': (
             240,
             240,
-            'pytest --timeout=240 sanity/test.py',
+            'pytest --timeout=4m sanity/test.py',
             'pytest sanity/test.py',
-            'pytest --timeout=240 sanity/test.py'
+            'pytest --timeout=4m sanity/test.py'
         ),
         'pytest --remote sanity/test.py': (
             180,
             1080,
             'pytest --remote sanity/test.py',
             'pytest --remote sanity/test.py',
-            'pytest --timeout=180 --remote sanity/test.py'
+            'pytest --timeout=3m --remote sanity/test.py'
         ),
     }
     # yapf: enable

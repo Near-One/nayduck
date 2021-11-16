@@ -14,6 +14,48 @@ class _CategorySpec(typing.NamedTuple):
     is_remote: bool
 
 
+_TIME_SUFFIXES = {'h': 3600, 'm': 60, 's': 1}
+
+
+def _parse_timeout(timeout: str) -> int:
+    """Parses timeout interval and converts it into number of seconds.
+
+    Args:
+        timeout: An integer with an optional ‘h’, ‘m’ or ‘s’ suffix which
+            multiply the integer by 3600, 60 and 1 respectively.
+    Returns:
+        Interval in seconds.
+    Raises:
+        ValueError: if the string argument is in the wrong format.
+    """
+    try:
+        mul = _TIME_SUFFIXES.get(timeout[-1])
+        if mul:
+            timeout = timeout[:-1]
+        else:
+            mul = 1
+        return int(timeout) * mul
+    except (ValueError, IndexError) as ex:
+        raise ValueError(f'Invalid timeout argument ‘{timeout}’') from ex
+
+
+def _format_timeout(timeout: int) -> str:
+    """Formats timeout expressed in seconds as a string with optional suffix.
+
+    Args:
+        timeout: An interval in seconds.
+    Returns:
+        Interval formatted as a string potentially with ‘h’ or ‘m’ suffix.
+        Suffixes are used if interval represents integer number of hours or
+        minutes respectively and largest possible suffix is used.
+    """
+    if timeout % 3600 == 0:
+        return f'{timeout // 3600}h'
+    if timeout % 60 == 0:
+        return f'{timeout // 60}m'
+    return str(timeout)
+
+
 def _extract_category(words: typing.List[str]) -> _CategorySpec:
     """Extracts category specification from a test.
 
@@ -44,10 +86,7 @@ def _extract_category(words: typing.List[str]) -> _CategorySpec:
         elif word == '--remote':
             is_remote = True
         elif word.startswith('--timeout='):
-            try:
-                timeout = int(word[10:])
-            except ValueError as ex:
-                raise ValueError(f'Invalid timeout argument ‘{word}’') from ex
+            timeout = _parse_timeout(word[10:])
         elif word.startswith('--'):
             raise ValueError(f'Invalid argument ‘{word}’')
         else:
@@ -259,7 +298,7 @@ class TestSpec:
         if include_timeout is None:
             include_timeout = self.timeout != _DEFAULT_TIMEOUT
         if include_timeout:
-            result.append(f'--timeout={self.timeout}')
+            result.append(f'--timeout={_format_timeout(self.timeout)}')
         if self.is_release:
             result.append('--release')
         if self.is_remote:
