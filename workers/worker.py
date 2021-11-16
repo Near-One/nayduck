@@ -152,6 +152,7 @@ def execute_test_command(test: testspec.TestSpec, envb: _EnvB, timeout: int,
     stdout_start = runner.stdout.tell()
     stderr_start = runner.stderr.tell()
     envb[b'RUST_BACKTRACE'] = b'1'
+    envb[b'NAYDUCK_TIMEOUT'] = str(timeout).encode('ascii')
     try:
         cwd, cmd = get_test_command(test)
         ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
