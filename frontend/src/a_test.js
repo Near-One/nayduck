@@ -48,12 +48,18 @@ export function parseTestName(name) {
 
 
 function testNameWithTimeout(test) {
-    if (test.timeout === 180) {
-        return test.name;
+    let {name, timeout} = test;
+    if (timeout !== 180) {
+        if (timeout % 3600 == 0) {
+            timeout = (timeout / 3600) + 'h';
+        } else if (timeout % 60 == 0) {
+            timeout = (timeout / 60) + 'm';
+        }
+        const words = test.name.trim().split(/\s+/);
+        words.splice(1, 0, '--timeout=' + timeout);
+        name = words.join(' ');
     }
-    const words = test.name.trim().split(/\s+/);
-    words.splice(1, 0, '--timeout=' + test.timeout);
-    return words.join(' ');
+    return name;
 }
 
 
