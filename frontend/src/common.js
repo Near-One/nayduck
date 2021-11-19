@@ -202,19 +202,19 @@ function formatTZOffset(value) {
 }
 
 
-export function formatDateTime(timestampMs) {
+export function formatDateTime(timestampMs, utc=false) {
     if (!timestampMs) {
         return null;
     }
     const date = new Date(timestampMs);
-    const year = date.getFullYear();
-    const month = pad(date.getMonth() + 1);
-    const day = pad(date.getDate());
-    const hours = pad(date.getHours());
-    const minutes = pad(date.getMinutes());
-    const seconds = pad(date.getSeconds());
-    const offset = formatTZOffset(date.getTimezoneOffset());
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${offset}`;
+    const year = utc ? date.getUTCFullYear() : date.getFullYear();
+    const month = pad((utc ? date.getUTCMonth() : date.getMonth()) + 1);
+    const day = pad(utc ? date.getUTCDate() : date.getDate());
+    const hours = pad(utc ? date.getUTCHours() : date.getHours());
+    const minutes = pad(utc ? date.getUTCMinutes() : date.getMinutes());
+    const seconds = pad(utc ? date.getUTCSeconds() : date.getSeconds());
+    const offset = utc ? '' : (' ' + formatTZOffset(date.getTimezoneOffset()));
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}${offset}`;
 }
 
 

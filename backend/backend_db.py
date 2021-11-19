@@ -462,6 +462,26 @@ class BackendDB(common_db.DB):
                                    build_keys=build_keys,
                                    last_test_success=last_test_success)
 
+    class NightlyTestEvent:
+        timestamp: datetime.datetime
+        run_id: int
+        name: str
+        status: str
+
+    def get_nightly_events(
+            self) -> typing.Sequence['BackendDB.NightlyTestEvent']:
+        """Returns nightly runs events."""
+        rows = self._exec('''
+            SELECT timestamp, run_id, name, status
+              FROM runs JOIN tests USING (run_id)
+             WHERE requester = 'NayDuck'
+               AND timestamp >= CURRENT_TIMESTAMP - interval '91 days'
+               AND finished IS NOT NULL
+             ORDER BY timestamp
+        ''')
+        return typing.cast(typing.Sequence[BackendDB.NightlyTestEvent],
+                           list(rows))
+
     def __get_last_test_success(
             self, name: str,
             now: datetime.datetime) -> typing.Optional[datetime.datetime]:

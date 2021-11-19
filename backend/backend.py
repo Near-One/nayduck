@@ -1,5 +1,7 @@
+import collections
 import datetime
 import gzip
+import itertools
 import json
 import pathlib
 import time
@@ -163,6 +165,42 @@ def schedule_nightly_run_check(delta: datetime.timedelta) -> None:
                   misfire_grace_time=None,
                   coalesce=True,
                   run_date=(datetime.datetime.now() + delta))
+
+
+@app.route('/api/nightly-events', methods=['GET'])
+def get_nightly_events() -> flask.Response:
+    with backend_db.BackendDB() as server:
+        events = server.get_nightly_events()
+
+    last_timestamp, last_run_id = datetime.datetime.utcnow(), 0
+    key_func = lambda row: (row.timestamp, row.run_id)
+    tests_by_name: typing.Dict[str, typing.List[typing.Tuple[
+        datetime.datetime, int, str]]] = collections.defaultdict(list)
+    enabled_tests: typing.Set[str] = set()
+
+    for (timestamp, run_id), tests in itertools.groupby(events, key=key_func):
+        last_timestamp = timestamp
+        last_run_id = run_id
+
+        curr_tests: typing.Set[str] = set()
+        for test in tests:
+            curr_tests.add(test.name)
+            test_events = tests_by_name[test.name]
+            if not test_events or test_events[-1][2] != test.status:
+                test_events.append((timestamp, run_id, test.status))
+
+        enabled_tests.difference_update(curr_tests)
+        for name in enabled_tests:
+            tests_by_name[name].append((timestamp, run_id, 'DISABLED'))
+        enabled_tests = curr_tests
+
+    if last_run_id:
+        return jsonify({
+            'last_run_id': last_run_id,
+            'last_nightly': last_timestamp,
+            'tests': tests_by_name
+        })
+    return jsonify({})
 
 
 @app.route('/logs/<any("test","build"):kind>/<int:obj_id>/<log_type>')
