@@ -136,9 +136,10 @@ class DB:
         """
         sql = f'''INSERT INTO {table} ("{'", "'.join(kw)}")
                   VALUES ({', '.join(f':{col}' for col in kw)})'''
-        if id_column:
-            sql += f'RETURNING "{id_column}"'
-        return int(self._exec(sql, **kw).scalar() or 0)
+        if not id_column:
+            self._exec(sql, **kw)
+            return 0
+        return int(self._exec(f'{sql} RETURNING "{id_column}"', **kw).scalar())
 
     def _multi_insert(
             self,
