@@ -99,7 +99,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     else:
         test_feature = 'adversarial'
 
-    cargo('build', '-pneard', '--bin', 'neard', '--features', test_feature)
+    cargo('build', '-pneard', '--bin', 'neard', '--features',
+          f'{test_feature},rosetta_rpc')
     cargo('build',
           '-pgenesis-populate',
           '-prestaked',

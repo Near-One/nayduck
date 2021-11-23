@@ -146,12 +146,12 @@ def _extract_features(words: typing.List[str]) -> str:
     if start is None:
         return ''
 
-    # ‘adversarial’ or ‘test_features’ feature is always enabled so remove them
-    # from the set if user explicitly enabled either of them.  If we don’t do
-    # that, we may end up doing an unnecessary build.  The two features are
-    # really the same with the former being the old name for the latter.
+    # ‘adversarial’/‘test_features’ and ‘rosetta_rpc’ features are always
+    # enabled so remove them from the set user chosen.  If we don’t do that, we
+    # may end up doing an unnecessary build.
     features.discard('adversarial')
     features.discard('test_features')
+    features.discard('rosetta_rpc')
 
     if want_features:
         raise ValueError('Missing features after --feature argument')
