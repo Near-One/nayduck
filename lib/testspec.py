@@ -12,6 +12,7 @@ class _CategorySpec(typing.NamedTuple):
     timeout: int
     is_release: bool
     is_remote: bool
+    skip_build: bool
 
 
 _TIME_SUFFIXES = {'h': 3600, 'm': 60, 's': 1}
@@ -61,7 +62,7 @@ def _extract_category(words: typing.List[str]) -> _CategorySpec:
 
     Expects words in the format:
 
-        <category> [--timeout=<timeout>] [--release] [--remote] <args>...
+        <category> [--timeout=<timeout>] [--skip-build] [--release] [--remote] <args>...
 
     Args:
         words: The test as list of words.  The list is modified in place by
@@ -76,6 +77,7 @@ def _extract_category(words: typing.List[str]) -> _CategorySpec:
     timeout = _DEFAULT_TIMEOUT
     is_release = False
     is_remote = False
+    skip_build = False
 
     index = 0  # silence pylint warning
     for index, word in enumerate(words):
@@ -85,6 +87,8 @@ def _extract_category(words: typing.List[str]) -> _CategorySpec:
             is_release = True
         elif word == '--remote':
             is_remote = True
+        elif word == '--skip-build':
+            skip_build = True
         elif word.startswith('--timeout='):
             timeout = _parse_timeout(word[10:])
         elif word.startswith('--'):
@@ -104,7 +108,8 @@ def _extract_category(words: typing.List[str]) -> _CategorySpec:
     return _CategorySpec(category=category,
                          timeout=timeout,
                          is_release=is_release,
-                         is_remote=is_remote)
+                         is_remote=is_remote,
+                         skip_build=skip_build or category == 'mocknet')
 
 
 def _extract_features(words: typing.List[str]) -> str:
@@ -195,6 +200,12 @@ def _check_args(category: str, args: typing.Sequence[str]) -> None:
 TestSpecSequence = typing.Sequence['TestSpec']
 
 
+class TestDBRow:
+    name: str
+    timeout: int
+    skip_build: bool
+
+
 @dataclasses.dataclass(frozen=True)
 class TestSpec:
     """Specification for a test to be run.
@@ -218,10 +229,11 @@ class TestSpec:
     timeout: int
     is_release: bool
     is_remote: bool
+    skip_build: bool
     args: typing.Sequence[str]
     features: str
 
-    def __init__(self, name: str, *, timeout: int = 0) -> None:
+    def __init__(self, name: str) -> None:
         """Parses a test name.
 
         Checks that the test is a string and verifies that the --features (if
@@ -236,17 +248,11 @@ class TestSpec:
 
         Args:
             name: The test name.
-            timeout: If given and non-zero, timeout to use for the test.  This
-                overrides any timeout that might have been specified in the
-                name.
         Returns:
             A TestSpec describing the test.
         Raises:
-            ValueError: if `name` is an invalid test specification or if
-                `timeout` is non-zero but less than a minute.
+            ValueError: if `name` is an invalid test specification.
         """
-        if timeout and timeout < 60:
-            raise ValueError(f'Invalid timeout: {timeout}')
         words = name.split()
         try:
             category_spec = _extract_category(words)
@@ -255,9 +261,10 @@ class TestSpec:
         except ValueError as ex:
             raise ValueError(f'{ex} in test ‘{name}’') from ex
         object.__setattr__(self, 'category', category_spec.category)
-        object.__setattr__(self, 'timeout', timeout or category_spec.timeout)
+        object.__setattr__(self, 'timeout', category_spec.timeout)
         object.__setattr__(self, 'is_release', category_spec.is_release)
         object.__setattr__(self, 'is_remote', category_spec.is_remote)
+        object.__setattr__(self, 'skip_build', category_spec.skip_build)
         object.__setattr__(self, 'args', tuple(words))
         object.__setattr__(self, 'features', features)
 
@@ -283,21 +290,48 @@ class TestSpec:
             name = match.group(2)
         return count, cls(name)
 
-    def name(self, *, include_timeout: typing.Optional[bool] = None) -> str:
+    @classmethod
+    def from_row(cls, row: TestDBRow) -> 'TestSpec':
+        """Construct test spec from a row read from the database.
+
+        Args:
+            row: A row read from the `tests` database table.
+        Returns:
+            A TestSpec describing the test.
+        Raises:
+            ValueError: if data read from the database is invalid.
+        """
+        self = cls(row.name)
+        if (timeout := int(row.timeout)) >= 60:
+            object.__setattr__(self, 'timeout', timeout)
+        object.__setattr__(self, 'skip_build', bool(row.skip_build))
+        return self
+
+    @property
+    def short_name(self) -> str:
+        """Returns normalised short name of the test.
+
+        Short name does not include --timeout or --skip-build flags."""
+        return self._name(full=False)
+
+    @property
+    def full_name(self) -> str:
+        """Returns normalised full name of the test."""
+        return self._name(full=True)
+
+    def _name(self, *, full: bool) -> str:
         """Returns normalised name of the test.
 
         Args:
-            include_timeout: If not given, function includes timeout in the name
-                only if it differed the default timeout.  Otherwise, the
-                argument forces inclusion or exclusion of the timeout in the
-                returned name.
+            full: If False, the name will not include --timeout or --skip-build
+                category flags.
         Returns:
             A normalised test specification.
         """
         result = [self.category]
-        if include_timeout is None:
-            include_timeout = self.timeout != _DEFAULT_TIMEOUT
-        if include_timeout:
+        if full:
+            if self.skip_build:
+                result.append('--skip-build')
             result.append(f'--timeout={_format_timeout(self.timeout)}')
         if self.is_release:
             result.append('--release')
@@ -309,7 +343,7 @@ class TestSpec:
         return ' '.join(result)
 
     def __str__(self) -> str:
-        return self.name()
+        return self.full_name
 
     @property
     def full_timeout(self) -> int:

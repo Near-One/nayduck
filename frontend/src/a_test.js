@@ -47,19 +47,26 @@ export function parseTestName(name) {
 }
 
 
-function testNameWithTimeout(test) {
-    let {name, timeout} = test;
+function formatFullTestName(test) {
+    let {name, timeout, skip_build} = test;
+    if (timeout === 180 && !skip_build) {
+        return name;
+    }
+    const args = [1, 0];
+    if (skip_build) {
+        args.push('--skip-build');
+    }
     if (timeout !== 180) {
         if (timeout % 3600 === 0) {
             timeout = (timeout / 3600) + 'h';
         } else if (timeout % 60 === 0) {
             timeout = (timeout / 60) + 'm';
         }
-        const words = test.name.trim().split(/\s+/);
-        words.splice(1, 0, '--timeout=' + timeout);
-        name = words.join(' ');
+        args.push('--timeout=' + timeout);
     }
-    return name;
+    const words = test.name.trim().split(/\s+/);
+    Array.prototype.splice.apply(words, args);
+    return words.join(' ');
 }
 
 
@@ -98,7 +105,7 @@ function ATest (props) {
             <td>Requested by</td>
             <td>{common.formatRequester(aTest.requester)}</td>
           </tr>
-          <tr><td>Test</td><td>{testNameWithTimeout(aTest)}</td></tr>
+          <tr><td>Test</td><td>{formatFullTestName(aTest)}</td></tr>
           {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
           {common.formatTimeStatsRows('Run Time', aTest)}
           <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>

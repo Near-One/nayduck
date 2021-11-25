@@ -56,6 +56,7 @@ CREATE TABLE "tests" (
   "category"    "test_category" NOT NULL,
   "name"        varchar         NOT NULL,
   "timeout"     integer         NOT NULL,
+  "skip_build"  boolean         NOT NULL,
   "started"     timestamptz,
   "finished"    timestamptz,
   "worker_ip"   integer         NOT NULL DEFAULT 0,
@@ -73,16 +74,13 @@ CREATE INDEX ON "tests" ("name", "finished")
  WHERE "is_nightly"
    AND finished IS NOT NULL
    AND status NOT IN ('PENDING', 'RUNNING');
--- Used by WorkerDB.get_pending_test
-CREATE INDEX ON "tests" ("build_id", ("category" != 'mocknet'))
+-- Used by WorkerDB.get_pending_test and MasterDB.get_new_build
+CREATE INDEX ON "tests" ("build_id", ("category" = 'expensive'))
  WHERE "status" = 'PENDING';
 -- Used by MasterDB.update_build_status (in the success=False case)
 -- and by MasterDB.builds_without_pending_tests
 CREATE INDEX ON "tests" ("build_id", "status")
  WHERE "status" IN ('PENDING', 'RUNNING');
--- Used by MasterDB.get_new_build
-CREATE INDEX ON "tests" ("build_id")
- WHERE "status" = 'PENDING' AND "category" = 'expensive';
 
 CREATE OR REPLACE VIEW "tests_history" (name, branch, status, count)
 AS SELECT name, branch, status, count(*)

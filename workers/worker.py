@@ -372,9 +372,7 @@ _COPIED_EXPENSIVE_DEPS: typing.List[str] = []
 
 def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
               runner: utils.Runner) -> None:
-    global _LAST_COPIED_BUILD_ID
-
-    if test.category == 'mocknet':
+    if test.skip_build:
         return
 
     builder_addr = utils.int_to_ip(builder_ip)
@@ -397,6 +395,7 @@ def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
             time.sleep(delay)
             delay *= 2
 
+    global _LAST_COPIED_BUILD_ID
     if _LAST_COPIED_BUILD_ID != build_id:
         _LAST_COPIED_BUILD_ID = None
         _COPIED_EXPENSIVE_DEPS[:] = ()
@@ -465,7 +464,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
     config_override: typing.Dict[str, typing.Any] = {}
     envb: _EnvB = typing.cast(_EnvB, os.environb)
 
-    test = testspec.TestSpec(name=test_row.name, timeout=test_row.timeout)
+    test = testspec.TestSpec.from_row(typing.cast(testspec.TestDBRow, test_row))
 
     if test.is_remote:
         config_override.update(local=False, preexist=True)
@@ -500,14 +499,12 @@ def main() -> None:
     ipv4, ip_str = utils.get_ip()
     print(f'Starting worker @ {socket.gethostname()} ({ip_str} / {ipv4})',
           file=sys.stderr)
-    hostname = socket.gethostname()
 
-    mocknet = 'mocknet' in hostname
     with worker_db.WorkerDB(ipv4) as server:
         server.handle_restart()
         while True:
             try:
-                test_row = server.get_pending_test(mocknet)
+                test_row = server.get_pending_test()
                 if test_row:
                     handle_test(server, test_row)
                 else:

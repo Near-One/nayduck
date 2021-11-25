@@ -72,7 +72,7 @@ class BackendDB(common_db.DB):
                              status = 'PENDING'
                        WHERE status IN ('FAILED', 'TIMEOUT')
                          AND run_id = {int(run_id)}
-                   RETURNING test_id, build_id, category'''
+                   RETURNING test_id, build_id, skip_build'''
             rows = tuple(self._exec(sql))
             if not rows:
                 return 0
@@ -80,8 +80,8 @@ class BackendDB(common_db.DB):
             self._exec(f'DELETE FROM logs WHERE test_id IN ({test_ids})')
             build_ids = set(
                 str(int(build_id))
-                for _, build_id, category in rows
-                if category != 'mocknet')
+                for _, build_id, skip_build in rows
+                if not skip_build)
             if build_ids:
                 self._exec(f'''UPDATE builds
                                   SET started = NULL,
@@ -308,7 +308,7 @@ class BackendDB(common_db.DB):
 
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, timeout,
-                        started, finished, runs.branch,
+                        skip_build, started, finished, runs.branch,
                         ENCODE(sha, 'hex') AS sha, title, requester
                    FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
@@ -368,8 +368,8 @@ class BackendDB(common_db.DB):
             item: typing.Tuple[_BuildKey, testspec.TestSpecSequence]
         ) -> typing.Tuple[int, str, bool, str, bool]:
             (is_release, features), tests = item
-            all_mocknet = all(test.category == 'mocknet' for test in tests)
-            status = 'BUILD DONE' if all_mocknet else 'PENDING'
+            skip_build = all(test.skip_build for test in tests)
+            status = 'BUILD DONE' if skip_build else 'PENDING'
             return (run_id, status, is_release, features, is_nightly)
 
         build_items = sorted(builds.items(), key=lambda item: -len(item[1]))
@@ -381,9 +381,9 @@ class BackendDB(common_db.DB):
 
         # Into Tests
         columns = ('run_id', 'build_id', 'name', 'category', 'timeout',
-                   'branch', 'is_nightly')
-        new_rows = sorted((run_id, build_id, test.name(include_timeout=False),
-                           test.category, test.timeout, branch, is_nightly)
+                   'skip_build', 'branch', 'is_nightly')
+        new_rows = sorted((run_id, build_id, test.short_name, test.category,
+                           test.timeout, test.skip_build, branch, is_nightly)
                           for build_id, is_release, features in rows
                           for test in builds[(is_release, features)])
         self._multi_insert('tests', columns, new_rows)

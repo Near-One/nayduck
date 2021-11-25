@@ -8,6 +8,7 @@ class Test:
     build_id: int
     name: str
     timeout: int
+    skip_build: bool
     builder_ip: int
     sha: str
 
@@ -25,35 +26,26 @@ class WorkerDB(common_db.DB):
         super().__init__()
         self._ipv4 = ipv4
 
-    def get_pending_test(self, include_mocknet: bool) -> typing.Optional[Test]:
-        """Returns a pending test to process or None if none found.
-
-        Args:
-            include_mocknet: Whether to consider mocknet tests in the result.
-        Returns:
-            A build to process or None if none are present.
-        """
-        build_is_ready = '''builds.status = 'BUILD DONE' AND builder_ip != 0'''
-        if include_mocknet:
-            tests_filter = f'''(({build_is_ready}) OR category = 'mocknet')'''
-        else:
-            tests_filter = f'''(({build_is_ready}) AND category != 'mocknet')'''
-        sql = f'''SELECT test_id
-                    FROM tests
-                    JOIN builds USING (build_id)
-                   WHERE tests.status = 'PENDING' AND {tests_filter}
-                   ORDER BY category != 'mocknet', low_priority
-                   LIMIT 1'''
+    def get_pending_test(self) -> typing.Optional[Test]:
+        """Returns a pending test to process or None if none found."""
+        sql = '''SELECT test_id
+                   FROM tests
+                   JOIN builds USING (build_id)
+                  WHERE tests.status = 'PENDING'
+                    AND (skip_build OR
+                         (builds.status = 'BUILD DONE' AND builder_ip != 0))
+                  ORDER BY low_priority
+                  LIMIT 1'''
         sql = f'''UPDATE tests
                      SET started = NOW(),
                          finished = NULL,
                          status = 'RUNNING',
                          worker_ip = :ip
-                  WHERE test_id IN ({sql})
-               RETURNING test_id, build_id, run_id, name, timeout'''
+                   WHERE test_id IN ({sql})
+               RETURNING test_id, build_id, run_id, name, timeout, skip_build'''
         sql = f'''WITH test AS ({sql})
-                  SELECT test_id, build_id, name, timeout, builder_ip,
-                         ENCODE(sha, 'hex') AS sha
+                  SELECT test_id, build_id, name, timeout, skip_build,
+                         builder_ip, ENCODE(sha, 'hex') AS sha
                     FROM test
                     JOIN runs USING (run_id)
                     JOIN builds USING (build_id)'''
