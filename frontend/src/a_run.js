@@ -58,6 +58,34 @@ const processRun = run => {
 
         test.name = words.join(' ');
 
+        let short_name;
+        switch (words[0]) {
+        case 'pytest':
+        case 'mocknet':
+            short_name = words[1];
+            if (words.length > 2) {
+                words.splice(0, 2);
+                short_name = <>{short_name} <small>{words.join(' ')}</small></>;
+            }
+            break;
+        case 'expensive':
+            // "expensive" <package> <binary> <test> <args>...
+            const pkg = words[1];
+            const test = words[3]
+                .replace(/^tests?::/, '')
+                .replace(/^([A-Za-z0-9_]*)::tests?::/, '$1 ')
+            words.splice(0, 4);
+            short_name = words.length
+                ? <><small>{pkg}</small> {test} <small>{words.join(' ')}</small></>
+                : <><small>{pkg}</small> {test}</>
+            break;
+        default:
+            /* nop */;
+        }
+        test.short_name = short_name
+            ? <span title={test.name}>{short_name}</span>
+            : test.name;
+
         const status = test.status;
         statuses[test.status] = (statuses[test.status] || 0) + 1;
         if (status === 'PENDING' || status === 'RUNNING') {
@@ -230,7 +258,7 @@ function ARun (props) {
             <tr key={a_test.test_id}>
               <td>{a_test.is_release ? 'Release' : 'Dev'}</td>
               <td>{a_test.features}</td>
-              <td><NavLink to={"/test/" + a_test.test_id}>{a_test.name}</NavLink></td>
+              <td><NavLink to={"/test/" + a_test.test_id}>{a_test.short_name}</NavLink></td>
               <td className={statusCls}>{a_test.status}<br/>
               {common.renderHistory(a_test)}
               </td>
