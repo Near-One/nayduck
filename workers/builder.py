@@ -81,11 +81,11 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         for filename in files:
             os.link(src_dir / filename, dst_dir / filename)
 
-    def is_test_executable(path: Path) -> bool:
-        if '.' in path.stem:
+    def is_test_executable(src_dir: Path, name: str) -> bool:
+        if '.' in name:
             return False
         try:
-            attrs = path.stat()
+            attrs = (src_dir / name).stat()
         except OSError:
             return False
         return bool(stat.S_ISREG(attrs.st_mode) and attrs.st_mode & 0o100)
@@ -134,7 +134,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
          dst_dir=spec.build_dir / 'expensive',
          files=[
              name for name in os.listdir(src_dir)
-             if is_test_executable(src_dir / name)
+             if is_test_executable(src_dir, name)
          ])
 
 
