@@ -107,6 +107,14 @@ const processRun = run => {
 };
 
 
+/** Formats list of features for display. */
+const formatFeatures = feataures => {
+    return feataures === 'nightly_protocol,nightly_protocol_features'
+        ? <i title="nightly_protocol,nightly_protocol_features">nightly</i>
+        : feataures;
+};
+
+
 /** Filters tests based on criteria in the filter form.
  *
  * Returns filtered array of tests.  `tests` is not modified though if no
@@ -257,7 +265,7 @@ function ARun (props) {
           return (
             <tr key={a_test.test_id}>
               <td>{a_test.is_release ? 'Release' : 'Dev'}</td>
-              <td>{a_test.features}</td>
+              <td>{formatFeatures(a_test.features)}</td>
               <td><NavLink to={"/test/" + a_test.test_id}>{a_test.short_name}</NavLink></td>
               <td className={statusCls}>{a_test.status}<br/>
               {common.renderHistory(a_test)}
