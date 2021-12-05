@@ -249,12 +249,36 @@ a:hover {
   text-decoration: none;
 }
 
-#userinfo {
+#topbar {
   margin: 0;
   padding: 1em 1em;
   display: flex;
-  justify-content: space-between;
   background: #f2f2f2;
+}
+#topbar > div {
+  display: flex;
+  height: 1.875rem;
+}
+#topbar > div div {
+  align-self: flex-end;
+}
+#sysinfo {
+  margin: 0 2em;
+  font-size: 0.5em;
+}
+#userinfo {
+  margin-left: auto;
+}
+#topbar h1 {
+  font-size: 1.5em;
+  margin: 0;
+  padding: 0;
+}
+#topbar h1 svg {
+  width: 1.25em;
+  height: 1.25em;
+  margin-right: 0.25em;
+  margin-bottom: -0.125em;
 }
 #userinfo button {
   all: unset;
@@ -273,17 +297,6 @@ a:hover {
 }
 #userinfo a:focus, #userinfo button:focus {
   background: #00C08B;
-}
-#userinfo h1 {
-  font-size: 1.5em;
-  margin: 0;
-  padding: 0;
-}
-#userinfo h1 svg {
-  width: 1.25em;
-  height: 1.25em;
-  margin-right: 0.25em;
-  margin-bottom: -0.125em;
 }
 #userinfo img, #userinfo div svg {
   width: 1.5em;

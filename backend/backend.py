@@ -203,6 +203,15 @@ def get_nightly_events() -> flask.Response:
     return jsonify({})
 
 
+@app.route('/api/sys-stats', methods=['GET'])
+def get_system_stats() -> flask.Response:
+    with backend_db.BackendDB() as server:
+        stats = server.get_system_stats()
+    response = jsonify(stats)
+    response.cache_control.max_age = 10
+    return response
+
+
 @app.route('/logs/<any("test","build"):kind>/<int:obj_id>/<log_type>')
 def get_test_log(kind: str, obj_id: int,
                  log_type: str) -> werkzeug.wrappers.Response:

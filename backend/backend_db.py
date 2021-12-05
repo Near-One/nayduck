@@ -643,3 +643,19 @@ class BackendDB(common_db.DB):
         else:
             blob = bytes(blob)
         return blob, ctime, is_compressed
+
+    def get_system_stats(self) -> _Dict:
+        """Returns statistics such us number of running builds and tests."""
+        sql = '''SELECT status, COUNT(*)
+                   FROM builds
+                  WHERE status IN ('PENDING', 'BUILDING')
+                  GROUP BY 1'''
+        build_stats = dict(
+            (status.lower(), count) for status, count in self._exec(sql))
+        sql = '''SELECT status, COUNT(*)
+                   FROM tests
+                  WHERE status IN ('PENDING', 'RUNNING')
+                  GROUP BY 1'''
+        test_stats = dict(
+            (status.lower(), count) for status, count in self._exec(sql))
+        return {'build': build_stats, 'test': test_stats}
