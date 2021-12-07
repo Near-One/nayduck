@@ -109,7 +109,7 @@ function AllRuns () {
         a_run.builds.map(build => <div key={build.build_id}>
           <NavLink to={"/build/" + build.build_id}
                    className={'status ' + common.statusClassName('build_status', build.status)}>
-            {buildName(build)} {build.status}
+            {buildName(build)} {build.status.replace(/^BUILD /, '')}
           </NavLink>
           <div>
             { testCounter(build, 'passed') }
