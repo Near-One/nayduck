@@ -4,45 +4,58 @@ import * as common from "./common"
 
 
 export function parseTestName(name) {
+    if (!name) {
+        return {
+            testBaseName: null,
+            testCommand: null,
+        };
+    }
+
     let baseName = null;
     let command = null;
 
-    if (name) {
-        const spec = name.trim().split(/\s+/);
-        const category = spec[0];
-        const pos = spec.indexOf('--features');
-        const features = pos === -1 ? '' : spec.splice(pos).join(' ');
-        let i = 1;
-        while (i < spec.length && /^--/.test(spec[i])) {
-            ++i;
+    const spec = name.trim().split(/\s+/);
+    const category = spec[0];
+    const pos = spec.indexOf('--features');
+    const features = pos !== -1
+          ? ' ' + spec.splice(pos).join(' ') + ',test_features'
+          : ' --features test_features';
+    let release = '';
+    let i = 1;
+    for (; i < spec.length && /^--/.test(spec[i]); ++i) {
+        if (spec[i] == '--release') {
+            release = ' --release';
         }
-        spec.splice(0, i);
+    }
+    spec.splice(0, i);
 
-        switch (category) {
-        case 'expensive':
-            if (spec.length === 3) {
-                baseName = spec[2];
-                const f = features
-                      ? features + ',expensive_tests'
-                      : '--features expensive_tests';
-                command = 'cargo test -p' + spec[0] + ' --test ' + spec[1] +
-                      ' ' + f + ' -- --exact --nocapture ' + spec[2];
-            }
-            break;
-        case 'pytest':
-        case 'mocknet':
-            baseName = spec[0];
-            command = 'cd pytest && python3 tests/' + spec.join(' ');
-            break;
-        default:
-            baseName = spec.join(' ');
-            break;
+    switch (category) {
+    case 'expensive':
+        if (spec.length === 3) {
+            baseName = spec[2];
+            command = 'cargo test -p' + spec[0] + release + features +
+                ',expensive_tests -- --exact --nocapture ' + spec[2];
+            command = <code>{command}</code>;
         }
+        break;
+    case 'pytest':
+    case 'mocknet':
+        baseName = spec[0];
+        command = 'python3 pytest/tests/' + spec.join(' ');
+        command = <>
+          <code><small>cargo build {release} -pneard {features},rosetta_rpc</small></code><br/>
+          <code><small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts</small></code><br/>
+          <code>{command}</code>
+        </>;
+        break;
+    default:
+        baseName = spec.join(' ');
+        break;
     }
 
     return {
         testBaseName: baseName,
-        testCommand: command && <code>{command}</code>,
+        testCommand: command,
     };
 }
 
