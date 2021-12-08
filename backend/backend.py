@@ -13,6 +13,7 @@ import flask
 import flask.json
 import flask_apscheduler
 import werkzeug.exceptions
+import werkzeug.middleware.proxy_fix
 import werkzeug.wrappers
 
 from . import auth
@@ -21,6 +22,9 @@ from . import metrics
 from . import scheduler
 
 app = flask.Flask(__name__, static_folder=None)
+
+app.wsgi_app = werkzeug.middleware.proxy_fix.ProxyFix(  # type: ignore
+    app.wsgi_app)
 
 sched = flask_apscheduler.APScheduler()
 sched.init_app(app)
