@@ -143,10 +143,9 @@ def new_run(login: str) -> flask.Response:
             run_id = scheduler.Request.from_json(
                 flask.request.get_json(force=True),
                 requester=login).schedule(server)
-            url = f'Success.  {flask.request.url_root}#/run/{run_id}'
             response: typing.Dict[str, typing.Any] = {
                 'code': 0,
-                'response': f'Success. {url}'
+                'response': f'Success.  {flask.request.url_root}#/run/{run_id}'
             }
         except scheduler.Failure as ex:
             response = ex.to_response()
