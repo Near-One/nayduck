@@ -3,18 +3,15 @@ import React, { useState, useEffect  } from "react";
 import * as common from "./common"
 
 
-export function parseTestName(name) {
-    if (!name) {
+export function parseTestName(test) {
+    if (!test || !test.name) {
         return {
             testBaseName: null,
             testCommand: null,
         };
     }
 
-    let baseName = null;
-    let command = null;
-
-    const spec = name.trim().split(/\s+/);
+    const spec = test.name.trim().split(/\s+/);
     const category = spec[0];
     const pos = spec.indexOf('--features');
     const features = pos !== -1
@@ -22,13 +19,15 @@ export function parseTestName(name) {
           : ' --features test_features';
     let release = '';
     let i = 1;
-    for (; i < spec.length && /^--/.test(spec[i]); ++i) {
-        if (spec[i] == '--release') {
+    for (; /^--/.test(spec[i] || ''); ++i) {
+        if (spec[i] === '--release') {
             release = ' --release';
         }
     }
     spec.splice(0, i);
 
+    let baseName = null;
+    let command = null;
     switch (category) {
     case 'expensive':
         if (spec.length === 3) {
@@ -42,11 +41,11 @@ export function parseTestName(name) {
     case 'mocknet':
         baseName = spec[0] === 'fuzz.py' ? spec.slice(1, 3).join(' ') : spec[0];
         command = 'python3 pytest/tests/' + spec.join(' ');
-        command = <>
-          <code><small>cargo build {release} -pneard {features},rosetta_rpc</small></code><br/>
-          <code><small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts</small></code><br/>
-          <code>{command}</code>
-        </>;
+        command = test.skip_build ? <code>{command}</code> : <code>
+          <small>cargo build {release} -pneard {features},rosetta_rpc</small><br/>
+          <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts</small><br/>
+          {command}
+        </code>;
         break;
     default:
         baseName = spec.join(' ');
@@ -101,7 +100,7 @@ function ATest (props) {
         });
     }, [props.match.params.test_id]);
 
-    const {testBaseName, testCommand} = parseTestName(aTest && aTest.name);
+    const {testBaseName, testCommand} = parseTestName(aTest);
     common.useTitle(aTest && (testBaseName + ' (run #' + aTest.run_id + ')'));
     const statusCls = aTest && common.statusClassName('text', aTest.status);
     return aTest && <>

@@ -9,7 +9,7 @@ const baseBranch = 'master';
 
 /** Formats page title base on data returned by the back end. */
 function formatTitle(data, testId) {
-    let title = parseTestName(data && data.name).testBaseName;
+    let title = parseTestName(data).testBaseName;
     title = title || ('Test #' + testId);
     title += ' (history';
     if (data && data.branch !== baseBranch) {
