@@ -386,6 +386,7 @@ small.blob {
 
 .text-failed,
 .text-scp_failed,
+.text-checkout_failed,
 .text-build_failed { color: #ff0000 }
 .text-timeout      { color: #f0a3aa }
 .text-passed       { color: #008000 }
