@@ -63,6 +63,10 @@ const processRun = run => {
         case 'pytest':
         case 'mocknet':
             short_name = words[1];
+            if (short_name === 'fuzz.py' && words.length >= 4) {
+                short_name = words.splice(2, 2).join(' ');
+                short_name = <><small>fuzz.py</small> {short_name}</>;
+            }
             if (words.length > 2) {
                 words.splice(0, 2);
                 short_name = <>{short_name} <small>{words.join(' ')}</small></>;

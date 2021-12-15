@@ -40,7 +40,7 @@ export function parseTestName(name) {
         break;
     case 'pytest':
     case 'mocknet':
-        baseName = spec[0];
+        baseName = spec[0] === 'fuzz.py' ? spec.slice(1, 3).join(' ') : spec[0];
         command = 'python3 pytest/tests/' + spec.join(' ');
         command = <>
           <code><small>cargo build {release} -pneard {features},rosetta_rpc</small></code><br/>
