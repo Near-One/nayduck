@@ -16,6 +16,7 @@ import werkzeug.exceptions
 import werkzeug.middleware.proxy_fix
 import werkzeug.wrappers
 
+from lib import testspec
 from . import auth
 from . import backend_db
 from . import metrics
@@ -171,15 +172,17 @@ def schedule_nightly_run_check(delta: datetime.timedelta) -> None:
 
 
 @app.route('/api/nightly-events', methods=['GET'])
-def get_nightly_events() -> flask.Response:
+def get_nightly_events() -> flask.Response:  # pylint: disable=too-many-locals
     with backend_db.BackendDB() as server:
         events = server.get_nightly_events()
 
     last_timestamp, last_run_id = datetime.datetime.utcnow(), 0
     key_func = lambda row: (row.timestamp, row.run_id)
-    tests_by_name: typing.Dict[str, typing.List[typing.Tuple[
+    tests_by_id: typing.Dict[str, typing.List[typing.Tuple[
         datetime.datetime, int, str]]] = collections.defaultdict(list)
     enabled_tests: typing.Set[str] = set()
+
+    id_to_name = {}
 
     for (timestamp, run_id), tests in itertools.groupby(events, key=key_func):
         last_timestamp = timestamp
@@ -187,21 +190,27 @@ def get_nightly_events() -> flask.Response:
 
         curr_tests: typing.Set[str] = set()
         for test in tests:
-            curr_tests.add(test.name)
-            test_events = tests_by_name[test.name]
+            identifier = testspec.TestSpec(test.name).normalised_identifier
+            if identifier != test.name:
+                id_to_name[identifier] = test.name
+            curr_tests.add(identifier)
+            test_events = tests_by_id[identifier]
             if not test_events or test_events[-1][2] != test.status:
                 test_events.append((timestamp, run_id, test.status))
 
         enabled_tests.difference_update(curr_tests)
         for name in enabled_tests:
-            tests_by_name[name].append((timestamp, run_id, 'DISABLED'))
+            tests_by_id[name].append((timestamp, run_id, 'DISABLED'))
         enabled_tests = curr_tests
 
     if last_run_id:
         return jsonify({
             'last_run_id': last_run_id,
             'last_nightly': last_timestamp,
-            'tests': tests_by_name
+            'tests': {
+                id_to_name.get(key, key): value
+                for key, value in tests_by_id.items()
+            }
         })
     return jsonify({})
 

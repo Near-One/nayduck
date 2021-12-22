@@ -102,6 +102,45 @@ def test_testspec_with_count():
     assert want == got
 
 
+def test_normalised_identifier():
+    # pylint: disable=line-too-long
+    # yapf: disable
+    tests = {
+        'pytest fuzz.py test_utils/runtime_tester/fuzz runtime_fuzzer': (
+            'mocknet --timeout=2h runtime/fuzz.py',
+            'pytest --skip-build --timeout=2h runtime/fuzz.py',
+            'pytest --skip-build --timeout=2h runtime/fuzz_runtime.py',
+            'pytest --skip-build --timeout=2h fuzz.py test-utils/runtime-tester/fuzz runtime-fuzzer',
+        ),
+        'pytest fuzz.py runtime/near_vm_runner/fuzz runner': (
+            'pytest --skip-build --timeout=2h runtime/fuzz_wasm_vm.py',
+            'pytest --skip-build --timeout=2h fuzz.py runtime/near-vm-runner/fuzz runner',
+        ),
+        'expensive near_client near_client catching_up::test_catchup_receipts_sync_third_epoch': (
+            'expensive --timeout=1800 near-client catching_up tests::test_catchup_receipts_sync_third_epoch',
+            'expensive --timeout=1800 near-client near_client tests::catching_up::tests::test_catchup_receipts_sync_third_epoch',
+            'expensive --timeout=1800 near-client near_client tests::catching_up::test_catchup_receipts_sync_third_epoch',
+        ),
+        'expensive integration_tests integration_tests standard_cases::rpc::test_access_key_smart_contract_testnet': (
+            'expensive integration-tests integration_tests tests::rpc::test::test_access_key_smart_contract_testnet',
+            'expensive integration-tests integration_tests tests::standard_cases::rpc::test::test_access_key_smart_contract_testnet',
+        ),
+        'expensive integration_tests integration_tests test_catchup::test_catchup': (
+            'expensive integration-tests integration_tests tests::test_catchup::test_catchup',
+            'expensive integration-tests integration_tests tests::test_catchup',
+        ),
+        'expensive integration_tests integration_tests test_tps_regression::test_highload': (
+            'expensive nearcore test_tps_regression test::test_highload',
+            'expensive integration-tests integration_testss tests::test_tps_regression::test::test_highload',
+            'expensive integration-tests integration_tests tests::test_tps_regression::test::test_highload',
+        ),
+    }
+    # yapf: enable
+    for want, lines in tests.items():
+        for line in lines:
+            assert want == testspec.TestSpec(line).normalised_identifier
+
+
 class MockTestRow(testspec.TestDBRow):
 
     def __init__(self,

@@ -342,6 +342,42 @@ class TestSpec:
             result.append(f'--features {self.features}')
         return ' '.join(result)
 
+    @property
+    def normalised_identifier(self) -> str:
+        """Returns a normalised identifier which tries to handle test renames.
+
+        Over times, some tests were renamed for various reasons.  For example,
+        fuzzing tests used to have their own Python scripts each but now all use
+        fuzz.py script.  Similarly, structure of the Rust code was changed such
+        that many of the expensive tests changed executable and test names as
+        well.
+
+        This property tries to map such variants into a single name to better
+        handle history of a test.  The identifier is not guaranteed to be
+        a properly formatted tests spec.
+        """
+        category, args = self.category, self.args
+        try:
+            if category in ('mocknet', 'pytest'):
+                category = 'pytest'
+                args = _normalise_pytest_args(list(args))
+            elif category == 'expensive':
+                args = _normalise_expensive_args(list(args))
+        except IndexError:
+            pass
+
+        result = [category]
+        if self.is_release:
+            result.append('--release')
+        if self.is_remote:
+            result.append('--remote')
+        # Normalise all dashes with underscores.  This happened in
+        # 230640169342085d99c12dda6b1bfc41cd1eeeaa for example.
+        result.extend(arg.replace('-', '_') for arg in args)
+        if self.features:
+            result.append(f'--features {self.features}')
+        return ' '.join(result)
+
     def __str__(self) -> str:
         return self.full_name
 
@@ -356,3 +392,70 @@ class TestSpec:
         if self.is_release:
             return 'release'
         return 'debug'
+
+
+def _normalise_pytest_args(args: typing.List[str]) -> typing.Sequence[str]:
+    """Normalises test arguments of pytest and mocknet tests specs."""
+    if args[0] in ('runtime/fuzz.py', 'runtime/fuzz_runtime.py'):
+        # 5011d288c87245d87ecd423eed09f6d991c08236
+        # 2c8ac45e46d5546af0e70cf0f187623946fb796e
+        args[0:1] = [
+            'fuzz.py', 'test-utils/runtime-tester/fuzz', 'runtime_fuzzer'
+        ]
+    elif args[0] == 'runtime/fuzz_wasm_vm.py':
+        # 2c8ac45e46d5546af0e70cf0f187623946fb796e
+        args[0:1] = ['fuzz.py', 'runtime/near-vm-runner/fuzz', 'runner']
+    return args
+
+
+_TEST_RS_PATH_PREFIX_RE = re.compile('^(?:tests?::)+')
+_TEST_RS_PATH_COMPONENT_RE = re.compile('::(?:tests?::)+')
+
+
+def _normalise_expensive_args(args: typing.List[str]) -> typing.Sequence[str]:
+    """Normalises test arguments of expensive tests specs."""
+    # pylint: disable=too-many-boolean-expressions
+
+    if args[0:3] == [
+            'near-client', 'process_blocks', 'test_gc_after_state_sync'
+    ]:
+        # bfc5a26733908096ebc55c307ffaa189cd16d3e7
+        args[0:3] = ['integration-tests', 'client', 'test_gc_after_state_sync']
+    if args[0:3] == ['integration-tests', 'client', 'test_gc_after_state_sync']:
+        # 93d7d8fa5c01ac4b1d51e3cc6fe036d58be79c41
+        args[2] = 'process_blocks::test_gc_after_state_sync'
+
+    if args[1] == 'integration_testss':
+        # 0c75024174772f4378fc5afee12a708e97dff0f1
+        args[1] = 'integration_tests'
+
+    if ((args[0] == 'near-client' and args[1] != 'near_client') or
+        (args[0] == 'near-chain' and args[1] != 'near_chain') or
+        (args[0] == 'integration-tests' and args[1] != 'integration_tests')):
+        # 26cb9fa940872f7a79f7217d9c92cce1de21b95b
+        # c91dc76abee38b728acd319a7174e5f094bc8d03
+        args[2] = f'tests::{args[1]}::{args[2]}'
+        args[1] = args[0].replace('-', '_')
+    elif args[0] == 'integration-tests' and args[1] == 'integration_tests':
+        # c91dc76abee38b728acd319a7174e5f094bc8d03
+        for (got, want) in (
+            ('tests::rpc::', 'tests::standard_cases::rpc::'),
+            ('tests::process_blocks::', 'tests::client::process_blocks::'),
+            ('tests::test::', 'tests::test_simple::test::'),
+        ):
+            if args[2].startswith(got):
+                args[2] = want + args[2][len(got):]
+        if args[2] == 'tests::test_catchup':
+            args[2] = 'tests::test_catchup::test_catchup'
+    elif args[0] == 'nearcore' and args[1] == 'test_tps_regression':
+        # 6c483b01d1e00bb73c0ac8e4ac0e82391934d484
+        args[2] = f'tests::{args[1]}::{args[2]}'
+        args[1] = 'integration_tests'
+        args[0] = 'integration-tests'
+
+    # Remove all `test` and `tests` path components from the test function name.
+    # Those are rather fragile when it comes to moving code around, e.g.:
+    # ec81769ddf66ce6e206c2f7b49738862b4442807
+    args[2] = _TEST_RS_PATH_PREFIX_RE.sub('', args[2])
+    args[2] = _TEST_RS_PATH_COMPONENT_RE.sub('::', args[2])
+    return args
