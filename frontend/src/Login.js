@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import Cookies from 'universal-cookie';
 
 import * as App from './App';
-import * as common from "./common"
+import SysStats from './SysStats'
 
 
 const cookies = new Cookies();
@@ -29,10 +29,6 @@ export function LoginBar(props) {
     const [authState, setAuthState] = useContext(App.AuthContext);
     const [sysStats, setSysStats] = useState(null);
 
-    useEffect(() => {
-        common.fetchAPI('/sys-stats').then(data => setSysStats(data))
-    }, []);
-
     const logout = () => {
         cookies.remove(COOKIE_NAME);
         setAuthState({});
@@ -56,20 +52,5 @@ export function LoginBar(props) {
         </div>;
     }
 
-    const sysInfoLine = (stats, verb) => {
-        let line = (stats[verb] || 0) + ' ' + verb;
-        if (stats.pending) {
-            line += ' + ' + stats.pending + ' pending';
-        }
-        return line;
-    };
-
-    const sysInfo = () => {
-        return sysStats && <div id="sysinfo"><div>
-            {sysInfoLine(sysStats.build, 'building')}<br/>
-            {sysInfoLine(sysStats.test, 'running')}
-        </div></div>;
-    };
-
-    return <nav id="topbar"><h1><svg viewBox="0 0 96 96"><use href="#duck"/></svg>NayDuck</h1>{sysInfo()}<div id="userinfo">{userInfo()}</div></nav>;
+    return <nav id="topbar"><h1><svg viewBox="0 0 96 96"><use href="#duck"/></svg>NayDuck</h1><SysStats/><div id="userinfo">{userInfo()}</div></nav>;
 }

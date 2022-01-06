@@ -262,7 +262,7 @@ a:hover {
 #topbar > div div {
   align-self: flex-end;
 }
-#sysinfo {
+#sysstats {
   margin: 0 2em;
   font-size: 0.5em;
 }
