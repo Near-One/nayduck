@@ -42,8 +42,8 @@ export function parseTestName(test) {
         baseName = spec[0] === 'fuzz.py' ? spec.slice(1, 3).join(' ') : spec[0];
         command = 'python3 pytest/tests/' + spec.join(' ');
         command = test.skip_build ? <code>{command}</code> : <code>
-          <small>cargo build {release} -pneard {features},rosetta_rpc</small><br/>
-          <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts</small><br/>
+          <small>cargo build {release} -pneard {features},rosetta_rpc &amp;&amp;</small><br/>
+          <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts &amp;&amp;</small><br/>
           {command}
         </code>;
         break;
