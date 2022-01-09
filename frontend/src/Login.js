@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext } from 'react';
 import Cookies from 'universal-cookie';
 
 import * as App from './App';
@@ -27,7 +27,6 @@ export function getLoginState() {
 
 export function LoginBar(props) {
     const [authState, setAuthState] = useContext(App.AuthContext);
-    const [sysStats, setSysStats] = useState(null);
 
     const logout = () => {
         cookies.remove(COOKIE_NAME);
