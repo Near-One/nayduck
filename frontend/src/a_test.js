@@ -100,6 +100,11 @@ function ATest (props) {
         });
     }, [props.match.params.test_id]);
 
+    const gitBisectCommand = aTest && aTest.first_bad && aTest.last_good ?
+        <code style={{marginLeft: '2em'}}><small>
+            git bisect start {aTest.first_bad.substr(0, 8)} {aTest.last_good.substr(0, 8)}
+        </small></code> : null;
+
     const {testBaseName, testCommand} = parseTestName(aTest);
     common.useTitle(aTest && (testBaseName + ' (run #' + aTest.run_id + ')'));
     const statusCls = aTest && common.statusClassName('text', aTest.status);
@@ -120,7 +125,11 @@ function ATest (props) {
           <tr><td>Test</td><td>{formatFullTestName(aTest)}</td></tr>
           {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
           {common.formatTimeStatsRows('Run Time', aTest)}
-          <tr><td>Status</td><td className={statusCls}>{aTest.status}</td></tr>
+          <tr>
+            <td>Status</td>
+            <td><span className={statusCls}>{aTest.status}</span>
+                {gitBisectCommand}</td>
+          </tr>
           {aTest.logs ? <>
              <tr><th colSpan="2">Logs</th></tr>
              {aTest.logs.map(common.logRow)}

@@ -69,7 +69,8 @@ CREATE TABLE "tests" (
   PRIMARY KEY ("test_id")
 );
 CREATE INDEX ON "tests" ("run_id");
--- Used by BackendDB.get_test_history and BackendDB.get_full_test_history
+-- Used by BackendDB.get_test_history, BackendDB.get_full_test_history and
+-- BackendDB.get_one_test
 CREATE INDEX ON "tests" ("branch", "name", "test_id", "status");
 -- Used by BackendDB.__get_last_test_success_timestamp
 CREATE INDEX ON "tests" ("name", "finished")

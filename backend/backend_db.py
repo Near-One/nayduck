@@ -309,13 +309,38 @@ class BackendDB(common_db.DB):
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, timeout,
                         skip_build, started, finished, runs.branch,
-                        ENCODE(sha, 'hex') AS sha, title, requester
+                        ENCODE(sha, 'hex') AS sha, title, requester, is_nightly
                    FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
                   LIMIT 1'''
         test = self._fetch_one(sql, id=test_id)
-        if test:
-            self._populate_data_about_tests([test], test['branch'], blob=True)
+        if not test:
+            return None
+
+        success_status = ('PASSED', 'IGNORED', 'RUNNING', 'PENDING')
+        if test['is_nightly'] and test['status'] not in success_status:
+            # We’re explicitly filtering on branch so that we can reuse an existing
+            # index which has branch as first key.
+            sql = '''SELECT ENCODE(sha, 'hex') AS sha, status
+                       FROM tests JOIN runs USING (run_id)
+                      WHERE tests.branch = 'master'
+                        AND name = :name
+                        AND test_id < :id
+                        AND status NOT in ('RUNNING', 'PENDING')
+                        AND is_nightly
+                      ORDER BY test_id DESC LIMIT 30'''
+            first_bad = test['sha']
+            last_good = None
+            for row in self._exec(sql, name=test['name'], id=test['test_id']):
+                if row.status in success_status:
+                    last_good = row.sha
+                    break
+                first_bad = row.sha
+            if first_bad and last_good:
+                test['first_bad'] = first_bad
+                test['last_good'] = last_good
+
+        self._populate_data_about_tests([test], test['branch'], blob=True)
         return test
 
     def schedule_a_run(self, *, branch: str, sha: str, title: str,
