@@ -187,15 +187,18 @@ const formatStatusRow = statuses => {
 
 
 /** Formats page title for the run. */
-const formatTitle = (aRun, runId) => {
-    if (aRun.requester === 'NayDuck') {
+const formatTitle = aRun => {
+    if (!aRun) {
+        return null;
+    } else if (aRun.requester === 'NayDuck') {
         return 'Nightly ' + common.formatDateTime(aRun.started).substr(0, 10);
+    } else {
+        let title = 'Run #' + aRun.run_id;
+        if (aRun.branch !== 'master') {
+            title += ' on ' + aRun.branch;
+        }
+        return title + ' by ' + aRun.requester;
     }
-    let title = 'Run #' + runId;
-    if (aRun.branch !== 'master') {
-        title += ' on ' + aRun.branch;
-    }
-    return title + ' by ' + aRun.requester;
 };
 
 
@@ -205,7 +208,11 @@ function ARun (props) {
     const [filteredRuns, setFilteredRuns] = useState([])
 
     useEffect(() => {
-        common.fetchAPI('/run/' + (0 | props.match.params.run_id))
+        let run_id = props.match.params.run_id;
+        if (run_id !== 'nightly') {
+            run_id = 0 | run_id;
+        }
+        common.fetchAPI('/run/' + run_id)
             .then(data => {
                 if (data) {
                     processRun(data);
@@ -230,7 +237,7 @@ function ARun (props) {
         setOrderDescTestTime(!orderDescTestTime);
     };
 
-    common.useTitle(aRun && formatTitle(aRun, props.match.params.run_id));
+    common.useTitle(formatTitle(aRun));
     return aRun && <>
       {common.renderBreadCrumbs()}
 

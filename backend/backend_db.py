@@ -206,14 +206,22 @@ class BackendDB(common_db.DB):
             self._populate_test_logs(tests, blob=False)
         return tests
 
-    def get_one_run(self, run_id: int) -> typing.Optional[_Dict]:
-        sql = '''SELECT branch, encode(sha, 'hex') AS sha, timestamp, title,
-                        requester
-                   FROM runs
-                  WHERE run_id = :run_id'''
-        run = self._fetch_one(sql, run_id=run_id)
-        if not run:
-            return None
+    def get_one_run(
+        self, run_id: typing.Union[int, 'BackendDB.LastNightlyRun']
+    ) -> typing.Optional[_Dict]:
+        if isinstance(run_id, int):
+            # NOTE: The set of columns we’re selecting here must be the same as
+            # in last_nightly_run method.
+            sql = '''SELECT run_id, branch, encode(sha, 'hex') AS sha,
+                            timestamp, title, requester
+                       FROM runs
+                      WHERE run_id = :run_id'''
+            run = self._fetch_one(sql, run_id=run_id)
+            if not run:
+                return None
+        else:
+            run = self._to_dict(run_id)
+            run_id = int(run_id.run_id)
 
         sql = '''SELECT test_id, status, name, started, finished
                    FROM tests
@@ -417,12 +425,18 @@ class BackendDB(common_db.DB):
 
     class LastNightlyRun:
         run_id: int
-        timestamp: datetime.datetime
+        branch: str
         sha: str
+        timestamp: datetime.datetime
+        title: str
+        requester: str
 
     def last_nightly_run(self) -> typing.Optional['BackendDB.LastNightlyRun']:
         """Returns the last nightly run."""
-        row = self._exec('''SELECT run_id, timestamp, encode(sha, 'hex') AS sha
+        # NOTE: The set of columns we’re selecting here must be the same as
+        # in get_one_run method.
+        row = self._exec('''SELECT run_id, branch, encode(sha, 'hex') AS sha,
+                                   timestamp, title, requester
                               FROM runs
                              WHERE requester = 'NayDuck'
                              ORDER BY timestamp DESC

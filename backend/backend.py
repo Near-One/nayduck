@@ -92,6 +92,14 @@ def get_a_run(run_id: int) -> flask.Response:
     return jsonify(a_run)
 
 
+@app.route('/api/run/nightly', methods=['GET'])
+def get_nightly_run() -> flask.Response:
+    with backend_db.BackendDB() as server:
+        nightly = server.last_nightly_run()
+        a_run = nightly and server.get_one_run(nightly)
+    return jsonify(a_run)
+
+
 @app.route('/api/test/<int:test_id>', methods=['GET'])
 def get_a_test(test_id: int) -> flask.Response:
     with backend_db.BackendDB() as server:
