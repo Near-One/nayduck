@@ -182,8 +182,6 @@ def run_test(outdir: pathlib.Path, test: testspec.TestSpec, envb: _EnvB,
             name for name in os.listdir(dot_near) if name.startswith('test')
         ]
         if dirs:
-            dirs.sort()
-            runner(('du', '-sh', '--', *dirs), cwd=dot_near)
             for name in dirs:
                 (outdir / name).symlink_to(dot_near / name)
     except Exception:
@@ -192,65 +190,107 @@ def run_test(outdir: pathlib.Path, test: testspec.TestSpec, envb: _EnvB,
 
 
 class LogFile:
+    name: str
+    path: pathlib.Path
+    stack_trace: bool = False
+    size: int
+    data: typing.Optional[bytes] = None
+    url: typing.Optional[str] = None
+    binary: bool
 
     def __init__(self,
                  name: str,
                  path: pathlib.Path,
+                 *,
                  binary: bool = False) -> None:
         self.name = name
         self.path = path
-        self.stack_trace = False
         self.size = path.stat().st_size
-        self.data: typing.Optional[bytes] = None
-        self.url: typing.Optional[str] = None
         self.binary = binary
 
 
-def generate_artifacts_file(directory: pathlib.Path, name: str) -> None:
+_COMPRESSORS = {'.xz': 'xz -9', '.bz2': 'bzip2 -9', '': 'gzip -9'}
+
+
+def create_tar_archive(*, outfile: pathlib.Path, entries: typing.Iterable[str],
+                       cwd: pathlib.Path) -> bool:
+    """Creates a compressed tar archive with given entries.
+
+    Args:
+        outfile: File to save the archive to.  The name influences what
+            compression method will be used for the archive.  If the name ends
+            with ‘.bz2’ the archive will be compressed using ‘bzip2’; if it’s
+            ‘.xz’ — ‘xz’; otherwise ‘gzip’ will be used.
+        entries: Iterable of entries to include in the archive.  The names are
+            relative to `cwd`.  This can be an empty iterable.  If it is, the
+            function will do nothing other than return false.
+        cwd: Directory where to run tar command.
+    Returns:
+        Whether the file has been created.
+    """
+    stdin = b''.join(os.fsencode(entry) + b'\0' for entry in sorted(entries))
+    if not stdin:
+        return False
+
+    compress = _COMPRESSORS.get(outfile.suffix) or 'gzip -9'
+    cmd: typing.Sequence[str] = ('tar', '-cvhI', compress, '--exclude-backups',
+                                 '--exclude=stderr', '--null', '-T-')
+    with tempfile.NamedTemporaryFile(dir=outfile.parent, delete=False) as tmp:
+        try:
+            print('+ ' + ' '.join(str(arg) for arg in cmd), file=sys.stderr)
+            subprocess.run(cmd, check=True, input=stdin, stdout=tmp, cwd=cwd)
+            pathlib.Path(tmp.name).rename(outfile)
+            return True
+        except (subprocess.CalledProcessError, OSError) as ex:
+            print(ex, file=sys.stderr)
+            os.unlink(tmp.name)
+            return False
+
+
+def generate_artifacts_file(directory: pathlib.Path, name: str) -> bool:
     """Generates a tar archive with fuzz crash artefacts if any are availabe."""
     artdir = utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts'
     subdir = 'runtime-fuzzer'
     if not (artdir / subdir).is_dir():
-        return
-
-    files = sorted(f'{subdir}/{entry}' for entry in os.listdir(artdir / subdir)
-                   if entry.startswith('crash-'))
-    if not files:
-        return
-
-    outfile = directory / name
-    cmd: typing.Sequence[typing.Union[str, pathlib.Path]]
-    cmd = ('tar', 'cf', outfile, '-I', 'gzip -9', '--', *files)
-    print('+ ' + ' '.join(str(arg) for arg in cmd), file=sys.stderr)
-    returncode = subprocess.run(cmd, check=False, cwd=artdir).returncode
-    if returncode != 0 and outfile.exists():
-        outfile.unlink()
+        return False
+    entries = (f'{subdir}/{entry}' for entry in os.listdir(artdir / subdir)
+               if entry.startswith('crash-'))
+    return create_tar_archive(outfile=directory / name,
+                              entries=entries,
+                              cwd=artdir)
 
 
-def list_logs(directory: pathlib.Path) -> typing.Sequence[LogFile]:
-    """Lists all log files to be saved."""
-    crashes_file_name = 'crashes.tar.gz'
-    generate_artifacts_file(directory, crashes_file_name)
+def generate_full_state(directory: pathlib.Path, name: str) -> bool:
+    """Generates a tar archive with test node’s home directories."""
+    entries = (name for name in os.listdir(directory)
+               if (name.startswith('test') and name.endswith('_finished') and
+                   (directory / name).is_dir()))
+    return create_tar_archive(outfile=directory / name,
+                              entries=entries,
+                              cwd=directory)
 
-    files = []
+
+def list_logs(directory: pathlib.Path,
+              *,
+              save_state: bool = False) -> typing.Iterable[LogFile]:
+    """Yields all log files to be saved."""
+    filename = 'crashes.tar.gz'
+    if generate_artifacts_file(directory, filename):
+        yield LogFile(filename, directory / filename, binary=True)
+
+    filename = 'full-state.tar.xz'
+    print('save_state =', save_state)
+    if save_state and generate_full_state(directory, filename):
+        yield LogFile(filename, directory / filename, binary=True)
+
     for entry in os.listdir(directory):
         entry_path = directory / entry
         if entry_path.is_dir():
-            base = entry.split('_')[0]
-            for filename, suffix in (
-                ('remote.log', '_remote'),
-                ('companion.log', '_companion'),
-                ('stderr', ''),
-            ):
-                if (entry_path / filename).exists():
-                    files.append(LogFile(base + suffix, entry_path / filename))
-        elif entry in ('stderr', 'stdout', crashes_file_name):
-            files.append(
-                LogFile(entry,
-                        directory / entry,
-                        binary=entry == 'crashes.tar.gz'))
-
-    return files
+            path = entry_path / 'stderr'
+            if path.exists():
+                yield LogFile(entry.split('_')[0], path)
+        elif entry in ('stderr', 'stdout'):
+            yield LogFile(entry, entry_path)
 
 
 _MAX_SHORT_LOG_SIZE = 10 * 1024
@@ -337,9 +377,9 @@ def read_short_log(  # pylint: disable=too-many-branches
     return b''.join(parts), False
 
 
-def save_logs(server: worker_db.WorkerDB, test_id: int,
-              directory: pathlib.Path) -> None:
-    logs = list_logs(directory)
+def save_logs(server: worker_db.WorkerDB, test_id: int, directory: pathlib.Path,
+              *, save_state: bool) -> None:
+    logs = list(list_logs(directory, save_state=save_state))
     if not logs:
         return
 
@@ -492,7 +532,10 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
         status = run_test(outdir, test, envb, runner)
 
     server.update_test_status(status, test_row.test_id)
-    save_logs(server, test_row.test_id, outdir)
+    save_logs(server,
+              test_row.test_id,
+              outdir,
+              save_state=status not in ('SCP FAILED', 'PASSED', 'IGNORED'))
 
 
 def main() -> None:
