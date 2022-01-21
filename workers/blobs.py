@@ -97,8 +97,8 @@ class GoogleBlobClient(BlobClient):
         self.__bucket = self.__service.bucket(kw.get('bucket_name', 'nayduck'))
 
     def _upload(self, name: str, rd: typing.BinaryIO) -> str:
-        for ext, ctype in (('.gz', 'application/gzip'),
-                           ('.xz', 'application/x-xz'),
+        for ext, ctype in (('.gz', 'application/gzip'), ('.xz',
+                                                         'application/x-xz'),
                            ('.bz2', 'application/x-bzip2')):
             if name.endswith(ext):
                 blob = self.__bucket.blob(name)

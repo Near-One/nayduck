@@ -200,3 +200,23 @@ def test_testspec_name():
         spec = testspec.TestSpec(line)
         got = (spec.timeout, spec.full_timeout, spec.short_name, spec.full_name)
         assert want == got
+
+
+def test_fuzz_spec():
+
+    for spec in (
+            'pytest --skip-build --timeout=2h fuzz.py core/account-id/fuzz borsh',
+            'pytest --skip-build fuzz.py core/account-id/fuzz borsh',
+            'pytest --release fuzz.py core/account-id/fuzz borsh',
+            'pytest fuzz.py core/account-id/fuzz borsh',
+    ):
+        fuzz = testspec.TestSpec(spec).get_fuzz_spec()
+        assert ('core/account-id/fuzz', 'borsh') == fuzz
+
+    for spec in (
+            'pytest fuzz.py',
+            'mocknet fuzz.py core/account-id/fuzz borsh',
+            'expensive fuzz.py near_chunks test::test_seal_removal',
+            'pytest sanity/sync_chunks_from_archival.py',
+    ):
+        assert testspec.TestSpec(spec).get_fuzz_spec() is None

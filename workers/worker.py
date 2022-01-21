@@ -247,17 +247,25 @@ def create_tar_archive(*, outfile: pathlib.Path, entries: typing.Iterable[str],
             return False
 
 
-def generate_artifacts_file(directory: pathlib.Path, name: str) -> bool:
+def generate_artifacts_file(
+        directory: pathlib.Path, name: str,
+        fuzz_spec: typing.Optional[testspec.FuzzSpec]) -> bool:
     """Generates a tar archive with fuzz crash artefacts if any are availabe."""
-    artdir = utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts'
-    subdir = 'runtime-fuzzer'
-    if not (artdir / subdir).is_dir():
+    if not fuzz_spec:
         return False
-    entries = (f'{subdir}/{entry}' for entry in os.listdir(artdir / subdir)
-               if entry.startswith('crash-'))
-    return create_tar_archive(outfile=directory / name,
-                              entries=entries,
-                              cwd=artdir)
+    artdir = utils.REPO_DIR / fuzz_spec.subdir / 'artifacts'
+    # Try target in snake-case as well as camel_case just to be sure we don’t
+    # overlook something.
+    target = fuzz_spec.target
+    for subdir in sorted(set((target.replace('_', '-'), target))):
+        if (artdir / subdir).is_dir():
+            entries = (f'{subdir}/{entry}' for entry in os.listdir(artdir /
+                                                                   subdir)
+                       if entry.startswith('crash-'))
+            return create_tar_archive(outfile=directory / name,
+                                      entries=entries,
+                                      cwd=artdir)
+    return False
 
 
 def generate_full_state(directory: pathlib.Path, name: str) -> bool:
@@ -270,12 +278,15 @@ def generate_full_state(directory: pathlib.Path, name: str) -> bool:
                               cwd=directory)
 
 
-def list_logs(directory: pathlib.Path,
-              *,
-              save_state: bool = False) -> typing.Iterable[LogFile]:
+def list_logs(
+    directory: pathlib.Path,
+    *,
+    save_state: bool = False,
+    fuzz_spec: typing.Optional[testspec.FuzzSpec] = None
+) -> typing.Iterable[LogFile]:
     """Yields all log files to be saved."""
     filename = 'crashes.tar.gz'
-    if generate_artifacts_file(directory, filename):
+    if generate_artifacts_file(directory, filename, fuzz_spec):
         yield LogFile(filename, directory / filename, binary=True)
 
     filename = 'full-state.tar.xz'
@@ -378,8 +389,10 @@ def read_short_log(  # pylint: disable=too-many-branches
 
 
 def save_logs(server: worker_db.WorkerDB, test_id: int, directory: pathlib.Path,
-              *, save_state: bool) -> None:
-    logs = list(list_logs(directory, save_state=save_state))
+              *, save_state: bool,
+              fuzz_spec: typing.Optional[testspec.FuzzSpec]) -> None:
+    logs = list(list_logs(directory, save_state=save_state,
+                          fuzz_spec=fuzz_spec))
     if not logs:
         return
 
@@ -535,7 +548,8 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
     save_logs(server,
               test_row.test_id,
               outdir,
-              save_state=status not in ('SCP FAILED', 'PASSED', 'IGNORED'))
+              save_state=status not in ('SCP FAILED', 'PASSED', 'IGNORED'),
+              fuzz_spec=test.get_fuzz_spec())
 
 
 def main() -> None:
