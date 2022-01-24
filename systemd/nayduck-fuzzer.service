@@ -1,0 +1,13 @@
+[Unit]
+Description=NayDuck Fuzzer
+After=network.target
+
+[Service]
+Restart=always
+User=nayduck
+Group=nayduck
+WorkingDirectory=/home/nayduck/nayduck
+ExecStart=/usr/bin/python3 -m fuzzers.main
+
+[Install]
+WantedBy=multi-user.target
