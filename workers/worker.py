@@ -115,10 +115,11 @@ def analyse_test_outcome(test: testspec.TestSpec, ret: int,
                 # Report that as a failure rather than ignored test.
                 return 'FAILED'
             break
-        if find_backtrace_line(stderr):
-            return 'FAILED'
-        if b'0 passed' in get_last_line(stdout):
+        last_line = get_last_line(stdout)
+        if b'1 ignored' in last_line:
             return 'IGNORED'
+        if b'1 failed' in last_line:
+            return 'FAILED'
         return 'PASSED'
 
     if ret != 0:
