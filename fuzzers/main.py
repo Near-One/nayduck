@@ -29,6 +29,9 @@ def connect_to_gcs():
 NUM_FUZZERS = os.cpu_count()
 #NUM_FUZZERS = 1
 
+AUTO_REFRESH_INTERVAL_SECS = 24 * 3600
+#AUTO_REFRESH_INTERVAL_SECS = 300
+
 CMD_PORT = 7055
 METRICS_PORT = 5507
 
@@ -48,17 +51,14 @@ FUZZ_CORPUS_DELETED = prometheus_client.Counter('fuzz_corpus_deleted', 'Number o
 def update_repo(branch):
     if not REPO_DIR.exists():
         print(f"Doing initial clone of repository {REPO_DIR}")
-        if 0 != subprocess.run(['git', 'clone', REPO_URL, REPO_DIR_NAME], cwd=REPO_DIR_PARENT).returncode:
-            raise RuntimeError(f"Failed to clone from repo {REPO_URL}")
+        subprocess.check_call(['git', 'clone', REPO_URL, REPO_DIR_NAME], cwd=REPO_DIR_PARENT)
 
     print(f"Updating to latest commit of branch {branch}")
-    if 0 != subprocess.run(['git', 'checkout', '-f', branch], cwd=REPO_DIR).returncode:
-        raise RuntimeError(f"Failed to checkout branch {branch}")
-    if 0 != subprocess.run(['git', 'pull', '--ff-only', REPO_URL, branch], cwd=REPO_DIR).returncode:
-        raise RuntimeError(f"Failed to fast-forward branch {branch} to latest from repo {REPO_URL}")
+    subprocess.check_call(['git', 'fetch', REPO_URL, branch], cwd=REPO_DIR)
+    subprocess.check_call(['git', 'checkout', 'FETCH_HEAD'], cwd=REPO_DIR)
 
 def parse_config():
-    return toml.load(REPO_DIR / 'fuzz.toml')
+    return toml.load(REPO_DIR / 'nightly' / 'fuzz.toml')
 
 FUZZERS = []
 
@@ -66,7 +66,7 @@ def report_artifact(gcs_path, branch, t):
     # todo: report on zulip with all the details
     FUZZ_ARTIFACTS_FOUND.labels(branch['name'], t['crate'], t['runner'], t['flags']).inc()
 
-def artifact_deleted():
+def artifact_deleted(path):
     raise RuntimeError(f"Deleted artifact {path}, which should have been prevented by ignore_deletions")
 
 def run_fuzzer(branch, t, gcs, exit_event):
@@ -74,12 +74,10 @@ def run_fuzzer(branch, t, gcs, exit_event):
     bucket = gcs.get_bucket(GCS_BUCKET)
     corpus_vers = bucket.blob('current-corpus').download_as_text().strip()
 
-    log_path = (datetime.datetime.now().strftime('%Y-%m-%d') + '/' +
-        t['crate'] + '/' +
-        t['runner'] + '/' +
-        str(uuid.uuid4()))
+    date = datetime.datetime.now().strftime('%Y-%m-%d')
+    log_path = pathlib.Path(date) / t['crate'] / t['runner'] / str(uuid.uuid4())
     log_filename = WORKDIR / 'fuzz-logs' / log_path
-    os.makedirs(log_filename.parent, exist_ok=True)
+    utils.mkdirs(log_filename.parent)
     with open(log_filename, 'a') as log_file:
         current_commit = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=REPO_DIR, capture_output=True, check=True).stdout
         log_file.write(f"Corpus version: {corpus_vers}\n")
@@ -112,12 +110,12 @@ def run_fuzzer(branch, t, gcs, exit_event):
             log_file,
             True,
             lambda path: report_artifact(path, branch, t),
-            lambda path: artifact_deleted(),
+            artifact_deleted,
         )
 
         # Prepare the fuzz time metric
         fuzz_time = FUZZ_TIME.labels(branch['name'], t['crate'], t['runner'], t['flags'])
-        last_time = time.time()
+        last_time = time.monotonic()
 
         # Finally, spin up the fuzzer itself
         proc = subprocess.Popen(
@@ -138,7 +136,7 @@ def run_fuzzer(branch, t, gcs, exit_event):
         # Wait for the fuzzer to complete (ie. either crash or requested to stop)
         while proc.poll() == None and not exit_event.is_set():
             time.sleep(0.5)
-            new_time = time.time()
+            new_time = time.monotonic()
             fuzz_time.inc(new_time - last_time)
             last_time = new_time
         print(f"Fuzzer running {t} has stopped")
@@ -159,7 +157,7 @@ def run_fuzzer(branch, t, gcs, exit_event):
         signal_fuzzer(signal.SIGKILL, proc)
 
     # Finally, upload the log files
-    bucket.blob('logs/' + log_path).upload_from_filename(log_filename)
+    bucket.blob(f'logs/{log_path}').upload_from_filename(log_filename)
 
 def start_a_fuzzer(branch, cfg, gcs):
     def run_it(cfg, gcs):
@@ -237,7 +235,7 @@ def reset_to_gcs(path, local, remote, log_file):
     log_file.write(f"Resetting path {local / path} to GCS {remote}/{path}/\n")
     log_file.flush()
     #utils.rmdirs(local / path)
-    os.makedirs(local / path, exist_ok = True)
+    utils.mkdirs(local / path)
     #for blob in bucket.list_blobs(prefix = remote + '/' + path + '/'):
     #    unprefixed_path = blob.name[len(remote) + 1:]
     #    print(f"Downloading blob {blob.name} to {local / unprefixed_path}")
@@ -255,7 +253,7 @@ def auto_upload_to_gcs(exit_event, path, local, remote, bucket, log_file, ignore
     log_file.flush()
 
     def uploader_thread(path, local, remote, bucket, exit_event, log_file):
-        os.makedirs(local / path, exist_ok = True) # Otherwise inotify fails
+        utils.mkdirs(local / path) # Otherwise inotify fails
         i = inotify.adapters.Inotify()
         i.add_watch((local / path).as_posix())
         while True:
@@ -293,7 +291,7 @@ def stop_everything():
 def spawn_auto_refresher(gcs):
     while True:
         # Restart the fuzzers, thus getting latest commit and corpus, every 24 hours
-        time.sleep(3600 * 24)
+        time.sleep(AUTO_REFRESH_INTERVAL_SECS)
         stop_fuzzers()
         start_fuzzing(gcs)
 
@@ -302,7 +300,6 @@ EXCEPTION_HAPPENED_IN_THREAD = threading.Event()
 
 def main():
     # Make sure to cleanup upon ctrl-c or upon any exception in a thread
-    signal.signal(signal.SIGINT, lambda _s, _f: stop_everything())
     def new_excepthook(args):
         global THREAD_EXCEPTION, EXCEPTION_HAPPENED_IN_THREAD
         print(f"!! Caught exception in thread: {args}")
@@ -310,26 +307,29 @@ def main():
         EXCEPTION_HAPPENED_IN_THREAD.set()
     threading.excepthook = new_excepthook
 
-    # Start the system
-    gcs = connect_to_gcs()
-    start_fuzzing(gcs)
+    try:
+        # Start the system
+        gcs = connect_to_gcs()
+        start_fuzzing(gcs)
 
-    # Start the metrics server
-    prometheus_client.start_http_server(METRICS_PORT)
+        # Start the metrics server
+        prometheus_client.start_http_server(METRICS_PORT)
 
-    # And listen for the commands that might come up
-    threading.Thread(daemon = True, target = lambda: listen_for_commands(gcs)).start()
+        # And listen for the commands that might come up
+        threading.Thread(daemon = True, target = lambda: listen_for_commands(gcs)).start()
 
-    # Spawn the auto-refresher thread
-    threading.Thread(daemon = True, target = lambda: spawn_auto_refresher(gcs)).start()
+        # Spawn the auto-refresher thread
+        threading.Thread(daemon = True, target = lambda: spawn_auto_refresher(gcs)).start()
 
-    # Finally, wait for a thread to get an exception and kill the whole process
-    print("Startup complete, will run forever now")
-    EXCEPTION_HAPPENED_IN_THREAD.wait()
-    print(f"!! Got exception from thread in main thread {THREAD_EXCEPTION}")
-    sys.excepthook(THREAD_EXCEPTION.exc_type, THREAD_EXCEPTION.exc_value, THREAD_EXCEPTION.exc_traceback)
-    stop_fuzzers()
-    raise THREAD_EXCEPTION.exc_value
+        # Finally, wait for a thread to get an exception and kill the whole process
+        print("Startup complete, will run forever now")
+        EXCEPTION_HAPPENED_IN_THREAD.wait()
+        print(f"!! Got exception from thread in main thread {THREAD_EXCEPTION}")
+        sys.excepthook(THREAD_EXCEPTION.exc_type, THREAD_EXCEPTION.exc_value, THREAD_EXCEPTION.exc_traceback)
+        stop_fuzzers()
+        raise THREAD_EXCEPTION.exc_value
+    except KeyboardInterrupt:
+        stop_everything()
 
 if __name__ == '__main__':
     utils.setup_environ()
