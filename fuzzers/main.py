@@ -1,5 +1,7 @@
+import atexit
 import datetime
-import google.cloud.storage
+import google
+import google.cloud.storage as gcs
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import inotify.adapters
 import os
@@ -18,259 +20,488 @@ import uuid
 from lib import config
 from workers import utils
 
-WORKDIR = utils.WORKDIR
-REPO_URL = utils.REPO_URL
-#WORKDIR = pathlib.Path('/tmp')
-#REPO_URL = 'https://github.com/Ekleog/nearcore'
-def connect_to_gcs() -> google.cloud.storage.Client:
+#WORKDIR = utils.WORKDIR
+#REPO_URL = utils.REPO_URL
+WORKDIR = pathlib.Path('/tmp')
+REPO_URL = 'https://github.com/Ekleog/nearcore'
+def connect_to_gcs() -> gcs.Client:
     """Setup the environment to have gsutils work, and return a connection to GCS"""
-    subprocess.run(
-        ['gcloud', 'auth', 'activate-service-account', '--key-file', GCS_CREDENTIALS_FILE],
-        check = True,
-    )
-    return google.cloud.storage.Client.from_service_account_json(str(GCS_CREDENTIALS_FILE))
-    #return google.cloud.storage.Client(project = 'near-nayduck')
+    #subprocess.run(
+    #    ['gcloud', 'auth', 'activate-service-account', '--key-file', GCS_CREDENTIALS_FILE],
+    #    check = True,
+    #)
+    #return gcs.Client.from_service_account_json(str(GCS_CREDENTIALS_FILE))
+    return gcs.Client(project = 'near-nayduck')
 
 NUM_FUZZERS = typing.cast(int, os.cpu_count())
 #NUM_FUZZERS = 1
 
-AUTO_REFRESH_INTERVAL_SECS = 24 * 3600
-#AUTO_REFRESH_INTERVAL_SECS = 300
+#AUTO_REFRESH_INTERVAL_SECS = 24 * 3600
+#SYNC_LOG_UPLOAD_INTERVAL_SECS = 3600
+AUTO_REFRESH_INTERVAL_SECS = 300
+SYNC_LOG_UPLOAD_INTERVAL_SECS = 30
 
 CMD_PORT = 7055
 METRICS_PORT = 5507
 
-REPO_DIR_PARENT = WORKDIR
-REPO_DIR_NAME = 'fuzzed-nearcore'
-REPO_DIR = REPO_DIR_PARENT / REPO_DIR_NAME
+REPO_DIR = WORKDIR / 'fuzzed-nearcore'
+LOGS_DIR = WORKDIR / 'fuzz-logs'
+CORPUS_DIR = WORKDIR / 'fuzz-corpus'
 
 GCS_CREDENTIALS_FILE = config.CONFIG_DIR / 'credentials.json'
 GCS_BUCKET = 'fuzzer'
 
 # pylint: disable=line-too-long
+FUZZ_BUILD_TIME = prometheus_client.Counter('fuzz_build_seconds', 'Time spent building fuzzers', ['branch', 'crate', 'runner'])
 FUZZ_TIME = prometheus_client.Counter('fuzz_seconds', 'Time spent fuzzing', ['branch', 'crate', 'runner', 'flags'])
 FUZZ_CRASHES = prometheus_client.Counter('fuzz_crashes', 'Number of times the fuzzer process crashed (not unique crashes)', ['branch', 'crate', 'runner', 'flags'])
-FUZZ_ARTIFACTS_FOUND = prometheus_client.Counter('fuzz_artifacts_found', 'Number of artifacts found (should be number of unique crashes)', ['branch', 'crate', 'runner', 'flags'])
-FUZZ_CORPUS_UPLOADED = prometheus_client.Counter('fuzz_corpus_uploaded', 'Number of elements uploaded to GCS corpus', ['branch', 'crate', 'runner', 'flags'])
-FUZZ_CORPUS_DELETED = prometheus_client.Counter('fuzz_corpus_deleted', 'Number of elements deleted from GCS corpus', ['branch', 'crate', 'runner', 'flags'])
+FUZZ_ARTIFACTS_FOUND = prometheus_client.Counter('fuzz_artifacts_found', 'Number of artifacts found (should be number of unique crashes)', ['crate', 'runner'])
+FUZZ_CORPUS_UPLOADED = prometheus_client.Counter('fuzz_corpus_uploaded', 'Number of elements uploaded to GCS corpus', ['crate', 'runner'])
+FUZZ_CORPUS_DELETED = prometheus_client.Counter('fuzz_corpus_deleted', 'Number of elements deleted from GCS corpus', ['crate', 'runner'])
 # pylint: enable=line-too-long
-
-class FuzzProcess:
-    def __init__(
-        self,
-        crate: str,
-        runner: str,
-        proc: subprocess.Popen,
-        exit_event: threading.Event,
-    ):
-        """Create a FuzzProcess object"""
-        self.crate = crate
-        self.runner = runner
-        self.proc = proc
-        self.exit_event = exit_event
-
-def update_repo(branch: str) -> None:
-    """Update the repository at REPO_DIR to the tip of github's branch `branch`"""
-    if not REPO_DIR.exists():
-        print(f"Doing initial clone of repository {REPO_DIR}")
-        subprocess.check_call(['git', 'clone', REPO_URL, REPO_DIR_NAME], cwd=REPO_DIR_PARENT)
-
-    print(f"Updating to latest commit of branch {branch}")
-    subprocess.check_call(['git', 'fetch', REPO_URL, branch], cwd=REPO_DIR)
-    subprocess.check_call(['git', 'checkout', 'FETCH_HEAD'], cwd=REPO_DIR)
 
 # TODO: make these types more precise? But then everything comes from toml.load so...
 ConfigType = typing.Any
 BranchType = typing.Any
 TargetType = typing.Any
 
-def parse_config() -> ConfigType:
-    """Parse the configuration from the repository at REPO_DIR"""
-    # TODO: rather than checking out master before parsing the config, we could use
-    # git fetch <repo>; git show FETCH_HEAD:nightly/fuzz.toml to get the file contents
-    return toml.load(REPO_DIR / 'nightly' / 'fuzz.toml')
+class Repository:
+    def __init__(self, repo_dir: pathlib.Path, url: str):
+        """Create a Repository object"""
 
-FUZZERS = []
+        self.repo_dir = repo_dir
+        self.url = url
+    
+    def clone_if_need_be(self):
+        """Clone the repository from `self.url` if it is not present yet"""
 
-def report_artifact(gcs_path: str, branch: BranchType, t: TargetType) -> None:
-    """Callback called when a new artifact is found by a fuzzer"""
-    # todo: report on zulip with all the details
-    FUZZ_ARTIFACTS_FOUND.labels(branch['name'], t['crate'], t['runner'], t['flags']).inc()
+        if not self.repo_dir.exists():
+            print(f"Doing initial clone of repository {self.repo_dir}")
+            utils.mkdirs(self.repo_dir)
+            subprocess.check_call(['git', 'clone', self.url, '.git-clone'], cwd=self.repo_dir)
 
-def artifact_deleted(path: str) -> None:
-    """Callback called when an artifact is deleted. This would be a programming error."""
-    raise RuntimeError(f"Deleted artifact {path}, this is a programming error")
+    def worktree(self, branch: str) -> pathlib.Path:
+        """
+        Checks out a worktree on the tip of `branch` in repo at `self.url`, and return the path to
+        the worktree.
+        """
 
-def run_fuzzer(
-    branch: BranchType,
-    t: TargetType,
-    gcs: google.cloud.storage.Client,
-    exit_event: threading.Event,
-) -> None:
-    """
-    Run a fuzzer.
+        print(f"Updating to latest commit of branch {branch}")
+        worktree_path = self.repo_dir / branch
+        if worktree_path.exists():
+            subprocess.check_call(['git', 'fetch', self.url, branch], cwd=worktree_path)
+            subprocess.check_call(['git', 'checkout', 'FETCH_HEAD'], cwd=worktree_path)
+        else:
+            print(f"Doing initial checkout of branch {branch}")
+            subprocess.check_call(['git', 'fetch', self.url, branch], cwd=self.repo_dir / '.git-clone')
+            subprocess.check_call(
+                ['git', 'worktree', 'add', worktree_path, 'FETCH_HEAD'],
+                cwd = self.repo_dir / '.git-clone',
+            )
 
-    `REPO_DIR` is assumed to already be checked out at `branch`.
-    `t` is a target configuration from `fuzz.toml`.
-    `gcs` is a handle to a connection to GCS with access to the proper bucket.
-    `exit_event` being set will cleanly kill the fuzzer.
-    """
+        return worktree_path
 
-    # First, figure out the current corpus version
-    bucket = gcs.get_bucket(GCS_BUCKET)
-    corpus_vers = bucket.blob('current-corpus').download_as_text().strip()
+    def latest_config(self) -> ConfigType:
+        """Parses the configuration from the latest master of repo self.url"""
 
-    date = datetime.datetime.now().strftime('%Y-%m-%d')
-    log_path = pathlib.Path(date) / t['crate'] / t['runner'] / str(uuid.uuid4())
-    log_filename = WORKDIR / 'fuzz-logs' / log_path
-    utils.mkdirs(log_filename.parent)
-    with open(log_filename, 'a') as log_file:
-        current_commit = subprocess.run(
-            ['git', 'rev-parse', 'HEAD'],
-            cwd = REPO_DIR,
-            capture_output = True,
-            check = True,
-        ).stdout
-        log_file.write(f"Corpus version: {corpus_vers}\n")
-        log_file.write(f"Running on commit {current_commit}\n")
+        # TODO: rather than checking out master before parsing the config, we could use
+        # git fetch <repo>; git show FETCH_HEAD:nightly/fuzz.toml to get the file contents
+        return toml.load(self.worktree('master') / 'nightly' / 'fuzz.toml')
+
+class Corpus:
+    def __init__(self, dir: pathlib.Path, bucket: gcs.Bucket):
+        """Create a corpus object that'll be using directory `dir`"""
+        self.dir = dir
+        self.bucket = bucket
+        self.inotify_threads = []
+
+    def update(self):
+        """Figure out the latest version of the corpus on GCS and download it"""
+        if len(self.inotify_threads) != 0:
+            raise RuntimeError("Attempted updating a corpus that has alive notifiers")
+        self.version = self.bucket.blob('current-corpus').download_as_text().strip()
+
+    def synchronize(self, crate: str, runner: str, log_file: typing.IO[str]):
+        """Download the corpus for `crate/runner` from GCS, then upload there any local changes"""
+        if self._sync_running_for(crate, runner):
+            raise RuntimeError(f"Attempted to synchronize {crate}/{runner} that's already being synchronized")
+        base = pathlib.Path(crate) / runner
+        self._reset_to_gcs(base / 'corpus', log_file)
+        self._reset_to_gcs(base / 'artifacts', log_file)
+        self._auto_upload(base / 'corpus', crate, runner, log_file, False)
+        self._auto_upload(base / 'artifacts', crate, runner, log_file, True)
+
+    def stop_synchronizing(self) -> None:
+        for t in self.inotify_threads:
+            t.exit_event.set()
+        for t in self.inotify_threads:
+            t.join()
+        self.inotify_threads = []
+
+    def corpus_for(self, target: TargetType) -> pathlib.Path:
+        """Return the path to the corpus for target `target`"""
+        dir = self.dir / target['crate'] / target['runner'] / 'corpus'
+        utils.mkdirs(dir)
+        return dir
+
+    def artifacts_for(self, target: TargetType) -> pathlib.Path:
+        """Return the path to the artifacts for target `target`"""
+        dir = self.dir / target['crate'] / target['runner'] / 'artifacts'
+        utils.mkdirs(dir)
+        return dir
+
+    def _reset_to_gcs(self, path: pathlib.Path, log_file: typing.IO[str]) -> None:
+        """Reset `path` to its GCS contents, logging to `log_file`"""
+        print(f"Resetting path {self.dir}/{path} to GCS {self.version}/{path}/")
+        log_file.write(f"Resetting path {self.dir}/{path} to GCS {self.version}/{path}/\n")
         log_file.flush()
-
-        # Then, make sure the local corpus is the same as the gcs version
-        reset_to_gcs(t['crate'] + '/corpus/' + t['runner'], REPO_DIR, corpus_vers, log_file)
-        reset_to_gcs(t['crate'] + '/artifacts/' + t['runner'], REPO_DIR, corpus_vers, log_file)
-
-        # Then, make sure we auto-upload any new discovery to gcs
-        stop_inotify_event = threading.Event()
-        auto_upload_to_gcs(
-            exit_event = stop_inotify_event,
-            path = t['crate'] + '/corpus/' + t['runner'],
-            local = REPO_DIR,
-            remote = corpus_vers,
-            bucket = bucket,
-            log_file = log_file,
-            ignore_deletions = False,
-            on_uploaded_item = lambda path:
-                FUZZ_CORPUS_UPLOADED.labels(branch['name'], t['crate'], t['runner'], t['flags'])
-                    .inc(),
-            on_deleted_item = lambda path:
-                FUZZ_CORPUS_DELETED.labels(branch['name'], t['crate'], t['runner'], t['flags'])
-                    .inc(),
-        )
-        auto_upload_to_gcs(
-            exit_event = stop_inotify_event,
-            path = t['crate'] + '/artifacts/' + t['runner'],
-            local = REPO_DIR,
-            remote = corpus_vers,
-            bucket = bucket,
-            log_file = log_file,
-            ignore_deletions = True,
-            on_uploaded_item = lambda path: report_artifact(path, branch, t),
-            on_deleted_item = artifact_deleted,
-        )
-
-        # Prepare the fuzz time metric
-        fuzz_time = FUZZ_TIME.labels(branch['name'], t['crate'], t['runner'], t['flags'])
-        last_time = time.monotonic()
-
-        # Finally, spin up the fuzzer itself
-        proc = subprocess.Popen(
-            ['cargo', 'fuzz', 'run', t['runner'], '--'] + t['flags'],
-            cwd = REPO_DIR / t['crate'],
-            start_new_session = True,
+        utils.mkdirs(self.dir / path)
+        subprocess.check_call(
+            ['gsutil', '-m', 'rsync', '-d', f"gs://{self.bucket.name}/{self.version}/{path}/", self.dir / path],
             stdout = log_file,
             stderr = subprocess.STDOUT,
         )
-        fuzzer = FuzzProcess(t['crate'], t['runner'], proc, exit_event)
-        FUZZERS.append(fuzzer)
 
-        # Wait for the fuzzer to complete (ie. either crash or requested to stop)
-        while proc.poll() == None and not exit_event.is_set():
-            time.sleep(0.5)
+    def _auto_upload(self, path: pathlib.Path, crate: str, runner: str, log_file: typing.IO[str], is_artifacts: bool) -> None:
+        # pylint: disable=line-too-long
+        print(f"Setting up inotify watch to auto-upload changes to {self.dir / path} to GCS {self.bucket.name}/{path}/")
+        log_file.write(f"Setting up inotify watch to auto-upload changes to {self.dir / path} to GCS {self.bucket.name}/{path}/\n")
+        log_file.flush()
+        # pylint: enable=line-too-long
+        thread = InotifyThread(crate, runner, self.dir, self.bucket, self.version, path, log_file, is_artifacts)
+        thread.start()
+        self.inotify_threads.append(thread)
+
+    def _sync_running_for(self, crate: str, runner: str) -> bool:
+        for t in self.inotify_threads:
+            if t.crate == crate and t.runner == runner:
+                return True
+        return False
+
+class InotifyThread(threading.Thread):
+    def __init__(
+        self,
+        crate: str,
+        runner: str,
+        dir: pathlib.Path,
+        bucket: gcs.Bucket,
+        version: str,
+        path: pathlib.Path,
+        log_file: typing.IO[str],
+        is_artifacts: bool,
+    ) -> None:
+        threading.Thread.__init__(self, daemon=True)
+        self.crate = crate
+        self.runner = runner
+        self.dir = dir
+        self.bucket = bucket
+        self.version = version
+        self.path = path
+        self.log_file = log_file
+        self.is_artifacts = is_artifacts
+
+        self.exit_event = threading.Event()
+        self.corpus_uploaded_metric = FUZZ_CORPUS_UPLOADED.labels(crate, runner)
+        self.corpus_deleted_metric = FUZZ_CORPUS_DELETED.labels(crate, runner)
+        self.artifacts_found_metric = FUZZ_ARTIFACTS_FOUND.labels(crate, runner)
+
+    def run(self):
+        utils.mkdirs(self.dir / self.path)
+        i = inotify.adapters.Inotify()
+        i.add_watch((self.dir / self.path).as_posix())
+        while not self.exit_event.is_set():
+            # check for exit_event at most every second
+            for event in i.event_gen(yield_nones = False, timeout_s = 1):
+                if self.exit_event.is_set():
+                    break
+                (_, event_types, _, filename) = event
+                local_filename = self.dir / self.path / filename
+                remote_filename = f'{self.version}/{self.path}/{filename}'
+
+                if 'IN_CLOSE_WRITE' in event_types:
+                    self.log_file.write(
+                        f"Uploading new corpus item {local_filename} to GCS {remote_filename}\n"
+                    )
+                    self.log_file.flush()
+                    try:
+                        # TODO: batch uploads
+                        self.bucket.blob(remote_filename).upload_from_filename(local_filename)
+                        if self.is_artifacts:
+                            self._report_artifact(remote_filename, self.crate, self.runner)
+                        else:
+                            self.corpus_uploaded_metric.inc()
+                    except FileNotFoundError:
+                        pass # Ignore, as it'd mean the file has been deleted already
+
+                if 'IN_DELETE' in event_types and not self.is_artifacts:
+                    self.log_file.write(
+                        f"Removing now-removed corpus item {local_filename} as GCS {remote_filename}\n"
+                    )
+                    self.log_file.flush()
+                    try:
+                        # TODO: batch
+                        self.bucket.blob(remote_filename).delete()
+                        self.corpus_deleted_metric.inc()
+                    except google.api_core.exceptions.NotFound:
+                        pass # Ignore, as it'd mean the file isn't there already
+
+    def _report_artifact(self, gcs_path: str, crate: str, runner: str) -> None:
+        self.artifacts_found_metric.inc()
+        # TODO: report on zulip with all the details
+
+class FuzzProcess:
+    def __init__(
+        self,
+        corpus_vers: str,
+        branch: BranchType,
+        target: TargetType,
+        repo_dir: pathlib.Path,
+        log_path: pathlib.Path,
+        log_file: typing.IO[str],
+    ):
+        """Create a FuzzProcess object"""
+
+        self.corpus_vers = corpus_vers
+        self.branch = branch
+        self.target = target
+        self.repo_dir = repo_dir
+        self.log_path = log_path
+        self.log_file = log_file
+
+        self.fuzz_build_time_metric = FUZZ_BUILD_TIME.labels(branch['name'], target['crate'], target['runner'])
+        self.fuzz_time_metric = FUZZ_TIME.labels(branch['name'], target['crate'], target['runner'], target['flags'])
+        self.fuzz_crashes_metric = FUZZ_TIME.labels(branch['name'], target['crate'], target['runner'], target['flags'])
+
+    def build(self):
+        """
+        Build the fuzzer runner.
+        
+        This is a synchronous operation for convenience reasons, as cargo itself uses all the
+        available cores most of the time it shouldn't be a big deal. The only drawback is that
+        requests to pause/exit the fuzzer would block until the current build is completed.
+        """
+
+        # Log metadata information
+        current_commit = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd = self.repo_dir,
+            capture_output = True,
+            check = True,
+        ).stdout
+        self.log_file.write(f"Corpus version: {self.corpus_vers}\n")
+        self.log_file.write(f"On commit {current_commit} (tip of branch {self.branch['name']})\n")
+        self.log_file.write(f"Target is {self.target}")
+        self.log_file.flush()
+
+        # Build the fuzzer runner
+        build_start = time.monotonic()
+        subprocess.check_call(
+            ['cargo', 'fuzz', 'build', self.target['runner']],
+            cwd = self.repo_dir / self.target['crate'],
+            stdout = self.log_file,
+            stderr = subprocess.STDOUT,
+        )
+        self.fuzz_build_time_metric.inc(time.monotonic() - build_start)
+
+    def start(self, corpus: Corpus):
+        """Start the fuzzer runner on corpus `Corpus`"""
+
+        # Prepare the fuzz time metric
+        self.last_time = time.monotonic()
+
+        # Spin up the fuzzer process itself
+        self.proc = subprocess.Popen(
+            [
+                'cargo',
+                'fuzz',
+                'run',
+                self.target['runner'],
+                '--',
+                corpus.corpus_for(self.target),
+                corpus.artifacts_for(self.target),
+                f"-artifact_prefix={corpus.artifacts_for(self.target)}/",
+            ] + self.target['flags'],
+            cwd = self.repo_dir / self.target['crate'],
+            start_new_session = True,
+            stdout = self.log_file,
+            stderr = subprocess.STDOUT,
+        )
+
+    def poll(self):
+        """Checks if the current process is still running. Returns True if it stopped"""
+        if self.proc.poll() == None:
             new_time = time.monotonic()
-            fuzz_time.inc(new_time - last_time)
-            last_time = new_time
-        print(f"Fuzzer running {t} has stopped")
+            self.fuzz_time_metric.inc(new_time - self.last_time)
+            self.last_time = new_time
+        else: # Fuzz crash found
+            print(f"Fuzzer running {self.target} has stopped")
+            self.fuzz_crashes_metric.inc()
 
-    # Remove this fuzzer from the fuzzer list
-    FUZZERS.remove(fuzzer)
+    def signal(self, signal: int) -> None:
+        """
+        Signal the fuzzer process (with all its process group as a fuzzer can spawn sub-fuzzers)
+        """
 
-    # If a crash was found, report
-    if proc.poll() != None:
-        FUZZ_CRASHES.labels(branch['name'], t['crate'], t['runner'], t['flags']).inc()
+        print(f"Sending signal {signal} to fuzzer {self.proc.pid}")
+        os.killpg(os.getpgid(self.proc.pid), signal)
 
-    # Stop the inotify threads and the process, and make sure to wait until they are stopped
-    stop_inotify_event.set()
-    if proc.poll() == None:
-        signal_fuzzer(signal.SIGTERM, proc)
+def random_weighted(array, num: int):
+    return random.choices(array, [x['weight'] for x in array], k = num)
+
+def pause_exit_spot(pause_evt: threading.Event, resume_evt: threading.Event, exit_evt: threading.Event) -> None:
+    """
+    Poll the events, returning True if `exit_evt` was set and pausing as requested by `pause_evt`
+    and `resume_evt`
+    """
+
+    resume_evt.clear()
+    if pause_evt.is_set():
+        while not resume_evt.wait(timeout=1):
+            if exit_evt.is_set():
+                return True
+        pause_evt.clear()
+    return exit_evt.is_set()
+
+def kill_fuzzers(bucket: gcs.Bucket, fuzzers: typing.Iterable[FuzzProcess]):
+    for f in fuzzers:
+        try:
+            f.signal(signal.SIGTERM)
+        except ProcessLookupError:
+            print(f"Failed looking up process {f.proc.pid}")
     time.sleep(5)
-    if proc.poll() == None:
-        signal_fuzzer(signal.SIGKILL, proc)
+    for f in fuzzers:
+        try:
+            f.signal(signal.SIGKILL)
+        except ProcessLookupError:
+            print(f"Failed looking up process {f.proc.pid}")
+    for f in fuzzers:
+        bucket.blob(f"logs/{f.log_path}").upload_from_filename(LOGS_DIR / f.log_path)
 
-    # Finally, upload the log files
-    bucket.blob(f'logs/{log_path}').upload_from_filename(log_filename)
-
-def start_a_fuzzer(branch: str, cfg: ConfigType, gcs: google.cloud.storage.Client) -> None:
-    """Start a fuzzer that will randomly run one of the fuzz targets from `cfg` forever"""
-    def run_it(cfg: ConfigType, gcs: google.cloud.storage.Client) -> None:
-        exit_event = threading.Event()
-        while not exit_event.is_set():
-            target = random.choices(cfg['target'], [t['weight'] for t in cfg['target']])[0]
-            run_fuzzer(branch, target, gcs, exit_event)
-    threading.Thread(daemon = True, target = run_it, args = (cfg, gcs)).start()
-
-def signal_fuzzer(signal: int, proc: subprocess.Popen) -> None:
+def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event, resume_evt: threading.Event, exit_evt: threading.Event):
     """
-    Kill fuzzer `proc` (with all its process group as a fuzzer can spawn sub-processes) with
-    `signal`
+    Run all the fuzzers until `exit_evt` gets triggered, pausing and resuming
+    them based on `pause_evt` and `resume_evt`.
     """
 
-    print(f"Killing fuzzer {proc.pid} with signal {signal}")
-    os.killpg(os.getpgid(proc.pid), signal)
+    bucket = gcs_client.bucket(GCS_BUCKET)
 
-def signal_fuzzers(signal: int) -> None:
-    """
-    Kill all fuzzers (with all their process group as a fuzzer can spawn sub-processes) with
-    `signal`
-    """
+    repo = Repository(REPO_DIR, REPO_URL)
+    repo.clone_if_need_be()
 
-    for f in FUZZERS:
-        signal_fuzzer(signal, f.proc)
+    corpus = Corpus(CORPUS_DIR, bucket)
 
-def stop_fuzzers() -> None:
-    """Stop all the fuzzers, cleaning everything up"""
-    global FUZZERS
-    signal_fuzzers(signal.SIGTERM)
-    for f in FUZZERS:
-        f.exit_event.set()
-    time.sleep(5)
-    signal_fuzzers(signal.SIGKILL)
-    FUZZERS = []
+    while True:
+        if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+            return
 
-def listen_for_commands(gcs: google.cloud.storage.Client) -> None:
+        sync_log_files = []
+        date = datetime.datetime.now().strftime('%Y-%m-%d')
+
+        # Read the configuration from the repository
+        cfg = repo.latest_config()
+
+        # Figure out which targets we want to run
+        branches = random_weighted(cfg['branch'], NUM_FUZZERS)
+        targets = random_weighted(cfg['target'], NUM_FUZZERS)
+
+        # Synchronize the relevant corpuses
+        corpus.stop_synchronizing()
+        corpus.update()
+        for t in set((t['crate'], t['runner']) for t in targets):
+            log_path = pathlib.Path('sync') / date / t[0] / t[1] / str(uuid.uuid4())
+            utils.mkdirs((LOGS_DIR / log_path).parent)
+            corpus.synchronize(t[0], t[1], open(LOGS_DIR / log_path, 'a'))
+            sync_log_files.append(log_path)
+            if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                return
+
+        # Initialize the fuzzers
+        fuzzers = []
+        for (b, t) in zip(branches, targets):
+            worktree = repo.worktree(b['name'])
+            log_path = pathlib.Path('fuzz') / date / t['crate'] / t['runner'] / str(uuid.uuid4())
+            utils.mkdirs((LOGS_DIR / log_path).parent)
+            log_file = open(LOGS_DIR / log_path, 'a')
+            fuzzers.append(FuzzProcess(corpus.version, b, t, worktree, log_path, log_file))
+
+        # Build the fuzzers
+        for f in fuzzers:
+            f.build()
+            if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                return
+
+        # Start the fuzzers
+        atexit.register(kill_fuzzers, bucket, fuzzers)
+        for f in fuzzers:
+            f.start(corpus)
+
+        # Wait until something happens
+        started = time.monotonic()
+        last_sync_file_upload = started
+        while time.monotonic() < started + AUTO_REFRESH_INTERVAL_SECS:
+            # Exit event happened?
+            if exit_evt.is_set():
+                kill_fuzzers(bucket, fuzzers)
+                atexit.unregister(kill_fuzzers)
+                return
+
+            # Pause event happened?
+            resume_evt.clear()
+            if pause_evt.is_set():
+                for f in fuzzers:
+                    f.signal(signal.SIGSTOP)
+                while not resume_evt.wait(timeout=1):
+                    if exit_evt.is_set():
+                        kill_fuzzers(bucket, fuzzers)
+                        atexit.unregister(kill_fuzzers)
+                        return
+                pause_evt.clear()
+                for f in fuzzers:
+                    f.signal(signal.SIGCONT)
+
+            # Fuzz crash found?
+            for f in fuzzers:
+                if f.poll():
+                    bucket.blob(f"logs/{f.log_path}").upload_from_filename(LOGS_DIR / f.log_path)
+                    fuzzers.remove(f)
+
+                    # Start a new fuzzer
+                    b = random_weighted(branches, 1)[0]
+                    t = random_weighted(targets, 1)[0]
+                    worktree = repo.worktree(b['name'])
+                    log_path = pathlib.Path('fuzz') / date / t['crate'] / t['runner'] / str(uuid.uuid4())
+                    utils.mkdirs((LOGS_DIR / log_path).parent)
+                    log_file = open(LOGS_DIR / log_path, 'a')
+                    fuzzers.append(FuzzProcess(corpus.version, b, t, worktree, log_path, log_file))
+
+            # Regularly upload the sync log files
+            if time.monotonic() > last_sync_file_upload + SYNC_LOG_UPLOAD_INTERVAL_SECS:
+                last_sync_file_upload = time.monotonic()
+                for l in sync_log_files:
+                    bucket.blob(f"logs/{l}").upload_from_filename(LOGS_DIR / l)
+
+    # TODO: Minimize the corpus
+    # TODO: Rsync the corpus from gcs more frequently, not just once per fuzzer restart
+    # TODO: Add corpus size gauge metric
+    # TODO: Add coverage metrics (will need to parse logs?)
+    # TODO: Add metrics about overhead (time to update corpus, to build fuzzer, etc.)
+
+def listen_for_commands(pause_event: threading.Event, resume_event: threading.Event) -> None:
     """
     Spawn an HTTP server to remote control the fuzzers
 
     `/pause` and `/resume` respectively sigstop and sigcont the fuzzers
-    `/restart` forces a fuzzer restar
-    `/exit` stops the whole process immediately (without cleanup)
     """
     class HTTPHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            global FUZZERS
             if self.path == '/pause':
-                signal_fuzzers(signal.SIGSTOP)
+                resume_event.clear()
+                pause_event.set()
                 self.send_response(200)
             elif self.path == '/resume':
-                signal_fuzzers(signal.SIGCONT)
+                pause_event.clear()
+                resume_event.set()
                 self.send_response(200)
-            elif self.path == '/restart':
-                stop_fuzzers()
-                start_fuzzing(gcs)
-                self.send_response(200)
-            elif self.path == '/exit':
-                # for development purposes only, production will be using systemctl stop
-                signal_fuzzers(signal.SIGKILL)
-                sys.exit(0)
             else:
                 self.send_response(404)
             self.end_headers()
@@ -278,129 +509,6 @@ def listen_for_commands(gcs: google.cloud.storage.Client) -> None:
     with HTTPServer(("127.0.0.1", CMD_PORT), HTTPHandler) as httpd:
         print(f"Serving command server on port {CMD_PORT}")
         httpd.serve_forever()
-
-def start_fuzzing(gcs: google.cloud.storage.Client) -> None:
-    """Start the fuzzing, taking the configuration from latest github repo master"""
-    update_repo('master')
-    cfg = parse_config()
-    print(f"Parsed configuration: {cfg}")
-
-    # Checkout random branch
-    branch = random.choices(cfg['branch'], [b['weight'] for b in cfg['branch']])[0]
-    update_repo(branch['name'])
-
-    # TODO: Minimize the corpus
-    # TODO: Rsync the corpus from gcs more frequently, not just once per fuzzer restart
-    # TODO: Add corpus size gauge metric
-    # TODO: Add coverage metrics (will need to parse logs?)
-    # TODO: Add metrics about overhead (time to update corpus, to build fuzzer, etc.)
-    # TODO: Have one worktree per branch, this would allow both dependency build caching
-    #       after a branch change and to run fuzzers on multiple branches from a single machine
-    #       The only drawback would be fuzz corpuses wouldn't be shared across processes on the
-    #       same host on different branches, which is probably not too bad
-
-    # Start the fuzzers
-    for _ in range(NUM_FUZZERS):
-        start_a_fuzzer(branch, cfg, gcs)
-
-def reset_to_gcs(path: str, local: pathlib.Path, remote: str, log_file: typing.IO[str]) -> None:
-    """Reset path `local/path` to the contents it has on `remote/path`, logging to `log_file`"""
-    print(f"Resetting path {local / path} to GCS {remote}/{path}/")
-    log_file.write(f"Resetting path {local / path} to GCS {remote}/{path}/\n")
-    log_file.flush()
-    #utils.rmdirs(local / path)
-    utils.mkdirs(local / path)
-    #for blob in bucket.list_blobs(prefix = remote + '/' + path + '/'):
-    #    unprefixed_path = blob.name[len(remote) + 1:]
-    #    print(f"Downloading blob {blob.name} to {local / unprefixed_path}")
-    #    blob.download_to_filename(local / unprefixed_path)
-    subprocess.run(
-        ['gsutil', '-m', 'rsync', '-d', f"gs://{GCS_BUCKET}/{remote}/{path}/", local / path],
-        stdout = log_file,
-        stderr = subprocess.STDOUT,
-        check = False,
-    )
-    # TODO: currently two concurrent gsutil can step on each other's feet,
-    # it still loads a corpus but it ends up with an error, hence the check=False
-
-def uploader_thread(
-    path: str,
-    local: pathlib.Path,
-    remote: str,
-    bucket: google.cloud.storage.Bucket,
-    exit_event: threading.Event,
-    log_file: typing.IO[str],
-) -> None:
-    utils.mkdirs(local / path) # Otherwise inotify fails
-    i = inotify.adapters.Inotify()
-    i.add_watch((local / path).as_posix())
-    while True:
-        # at most every 5 seconds check for exit_event
-        for event in i.event_gen(yield_nones = False, timeout_s = 5):
-            (_, event_types, _, filename) = event
-            local_filename = local / path / filename
-            remote_filename = f'{remote}/{path}/{filename}'
-            if 'IN_CLOSE_WRITE' in event_types:
-                log_file.write(
-                    f"Uploading new corpus item {local_filename} to GCS {remote_filename}\n"
-                )
-                log_file.flush()
-                try:
-                    # TODO: batch uploads
-                    bucket.blob(remote_filename).upload_from_filename(local_filename)
-                    on_uploaded_item(remote_filename)
-                except FileNotFoundError:
-                    pass # Ignore, as it'd mean the file has been deleted already
-            if 'IN_DELETE' in event_types and not ignore_deletions:
-                log_file.write(
-                    f"Removing now-removed corpus item {local_filename} as GCS {remote_filename}\n"
-                )
-                log_file.flush()
-                try:
-                    # TODO: batch
-                    bucket.blob(remote_filename).delete()
-                    on_deleted_item(remote_filename)
-                except google.api_core.exceptions.NotFound:
-                    pass # Ignore, as it'd mean the file isn't there already
-            if exit_event.is_set():
-                return
-        if exit_event.is_set():
-            return
-
-def auto_upload_to_gcs(
-    *,
-    exit_event: threading.Event,
-    path: pathlib.Path,
-    local: pathlib.Path,
-    remote: str,
-    bucket: str,
-    log_file: typing.IO[str],
-    ignore_deletions: bool,
-    # Without Any here mypy doesn't let us use lambdas. The result is ignored anyway.
-    on_uploaded_item: typing.Callable[[str], typing.Any],
-    on_deleted_item: typing.Callable[[str], typing.Any],
-) -> None:
-    """
-    Setup an inotify thread that will automatically upload changes to GCS
-
-    `exit_event` will stop the thread when set
-    The contents of `local/path` will be propagated to `remote/path` in `bucket`
-    Logs will be sent to `log_file`.
-    If `ignore_deletions` is set, deletions will not be propagated.
-    Upon successful uploading of deletion or an item, resp. `on_uploaded_item` and
-    `on_deleted_item` will be called.
-    """
-    # pylint: disable=line-too-long
-    print(f"Setting up inotify watch to auto-upload changes to {local / path} to GCS {remote}/{path}/")
-    log_file.write(f"Setting up inotify watch to auto-upload changes to {local / path} to GCS {remote}/{path}/\n")
-    log_file.flush()
-    # pylint: enable=line-too-long
-
-    threading.Thread(
-        daemon = True,
-        target = uploader_thread,
-        args = (path, local, remote, bucket, exit_event, log_file),
-    ).start()
 
 # TODO: replace Any here with something more precise
 THREAD_EXCEPTION: typing.Optional[typing.Any] = None
@@ -411,38 +519,31 @@ def main() -> None:
     # Make sure to cleanup upon ctrl-c or upon any exception in a thread
     def new_excepthook(args: typing.Any) -> None:
         global THREAD_EXCEPTION, EXCEPTION_HAPPENED_IN_THREAD
-        print(f"!! Caught exception in thread: {args}")
         THREAD_EXCEPTION = args
         EXCEPTION_HAPPENED_IN_THREAD.set()
     threading.excepthook = new_excepthook
 
     try:
-        # Start the system
         gcs = connect_to_gcs()
-        start_fuzzing(gcs)
 
         # Start the metrics server
         prometheus_client.start_http_server(METRICS_PORT)
 
         # And listen for the commands that might come up
-        threading.Thread(daemon = True, target = listen_for_commands, args = (gcs,)).start()
+        pause_event = threading.Event()
+        resume_event = threading.Event()
+        threading.Thread(daemon = True, target = listen_for_commands, args = (pause_event, resume_event)).start()
 
         # Run until an exception forces us to stop
-        print("Startup complete, will run forever now")
-        while not EXCEPTION_HAPPENED_IN_THREAD.wait(timeout=AUTO_REFRESH_INTERVAL_SECS):
-            # Restart the fuzzers, thus getting latest commit and corpus, at every refresh interval
-            stop_fuzzers()
-            start_fuzzing(gcs)
+        print("Startup complete, will start running forever now")
+        run_fuzzers(gcs, pause_event, resume_event, EXCEPTION_HAPPENED_IN_THREAD)
 
         # Finally, proxy the exception so it gets detected and acted upon by a human
-        exc_info = typing.cast(typing.Any, THREAD_EXCEPTION) # TODO: remove Any here
-        print(f"!! Got exception from thread in main thread {exc_info}")
-        sys.excepthook(exc_info.exc_type, exc_info.exc_value, exc_info.exc_traceback)
-        raise exc_info.exc_value
+        exc_info = THREAD_EXCEPTION
+        if exc_info != None:
+            raise exc_info.exc_value
     except KeyboardInterrupt:
         print('Got ^C, stopping')
-    finally:
-        stop_fuzzers()
 
 if __name__ == '__main__':
     utils.setup_environ()
