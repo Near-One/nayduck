@@ -89,11 +89,11 @@ class Repository:
         print(f"Updating to latest commit of branch {branch}")
         worktree_path = self.repo_dir / branch
         if worktree_path.exists():
-            subprocess.check_call(['git', 'fetch', self.url, branch], cwd=worktree_path)
+            subprocess.check_call(['git', 'fetch', self.url, f'refs/heads/{branch}'], cwd=worktree_path)
             subprocess.check_call(['git', 'checkout', 'FETCH_HEAD'], cwd=worktree_path)
         else:
             print(f"Doing initial checkout of branch {branch}")
-            subprocess.check_call(['git', 'fetch', self.url, branch], cwd=self.repo_dir / '.git-clone')
+            subprocess.check_call(['git', 'fetch', self.url, f'refs/heads/{branch}'], cwd=self.repo_dir / '.git-clone')
             subprocess.check_call(
                 ['git', 'worktree', 'add', worktree_path, 'FETCH_HEAD'],
                 cwd = self.repo_dir / '.git-clone',
