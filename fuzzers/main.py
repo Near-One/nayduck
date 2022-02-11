@@ -280,6 +280,7 @@ class FuzzProcess:
         available cores most of the time it shouldn't be a big deal. The only drawback is that
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
+        print(f'Building fuzzer for branch {self.branch} and target {self.target}, log is at {self.log_path}')
 
         # Log metadata information
         current_commit = subprocess.run(
@@ -305,6 +306,7 @@ class FuzzProcess:
 
     def start(self, corpus: Corpus):
         """Start the fuzzer runner on corpus `Corpus`"""
+        print(f'Starting fuzzer for branch {self.branch} and target {self.target}, log is at {self.log_path}')
 
         # Prepare the fuzz time metric
         self.last_time = time.monotonic()
