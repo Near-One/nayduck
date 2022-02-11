@@ -101,12 +101,12 @@ class Repository:
 
         return worktree_path
 
-    def latest_config(self) -> ConfigType:
-        """Parses the configuration from the latest master of repo self.url"""
+    def latest_config(self, branch) -> ConfigType:
+        """Parses the configuration from the tip of `branch` of repo self.url"""
 
         # TODO: rather than checking out master before parsing the config, we could use
         # git fetch <repo>; git show FETCH_HEAD:nightly/fuzz.toml to get the file contents
-        return toml.load(self.worktree('master') / 'nightly' / 'fuzz.toml')
+        return toml.load(self.worktree(branch) / 'nightly' / 'fuzz.toml')
 
 class Corpus:
     def __init__(self, dir: pathlib.Path, bucket: gcs.Bucket):
@@ -398,11 +398,12 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event, resume_evt: 
         date = datetime.datetime.now().strftime('%Y-%m-%d')
 
         # Read the configuration from the repository
-        cfg = repo.latest_config()
+        cfg = repo.latest_config('master')
+        cfg_for = {b['name']: repo.latest_config(b['name']) for b in cfg['branch']}
 
         # Figure out which targets we want to run
         branches = random_weighted(cfg['branch'], NUM_FUZZERS)
-        targets = random_weighted(cfg['target'], NUM_FUZZERS)
+        targets = [random_weighted(cfg_for[b['name']]['target'], 1)[0] for b in branches]
 
         # Synchronize the relevant corpuses
         corpus.stop_synchronizing()
