@@ -1,4 +1,5 @@
 import atexit
+from collections import defaultdict
 import datetime
 import google
 import google.cloud.storage as gcs
@@ -64,6 +65,8 @@ FUZZ_CORPUS_DELETED = prometheus_client.Counter('fuzz_corpus_deleted', 'Number o
 ConfigType = typing.Any
 BranchType = typing.Any
 TargetType = typing.Any
+
+REPORTED_ARTIFACTS = defaultdict(list)
 
 class Repository:
     def __init__(self, repo_dir: pathlib.Path, url: str):
@@ -247,7 +250,6 @@ class InotifyThread(threading.Thread):
 
     def _report_artifact(self, gcs_path: str, crate: str, runner: str) -> None:
         self.artifacts_found_metric.inc()
-        # TODO: report on zulip with all the details
 
 class FuzzProcess:
     def __init__(
@@ -338,6 +340,73 @@ class FuzzProcess:
         else: # Fuzz crash found
             print(f"Fuzzer running {self.target} has stopped")
             self.fuzz_crashes_metric.inc()
+    def report_crash(self):
+        branch = self.branch['name']
+        artifact = 0# TODO
+        logs_url = 0# TODO
+        log_lines = self.log_file.readlines()
+        downloader = 0# TODO
+        reproducer = 0# TODO
+        minimizer = 0# TODO
+
+        # Check the artifact was not reported yet for this branch
+        global REPORTED_ARTIFACTS
+        if artifact in REPORTED_ARTIFACTS[branch]:
+            return
+        already_reported_for = []
+        for other_branch in REPORTED_ARTIFACTS.keys():
+            if artifact in REPORTED_ARTIFACTS[other_branch]:
+                already_reported_for.append(other_branch)
+        REPORTED_ARTIFACTS[branch].append(artifact)
+
+        if len(already_reported_for) == 0:
+            already_reported_msg = ""
+        else:
+            already_reported_msg = f"(already reported for branches {already_reported_for})"
+
+        # Send the information in two mesages, a short one guaranteed to succeed, then a long one
+        # with the log lines that could go over the message size limit
+        import textwrap
+        import zulip
+        client = zulip.Client(config_file="~/.zuliprc")
+        client.send_message({
+            "type": "stream",
+            "to": "nearinc/fuzzer/private",
+            "topic": f"{branch}: artifact {artifact}",
+            "content": textwrap.dedent(f"""\
+                # Fuzzer found new crash for branch *{branch}* {already_reported_msg}
+                Full logs are available at {logs_url}.
+                You can download the artifact by using the following command (all commands are to be run from the root of `nearcore`):
+                ```bash
+                {downloader}
+                ```
+                Then, you can reproduce by running the following command:
+                ```bash
+                {reproducer}
+                ```
+                Or minimize by running the following command:
+                ```bash
+                {minimizer}
+                ```
+                Please edit the topic name to add more meaningful information once investigated. Keeping the artifact hash in it can help if the same artifact gets detected as crashing another branch.
+            """),
+        })
+        last_log_lines = ""
+        for l in log_lines[::-1]:
+            if l.starts_with("```"):
+                # Censor the end of a spoiler block, not great but this is for human consumption
+                # anyway
+                l = " " + l
+            if len(last_log_lines) + len(l) > 9000:
+                # Zulip limit is 10k, let's keep some safety buffer here
+                break
+            last_log_lines = l + last_log_lines
+        client.send_message({
+            "type": "stream",
+            "to": "nearinc/fuzzer/private",
+            "topic": f"{branch}: artifact {artifact}",
+            "content": f"```spoiler Last few log lines\n{last_log_lines}\n```",
+        })
 
     def signal(self, signal: int) -> None:
         """
@@ -466,6 +535,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event, resume_evt: 
             for f in fuzzers:
                 if f.poll():
                     bucket.blob(f"logs/{f.log_path}").upload_from_filename(LOGS_DIR / f.log_path)
+                    f.report_crash()
                     fuzzers.remove(f)
 
                     # Start a new fuzzer
