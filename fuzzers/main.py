@@ -259,7 +259,7 @@ class FuzzProcess:
         target: TargetType,
         repo_dir: pathlib.Path,
         log_path: pathlib.Path,
-        log_file: typing.IO[str],
+        log_filepath: pathlib.Path,
     ):
         """Create a FuzzProcess object"""
 
@@ -268,7 +268,8 @@ class FuzzProcess:
         self.target = target
         self.repo_dir = repo_dir
         self.log_path = log_path
-        self.log_file = log_file
+        self.log_filepath = log_filepath
+        self.log_file = open(log_filepath, 'a')
 
         self.fuzz_build_time_metric = FUZZ_BUILD_TIME.labels(branch['name'], target['crate'], target['runner'])
         self.fuzz_time_metric = FUZZ_TIME.labels(branch['name'], target['crate'], target['runner'], target['flags'])
@@ -343,14 +344,22 @@ class FuzzProcess:
             self.fuzz_crashes_metric.inc()
             return True
 
-    def report_crash(self):
+    def report_crash(self, corpus: Corpus, bucket: gcs.Bucket):
+        with open(self.log_filepath, 'r') as log_file_r:
+            log_lines = log_file_r.readlines()
+
+        artifact_pattern = f'Test unit written to {corpus.artifacts_for(self.target)}/'
+        artifact = "<failed detecting relevant artifact in log file>"
+        for l in log_lines[::-1]:
+            if artifact_pattern in l:
+                artifact = l.split(artifact_pattern)[1][:-1] # Second part of the line except the \n
+                break
+
         branch = self.branch['name']
-        artifact = 0# TODO
-        logs_url = 0# TODO
-        log_lines = []# TODO
-        downloader = 0# TODO
-        reproducer = 0# TODO
-        minimizer = 0# TODO
+        logs_url = f"https://storage.cloud.google.com/fuzzer/logs/{self.log_path}"
+        downloader = f"gsutil cp gs://{bucket.name}/{self.corpus_vers}/{self.target['crate']}/{self.target['runner']}/artifacts/{artifact} {self.target['crate']}/artifacts/{self.target['runner']}/{artifact}"
+        reproducer = f"cd {self.target['crate']}\nRUSTC_BOOTSTRAP=1 cargo fuzz run {self.target['runner']} artifacts/{self.target['runner']}/{artifact}"
+        minimizer = f"cd {self.target['crate']}\nRUSTC_BOOTSTRAP=1 cargo fuzz tmin {self.target['runner']} artifacts/{self.target['runner']}/{artifact}"
 
         # Check the artifact was not reported yet for this branch
         global REPORTED_ARTIFACTS
@@ -371,32 +380,36 @@ class FuzzProcess:
         # with the log lines that could go over the message size limit
         import textwrap
         import zulip
-        client = zulip.Client(config_file="~/.zuliprc")
+        client = zulip.Client(config_file="~/.fuzzer-zuliprc")
         client.send_message({
             "type": "stream",
             "to": "nearinc/fuzzer/private",
             "topic": f"{branch}: artifact {artifact}",
-            "content": textwrap.dedent(f"""\
-                # Fuzzer found new crash for branch *{branch}* {already_reported_msg}
-                Full logs are available at {logs_url}.
-                You can download the artifact by using the following command (all commands are to be run from the root of `nearcore`):
-                ```bash
-                {downloader}
-                ```
-                Then, you can reproduce by running the following command:
-                ```bash
-                {reproducer}
-                ```
-                Or minimize by running the following command:
-                ```bash
-                {minimizer}
-                ```
-                Please edit the topic name to add more meaningful information once investigated. Keeping the artifact hash in it can help if the same artifact gets detected as crashing another branch.
-            """),
+            "content": (
+                f"# Fuzzer found new crash for branch *{branch}* {already_reported_msg}\n"
+                f"Full logs are available at {logs_url}.\n"
+                f"\n"
+                f"You can download the artifact by using the following command (all commands are to be run from the root of `nearcore`):\n"
+                f"```\n"
+                f"{downloader}\n"
+                f"```\n"
+                f"\n"
+                f"Then, you can reproduce by running the following command:\n"
+                f"```\n"
+                f"{reproducer}\n"
+                f"```\n"
+                f"\n"
+                f"Or minimize by running the following command:\n"
+                f"```\n"
+                f"{minimizer}\n"
+                f"```\n"
+                f"\n"
+                f"Please edit the topic name to add more meaningful information once investigated. Keeping the artifact hash in it can help if the same artifact gets detected as crashing another branch.\n"
+            ),
         })
         last_log_lines = ""
         for l in log_lines[::-1]:
-            if l.starts_with("```"):
+            if l.startswith("```"):
                 # Censor the end of a spoiler block, not great but this is for human consumption
                 # anyway
                 l = " " + l
@@ -496,7 +509,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event, resume_evt: 
             worktree = repo.worktree(b['name'])
             log_path = pathlib.Path('fuzz') / date / t['crate'] / t['runner'] / str(uuid.uuid4())
             utils.mkdirs((LOGS_DIR / log_path).parent)
-            log_file = open(LOGS_DIR / log_path, 'a')
+            log_file = LOGS_DIR / log_path
             fuzzers.append(FuzzProcess(corpus.version, b, t, worktree, log_path, log_file))
 
         # Build the fuzzers
@@ -538,7 +551,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event, resume_evt: 
             for f in fuzzers:
                 if f.poll():
                     bucket.blob(f"logs/{f.log_path}").upload_from_filename(LOGS_DIR / f.log_path)
-                    f.report_crash()
+                    f.report_crash(corpus, bucket)
                     fuzzers.remove(f)
 
                     # Start a new fuzzer
@@ -547,8 +560,11 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event, resume_evt: 
                     worktree = repo.worktree(b['name'])
                     log_path = pathlib.Path('fuzz') / date / t['crate'] / t['runner'] / str(uuid.uuid4())
                     utils.mkdirs((LOGS_DIR / log_path).parent)
-                    log_file = open(LOGS_DIR / log_path, 'a')
-                    fuzzers.append(FuzzProcess(corpus.version, b, t, worktree, log_path, log_file))
+                    log_file = LOGS_DIR / log_path
+                    new_fuzzer = FuzzProcess(corpus.version, b, t, worktree, log_path, log_file)
+                    new_fuzzer.build() # TODO: building the fuzzer should not block receiving the pause/resume messages
+                    new_fuzzer.start(corpus)
+                    fuzzers.append(new_fuzzer)
 
             # Regularly upload the sync log files
             if time.monotonic() > last_sync_file_upload + SYNC_LOG_UPLOAD_INTERVAL_SECS:
