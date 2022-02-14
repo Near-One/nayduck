@@ -61,10 +61,9 @@ FUZZ_CORPUS_UPLOADED = prometheus_client.Counter('fuzz_corpus_uploaded', 'Number
 FUZZ_CORPUS_DELETED = prometheus_client.Counter('fuzz_corpus_deleted', 'Number of elements deleted from GCS corpus', ['crate', 'runner'])
 # pylint: enable=line-too-long
 
-# TODO: make these types more precise? But then everything comes from toml.load so...
-ConfigType = typing.Any
-BranchType = typing.Any
-TargetType = typing.Any
+ConfigType = typing.Dict[str, typing.Any]
+BranchType = typing.Dict[str, typing.Any]
+TargetType = typing.Dict[str, typing.Any]
 
 REPORTED_ARTIFACTS = defaultdict(list)
 
@@ -334,7 +333,7 @@ class FuzzProcess:
 
     def poll(self):
         """Checks if the current process is still running. Returns True if it stopped"""
-        if self.proc.poll() == None:
+        if self.proc.poll() is None:
             new_time = time.monotonic()
             self.fuzz_time_metric.inc(new_time - self.last_time)
             self.last_time = new_time
@@ -632,7 +631,7 @@ def main() -> None:
 
         # Finally, proxy the exception so it gets detected and acted upon by a human
         exc_info = THREAD_EXCEPTION
-        if exc_info != None:
+        if exc_info is not None:
             raise exc_info.exc_value
     except KeyboardInterrupt:
         print('Got ^C, stopping')
