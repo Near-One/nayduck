@@ -337,14 +337,17 @@ class FuzzProcess:
             new_time = time.monotonic()
             self.fuzz_time_metric.inc(new_time - self.last_time)
             self.last_time = new_time
+            return False
         else: # Fuzz crash found
             print(f"Fuzzer running {self.target} has stopped")
             self.fuzz_crashes_metric.inc()
+            return True
+
     def report_crash(self):
         branch = self.branch['name']
         artifact = 0# TODO
         logs_url = 0# TODO
-        log_lines = self.log_file.readlines()
+        log_lines = []# TODO
         downloader = 0# TODO
         reproducer = 0# TODO
         minimizer = 0# TODO
