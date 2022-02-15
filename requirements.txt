@@ -11,4 +11,5 @@ requests
 sqlalchemy
 toml
 types-flask
+types-toml
 zulip
