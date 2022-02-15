@@ -25,10 +25,15 @@ from workers import utils
 
 WORKDIR = utils.WORKDIR
 REPO_URL = utils.REPO_URL
-
-
 #WORKDIR = pathlib.Path('/tmp')
 #REPO_URL = 'https://github.com/Ekleog/nearcore'
+
+AUTO_REFRESH_INTERVAL = datetime.timedelta(24 * 3600)
+SYNC_LOG_UPLOAD_INTERVAL = datetime.timedelta(3600)
+#AUTO_REFRESH_INTERVAL = datetime.timedelta(seconds=300)
+#SYNC_LOG_UPLOAD_INTERVAL = datetime.timedelta(seconds=30)
+
+
 def connect_to_gcs() -> gcs.Client:
     """Setup the environment to have gsutils work, and return a connection to GCS"""
     subprocess.run(
@@ -44,11 +49,6 @@ def connect_to_gcs() -> gcs.Client:
 
 NUM_FUZZERS = typing.cast(int, os.cpu_count())
 #NUM_FUZZERS = 1
-
-#AUTO_REFRESH_INTERVAL_SECS = 24 * 3600
-#SYNC_LOG_UPLOAD_INTERVAL_SECS = 3600
-AUTO_REFRESH_INTERVAL_SECS = 300
-SYNC_LOG_UPLOAD_INTERVAL_SECS = 30
 
 CMD_PORT = 7055
 METRICS_PORT = 5507
@@ -99,7 +99,8 @@ class Repository:
     def clone_if_need_be(self) -> None:
         """Clone the repository from `self.url` if it is not present yet"""
 
-        if not self.repo_dir.exists():
+        if not self.repo_dir.exists() or not (self.repo_dir /
+                                              '.git-clone').exists():
             print(f'Doing initial clone of repository {self.repo_dir}')
             utils.mkdirs(self.repo_dir)
             subprocess.check_call(['git', 'clone', self.url, '.git-clone'],
@@ -152,9 +153,9 @@ class Corpus:
 
     def update(self) -> None:
         """Figure out the latest version of the corpus on GCS and download it"""
-        if len(self.inotify_threads) != 0:
+        if self.inotify_threads:
             raise RuntimeError(
-                'Attempted updating a corpus that has alive notifiers')
+                'Attempted updating a corpus that has live notifiers')
         self.version = self.bucket.blob(
             'current-corpus').download_as_text().strip()
 
@@ -210,23 +211,25 @@ class Corpus:
 
     def _auto_upload(self, path: pathlib.Path, crate: str, runner: str,
                      log_file: typing.IO[str], is_artifacts: bool) -> None:
-        # pylint: disable=line-too-long
-        # yapf: disable
-        print(f'Setting up inotify watch to auto-upload changes to {self.dir / path} to GCS {self.bucket.name}/{path}/')
-        log_file.write(f'Setting up inotify watch to auto-upload changes to {self.dir / path} to GCS {self.bucket.name}/{path}/\n')
+        print(f'Setting up inotify watch to auto-upload changes to '
+              f'{self.dir / path} to GCS {self.bucket.name}/{path}/')
+        log_file.write(f'Setting up inotify watch to auto-upload changes to '
+                       f'{self.dir / path} to GCS {self.bucket.name}/{path}/\n')
         log_file.flush()
-        # yapf: enable
-        # pylint: enable=line-too-long
-        thread = InotifyThread(crate, runner, self.dir, self.bucket,
-                               self.version, path, log_file, is_artifacts)
+        thread = InotifyThread(crate=crate,
+                               runner=runner,
+                               directory=self.dir,
+                               bucket=self.bucket,
+                               version=self.version,
+                               path=path,
+                               log_file=log_file,
+                               is_artifacts=is_artifacts)
         thread.start()
         self.inotify_threads.append(thread)
 
     def _sync_running_for(self, crate: str, runner: str) -> bool:
-        for thread in self.inotify_threads:
-            if thread.crate == crate and thread.runner == runner:
-                return True
-        return False
+        return any(t.crate == crate and t.runner == runner
+                   for t in self.inotify_threads)
 
 
 class InotifyThread(threading.Thread):
@@ -234,6 +237,7 @@ class InotifyThread(threading.Thread):
 
     def __init__(
         self,
+        *,
         crate: str,
         runner: str,
         directory: pathlib.Path,
@@ -243,7 +247,21 @@ class InotifyThread(threading.Thread):
         log_file: typing.IO[str],
         is_artifacts: bool,
     ) -> None:
-        threading.Thread.__init__(self, daemon=True)
+        """
+        Prepare an inotify thread for running. The thread can be called with `.run()`.
+
+        `crate` and `runner` are resp. the crate path from repository root and the runner name.
+        `directory` is the root of the corpus directory in use.
+        `bucket` is the GCS bucket to which to upload/delete the new items.
+        `version` is the corpus version in the GCS bucket (first path item, used to handle corpus
+        minimization).
+        `path` is the path to watch, starting from the corpus root.
+        `log_file` is an open log file to which to write the syncing operations performed.
+        `is_artifacts` is `True` iff the folder to watch is an artifacts (as opposed to corpus)
+        folder. It will not bump the same metrics and will disable the remote deletion logic.
+        """
+
+        super().__init__(daemon=True)
         self.crate = crate
         self.runner = runner
         self.dir = directory
@@ -305,22 +323,32 @@ class FuzzProcess:
 
     def __init__(
         self,
+        *,
         corpus_vers: str,
         branch: BranchType,
         target: TargetType,
         repo_dir: pathlib.Path,
-        log_path: pathlib.Path,
-        log_filepath: pathlib.Path,
+        log_relpath: pathlib.Path,
+        log_fullpath: pathlib.Path,
     ):
-        """Create a FuzzProcess object"""
+        """
+        Create a FuzzProcess object. It can be built with `.build()` and then started with
+        `.start()`.
+
+        `corpus_vers` is the version of the corpus (first path item), used only for logging.
+        `branch` and `target` are the configuration parameters to run this process with.
+        `repo_dir` is the path to the nearcore checkout root.
+        `log_relpath` is the relative path from the log folder to the log file.
+        `log_fullpath` is the absolute path to the log file.s
+        """
 
         self.corpus_vers = corpus_vers
         self.branch = branch
         self.target = target
         self.repo_dir = repo_dir
-        self.log_path = log_path
-        self.log_filepath = log_filepath
-        self.log_file = open(log_filepath, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
+        self.log_relpath = log_relpath
+        self.log_fullpath = log_fullpath
+        self.log_file = open(log_fullpath, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
 
         self.last_time = 0.
         self.proc: typing.Any = None  # There's some weirdness around brackets and Popen
@@ -342,7 +370,7 @@ class FuzzProcess:
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
         print(f'Building fuzzer for branch {self.branch} and target '
-              f'{self.target}, log is at {self.log_path}')
+              f'{self.target}, log is at {self.log_relpath}')
 
         # Log metadata information
         current_commit = str(
@@ -372,7 +400,7 @@ class FuzzProcess:
     def start(self, corpus: Corpus) -> None:
         """Start the fuzzer runner on corpus `Corpus`"""
         print(f'Starting fuzzer for branch {self.branch} and '
-              f'target {self.target}, log is at {self.log_path}')
+              f'target {self.target}, log is at {self.log_relpath}')
 
         # Prepare the fuzz time metric
         self.last_time = time.monotonic()
@@ -408,42 +436,33 @@ class FuzzProcess:
         return True
 
     def report_crash(self, corpus: Corpus, bucket: gcs.Bucket) -> None:
-        # pylint: disable=too-many-locals
-        with open(self.log_filepath, 'r', encoding='utf-8') as log_file_r:
+        with open(self.log_fullpath, 'r', encoding='utf-8') as log_file_r:
             log_lines = log_file_r.readlines()
 
         artifact_pattern = f'Test unit written to {corpus.artifacts_for(self.target)}/'
         artifact = '<failed detecting relevant artifact in log file>'
         for line in log_lines[::-1]:
             if artifact_pattern in line:
-                # Take the second part of the line except the \n
-                artifact = line.split(artifact_pattern)[1][:-1]
+                artifact = line.split(artifact_pattern)[1].strip()
                 break
 
         branch = self.branch['name']
-        logs_url = f'https://storage.cloud.google.com/fuzzer/logs/{self.log_path}'
-
-        # pylint: disable=line-too-long
-        # yapf: disable
-        downloader = f'gsutil cp gs://{bucket.name}/{self.corpus_vers}/{self.target["crate"]}/{self.target["runner"]}/artifacts/{artifact} {self.target["crate"]}/artifacts/{self.target["runner"]}/{artifact}'
-        reproducer = f'cd {self.target["crate"]}\nRUSTC_BOOTSTRAP=1 cargo fuzz run {self.target["runner"]} artifacts/{self.target["runner"]}/{artifact}'
-        minimizer = f'cd {self.target["crate"]}\nRUSTC_BOOTSTRAP=1 cargo fuzz tmin {self.target["runner"]} artifacts/{self.target["runner"]}/{artifact}'
-        # yapf: enable
-        # pylint: enable=line-too-long
+        logs_url = f'https://storage.cloud.google.com/fuzzer/logs/{self.log_relpath}'
 
         # Check the artifact was not reported yet for this branch
         if artifact in REPORTED_ARTIFACTS[branch]:
             return
-        already_reported_for = []
-        for (other_branch, reported_artifacts) in REPORTED_ARTIFACTS.items():
-            if artifact in reported_artifacts:
-                already_reported_for.append(other_branch)
+        already_reported_for = [
+            other_branch for (other_branch,
+                              reported_artifacts) in REPORTED_ARTIFACTS.items()
+            if artifact in reported_artifacts
+        ]
         REPORTED_ARTIFACTS[branch].append(artifact)
 
-        if len(already_reported_for) == 0:
-            already_reported_msg = ''
-        else:
+        if already_reported_for:
             already_reported_msg = f'(already reported for branches {already_reported_for})'
+        else:
+            already_reported_msg = ''
 
         # Send the information in two mesages, a short one guaranteed to succeed, then a long one
         # with the log lines that could go over the message size limit
@@ -460,24 +479,30 @@ class FuzzProcess:
                 f'Full logs are available at {logs_url}.\n'
                 f'\n'
                 f'You can download the artifact by using the following command (all commands '
-                'are to be run from the root of `nearcore`):\n'
+                f'are to be run from the root of `nearcore`):\n'
                 f'```\n'
-                f'{downloader}\n'
+                f'gsutil cp gs://{bucket.name}/{self.corpus_vers}/{self.target["crate"]}/'
+                f'{self.target["runner"]}/artifacts/{artifact} {self.target["crate"]}/'
+                f'artifacts/{self.target["runner"]}/{artifact}\n'
                 f'```\n'
                 f'\n'
                 f'Then, you can reproduce by running the following command:\n'
                 f'```\n'
-                f'{reproducer}\n'
+                f'cd {self.target["crate"]}\n'
+                f'RUSTC_BOOTSTRAP=1 cargo fuzz run {self.target["runner"]} '
+                f'artifacts/{self.target["runner"]}/{artifact}\n'
                 f'```\n'
                 f'\n'
                 f'Or minimize by running the following command:\n'
                 f'```\n'
-                f'{minimizer}\n'
+                f'cd {self.target["crate"]}\n'
+                f'RUSTC_BOOTSTRAP=1 cargo fuzz tmin {self.target["runner"]} '
+                f'artifacts/{self.target["runner"]}/{artifact}\n'
                 f'```\n'
                 f'\n'
                 f'Please edit the topic name to add more meaningful information once investigated. '
-                'Keeping the artifact hash in it can help if the same artifact gets detected '
-                'as crashing another branch.\n'),
+                f'Keeping the artifact hash in it can help if the same artifact gets detected '
+                f'as crashing another branch.\n'),
         })
         last_log_lines = ''
         for line in log_lines[::-1]:
@@ -544,8 +569,8 @@ def kill_fuzzers(bucket: gcs.Bucket,
         except ProcessLookupError:
             print(f'Failed looking up process {fuzzer.proc.pid}')
     for fuzzer in fuzzers:
-        bucket.blob(f'logs/{fuzzer.log_path}').upload_from_filename(
-            str(LOGS_DIR / fuzzer.log_path))
+        bucket.blob(f'logs/{fuzzer.log_relpath}').upload_from_filename(
+            str(LOGS_DIR / fuzzer.log_relpath))
 
 
 def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
@@ -606,11 +631,15 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
             log_path = pathlib.Path(
                 'fuzz') / date / target['crate'] / target['runner'] / str(
                     uuid.uuid4())
-            utils.mkdirs((LOGS_DIR / log_path).parent)
             log_file = LOGS_DIR / log_path
+            utils.mkdirs(log_file.parent)
             fuzzers.append(
-                FuzzProcess(corpus.version, branch, target, worktree, log_path,
-                            log_file))
+                FuzzProcess(corpus_vers=corpus.version,
+                            branch=branch,
+                            target=target,
+                            repo_dir=worktree,
+                            log_relpath=log_path,
+                            log_fullpath=log_file))
 
         # Build the fuzzers
         for fuzzer in fuzzers:
@@ -626,7 +655,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         # Wait until something happens
         started = time.monotonic()
         last_sync_file_upload = started
-        while time.monotonic() < started + AUTO_REFRESH_INTERVAL_SECS:
+        next_restart = started + AUTO_REFRESH_INTERVAL.total_seconds()
+        while time.monotonic() < next_restart:
             # Exit event happened?
             if exit_evt.is_set():
                 kill_fuzzers(bucket, fuzzers)
@@ -650,8 +680,9 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
             # Fuzz crash found?
             for fuzzer in fuzzers:
                 if fuzzer.poll():
-                    bucket.blob(f'logs/{fuzzer.log_path}').upload_from_filename(
-                        str(LOGS_DIR / fuzzer.log_path))
+                    bucket.blob(
+                        f'logs/{fuzzer.log_relpath}').upload_from_filename(
+                            str(fuzzer.log_fullpath))
                     fuzzer.report_crash(corpus, bucket)
                     fuzzers.remove(fuzzer)
 
@@ -663,16 +694,21 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                         'crate'] / target['runner'] / str(uuid.uuid4())
                     utils.mkdirs((LOGS_DIR / log_path).parent)
                     log_file = LOGS_DIR / log_path
-                    new_fuzzer = FuzzProcess(corpus.version, branch, target,
-                                             worktree, log_path, log_file)
+                    new_fuzzer = FuzzProcess(corpus_vers=corpus.version,
+                                             branch=branch,
+                                             target=target,
+                                             repo_dir=worktree,
+                                             log_relpath=log_path,
+                                             log_fullpath=log_file)
                     # TODO: building the fuzzer should not block receiving the pause/resume messages
                     new_fuzzer.build()
                     new_fuzzer.start(corpus)
                     fuzzers.append(new_fuzzer)
 
             # Regularly upload the sync log files
-            next_sync_file_upload = last_sync_file_upload + SYNC_LOG_UPLOAD_INTERVAL_SECS
-            if time.monotonic() > next_sync_file_upload:
+            upload_interval_secs = SYNC_LOG_UPLOAD_INTERVAL.total_seconds()
+            next_sync = last_sync_file_upload + upload_interval_secs
+            if time.monotonic() > next_sync:
                 last_sync_file_upload = time.monotonic()
                 for line in sync_log_files:
                     bucket.blob(f'logs/{line}').upload_from_filename(
