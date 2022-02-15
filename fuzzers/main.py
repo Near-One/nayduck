@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
 import pathlib
 import random
+import shlex
 import signal
 import subprocess
 import threading
@@ -57,6 +58,7 @@ REPO_DIR = WORKDIR / 'fuzzed-nearcore'
 LOGS_DIR = WORKDIR / 'fuzz-logs'
 CORPUS_DIR = WORKDIR / 'fuzz-corpus'
 
+ZULIPRC = config.CONFIG_DIR / 'zuliprc'
 GCS_CREDENTIALS_FILE = config.CONFIG_DIR / 'credentials.json'
 GCS_BUCKET = 'fuzzer'
 
@@ -448,6 +450,8 @@ class FuzzProcess:
         return True
 
     def report_crash(self, corpus: Corpus, bucket: gcs.Bucket) -> None:
+        # pylint: disable=too-many-locals
+
         with open(self.log_fullpath, 'r', encoding='utf-8') as log_file_r:
             log_lines = log_file_r.readlines()
 
@@ -478,7 +482,17 @@ class FuzzProcess:
 
         # Send the information in two mesages, a short one guaranteed to succeed, then a long one
         # with the log lines that could go over the message size limit
-        client = zulip.Client(config_file='~/.fuzzer-zuliprc')
+        client = zulip.Client(config_file=ZULIPRC)
+        gcs_artifact = shlex.quote(
+            f'gs://{bucket.name}/{self.corpus_vers}/{self.target["crate"]}/'
+            f'{self.target["runner"]}/artifacts/{artifact}')
+        artifact_dest = shlex.quote(
+            f'{self.target["crate"]}/artifacts/{self.target["runner"]}/{artifact}'
+        )
+        quoted_crate = shlex.quote(self.target['crate'])
+        quoted_runner = shlex.quote(self.target['runner'])
+        quoted_artifact = shlex.quote(
+            f'artifacts/{self.target["runner"]}/{artifact}')
         client.send_message({
             'type':
                 'stream',
@@ -493,23 +507,19 @@ class FuzzProcess:
                 f'You can download the artifact by using the following command (all commands '
                 f'are to be run from the root of `nearcore`):\n'
                 f'```\n'
-                f'gsutil cp gs://{bucket.name}/{self.corpus_vers}/{self.target["crate"]}/'
-                f'{self.target["runner"]}/artifacts/{artifact} {self.target["crate"]}/'
-                f'artifacts/{self.target["runner"]}/{artifact}\n'
+                f'gsutil cp {gcs_artifact} {artifact_dest}\n'
                 f'```\n'
                 f'\n'
                 f'Then, you can reproduce by running the following command:\n'
                 f'```\n'
-                f'cd {self.target["crate"]}\n'
-                f'RUSTC_BOOTSTRAP=1 cargo fuzz run {self.target["runner"]} '
-                f'artifacts/{self.target["runner"]}/{artifact}\n'
+                f'cd {quoted_crate}\n'
+                f'RUSTC_BOOTSTRAP=1 cargo fuzz run {quoted_runner} {quoted_artifact}\n'
                 f'```\n'
                 f'\n'
                 f'Or minimize by running the following command:\n'
                 f'```\n'
-                f'cd {self.target["crate"]}\n'
-                f'RUSTC_BOOTSTRAP=1 cargo fuzz tmin {self.target["runner"]} '
-                f'artifacts/{self.target["runner"]}/{artifact}\n'
+                f'cd {quoted_crate}\n'
+                f'RUSTC_BOOTSTRAP=1 cargo fuzz tmin {quoted_runner} {quoted_artifact}\n'
                 f'```\n'
                 f'\n'
                 f'Please edit the topic name to add more meaningful information once investigated. '
