@@ -60,16 +60,25 @@ CORPUS_DIR = WORKDIR / 'fuzz-corpus'
 GCS_CREDENTIALS_FILE = config.CONFIG_DIR / 'credentials.json'
 GCS_BUCKET = 'fuzzer'
 
-# pylint: disable=line-too-long
-# yapf: disable
-FUZZ_BUILD_TIME = prometheus_client.Counter('fuzz_build_seconds', 'Time spent building fuzzers', ['branch', 'crate', 'runner'])
-FUZZ_TIME = prometheus_client.Counter('fuzz_seconds', 'Time spent fuzzing', ['branch', 'crate', 'runner', 'flags'])
-FUZZ_CRASHES = prometheus_client.Counter('fuzz_crashes', 'Number of times the fuzzer process crashed (not unique crashes)', ['branch', 'crate', 'runner', 'flags'])
-FUZZ_ARTIFACTS_FOUND = prometheus_client.Counter('fuzz_artifacts_found', 'Number of artifacts found (should be number of unique crashes)', ['crate', 'runner'])
-FUZZ_CORPUS_UPLOADED = prometheus_client.Counter('fuzz_corpus_uploaded', 'Number of elements uploaded to GCS corpus', ['crate', 'runner'])
-FUZZ_CORPUS_DELETED = prometheus_client.Counter('fuzz_corpus_deleted', 'Number of elements deleted from GCS corpus', ['crate', 'runner'])
-# yapf: enable
-# pylint: enable=line-too-long
+FUZZ_BUILD_TIME = prometheus_client.Counter('fuzz_build_seconds',
+                                            'Time spent building fuzzers',
+                                            ['branch', 'crate', 'runner'])
+FUZZ_TIME = prometheus_client.Counter('fuzz_seconds', 'Time spent fuzzing',
+                                      ['branch', 'crate', 'runner', 'flags'])
+FUZZ_CRASHES = prometheus_client.Counter(
+    'fuzz_crashes',
+    'Number of times the fuzzer process crashed (not unique crashes)',
+    ['branch', 'crate', 'runner', 'flags'])
+FUZZ_ARTIFACTS_FOUND = prometheus_client.Counter(
+    'fuzz_artifacts_found',
+    'Number of artifacts found (should be number of unique crashes)',
+    ['crate', 'runner'])
+FUZZ_CORPUS_UPLOADED = prometheus_client.Counter(
+    'fuzz_corpus_uploaded', 'Number of elements uploaded to GCS corpus',
+    ['crate', 'runner'])
+FUZZ_CORPUS_DELETED = prometheus_client.Counter(
+    'fuzz_corpus_deleted', 'Number of elements deleted from GCS corpus',
+    ['crate', 'runner'])
 
 BranchType = TypedDict('BranchType', {'name': str, 'weight': int})
 TargetType = TypedDict('TargetType', {
@@ -353,13 +362,16 @@ class FuzzProcess:
         self.last_time = 0.
         self.proc: typing.Any = None  # There's some weirdness around brackets and Popen
 
-        # pylint: disable=line-too-long
-        # yapf: disable
-        self.fuzz_build_time_metric = FUZZ_BUILD_TIME.labels(branch['name'], target['crate'], target['runner'])
-        self.fuzz_time_metric = FUZZ_TIME.labels(branch['name'], target['crate'], target['runner'], target['flags'])
-        self.fuzz_crashes_metric = FUZZ_TIME.labels(branch['name'], target['crate'], target['runner'], target['flags'])
-        # yapf: enable
-        # pylint: enable=line-too-long
+        self.fuzz_build_time_metric = FUZZ_BUILD_TIME.labels(
+            branch['name'], target['crate'], target['runner'])
+        self.fuzz_time_metric = FUZZ_TIME.labels(branch['name'],
+                                                 target['crate'],
+                                                 target['runner'],
+                                                 target['flags'])
+        self.fuzz_crashes_metric = FUZZ_TIME.labels(branch['name'],
+                                                    target['crate'],
+                                                    target['runner'],
+                                                    target['flags'])
 
     def build(self) -> None:
         """
