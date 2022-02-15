@@ -290,8 +290,7 @@ class InotifyThread(threading.Thread):
                 if 'IN_DELETE' in event_types and not self.is_artifacts:
                     self.log_file.write(
                         f'Removing now-removed corpus item {local_filename} '
-                        f'as GCS {remote_filename}\n'
-                    )
+                        f'as GCS {remote_filename}\n')
                     self.log_file.flush()
                     try:
                         # TODO: batch
@@ -323,8 +322,8 @@ class FuzzProcess:
         self.log_filepath = log_filepath
         self.log_file = open(log_filepath, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
 
-        self.last_time = 0
-        self.proc = None
+        self.last_time = 0.
+        self.proc: typing.Any = None  # There's some weirdness around brackets and Popen
 
         # pylint: disable=line-too-long
         # yapf: disable
@@ -342,10 +341,8 @@ class FuzzProcess:
         available cores most of the time it shouldn't be a big deal. The only drawback is that
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
-        print(
-            f'Building fuzzer for branch {self.branch} and target '
-            f'{self.target}, log is at {self.log_path}'
-        )
+        print(f'Building fuzzer for branch {self.branch} and target '
+              f'{self.target}, log is at {self.log_path}')
 
         # Log metadata information
         current_commit = str(
@@ -374,10 +371,8 @@ class FuzzProcess:
 
     def start(self, corpus: Corpus) -> None:
         """Start the fuzzer runner on corpus `Corpus`"""
-        print(
-            f'Starting fuzzer for branch {self.branch} and '
-            f'target {self.target}, log is at {self.log_path}'
-        )
+        print(f'Starting fuzzer for branch {self.branch} and '
+              f'target {self.target}, log is at {self.log_path}')
 
         # Prepare the fuzz time metric
         self.last_time = time.monotonic()
@@ -465,7 +460,7 @@ class FuzzProcess:
                 f'Full logs are available at {logs_url}.\n'
                 f'\n'
                 f'You can download the artifact by using the following command (all commands '
-                    'are to be run from the root of `nearcore`):\n'
+                'are to be run from the root of `nearcore`):\n'
                 f'```\n'
                 f'{downloader}\n'
                 f'```\n'
@@ -481,9 +476,8 @@ class FuzzProcess:
                 f'```\n'
                 f'\n'
                 f'Please edit the topic name to add more meaningful information once investigated. '
-                    'Keeping the artifact hash in it can help if the same artifact gets detected '
-                    'as crashing another branch.\n'
-            ),
+                'Keeping the artifact hash in it can help if the same artifact gets detected '
+                'as crashing another branch.\n'),
         })
         last_log_lines = ''
         for line in log_lines[::-1]:
@@ -598,7 +592,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                 uuid.uuid4())
             utils.mkdirs((LOGS_DIR / log_path).parent)
             # pylint: disable=consider-using-with
-            corpus.synchronize(targ[0], targ[1], open(LOGS_DIR / log_path, 'a', encoding='utf-8'))
+            corpus.synchronize(targ[0], targ[1],
+                               open(LOGS_DIR / log_path, 'a', encoding='utf-8'))
             # pylint: enable=consider-using-with
             sync_log_files.append(log_path)
             if pause_exit_spot(pause_evt, resume_evt, exit_evt):
@@ -609,11 +604,13 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         for (branch, target) in zip(branches, targets):
             worktree = repo.worktree(branch['name'])
             log_path = pathlib.Path(
-                'fuzz') / date / target['crate'] / target['runner'] / str(uuid.uuid4())
+                'fuzz') / date / target['crate'] / target['runner'] / str(
+                    uuid.uuid4())
             utils.mkdirs((LOGS_DIR / log_path).parent)
             log_file = LOGS_DIR / log_path
             fuzzers.append(
-                FuzzProcess(corpus.version, branch, target, worktree, log_path, log_file))
+                FuzzProcess(corpus.version, branch, target, worktree, log_path,
+                            log_file))
 
         # Build the fuzzers
         for fuzzer in fuzzers:
@@ -662,13 +659,12 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     branch = random_weighted(branches, 1)[0]
                     target = random_weighted(targets, 1)[0]
                     worktree = repo.worktree(branch['name'])
-                    log_path = pathlib.Path(
-                        'fuzz') / date / target['crate'] / target['runner'] / str(
-                            uuid.uuid4())
+                    log_path = pathlib.Path('fuzz') / date / target[
+                        'crate'] / target['runner'] / str(uuid.uuid4())
                     utils.mkdirs((LOGS_DIR / log_path).parent)
                     log_file = LOGS_DIR / log_path
-                    new_fuzzer = FuzzProcess(corpus.version, branch, target, worktree,
-                                             log_path, log_file)
+                    new_fuzzer = FuzzProcess(corpus.version, branch, target,
+                                             worktree, log_path, log_file)
                     # TODO: building the fuzzer should not block receiving the pause/resume messages
                     new_fuzzer.build()
                     new_fuzzer.start(corpus)
