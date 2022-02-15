@@ -68,24 +68,6 @@ class BlobClient:
         raise NotImplementedError()
 
 
-class AzureBlobClient(BlobClient):
-    """Interface for uploading blobs to Azure."""
-
-    def __init__(self, **kw: typing.Any) -> None:
-        import azure.storage.blob  # pylint: disable=import-outside-toplevel
-
-        self.__container = kw.pop('container_name')
-        self.__service = azure.storage.blob.BlobServiceClient(**kw)
-        self.__settings = azure.storage.blob.ContentSettings(
-            content_type=_CONTENT_TYPE, cache_control=_CACHE_CONTROL)
-
-    def _upload(self, name: str, rd: typing.BinaryIO) -> str:
-        client = self.__service.get_blob_client(container=self.__container,
-                                                blob=name)
-        client.upload_blob(rd, content_settings=self.__settings, overwrite=True)
-        return client.url
-
-
 class GoogleBlobClient(BlobClient):
     """Interface for uploading blobs to Google Cloud Storage."""
 
