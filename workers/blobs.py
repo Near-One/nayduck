@@ -2,10 +2,13 @@ import gzip
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import time
 import traceback
 import typing
+
+import google.cloud.storage
 
 from lib import config
 
@@ -71,10 +74,21 @@ class BlobClient:
 class GoogleBlobClient(BlobClient):
     """Interface for uploading blobs to Google Cloud Storage."""
 
-    def __init__(self, **kw: typing.Any) -> None:
-        import google.cloud.storage  # pylint: disable=import-outside-toplevel
+    @classmethod
+    def connect_to_gcs(cls,
+                       credentials_file: str) -> google.cloud.storage.Client:
+        subprocess.run(
+            [
+                'gcloud', 'auth', 'activate-service-account', '--key-file',
+                credentials_file
+            ],
+            check=True,
+        )
+        return google.cloud.storage.Client.from_service_account_json(
+            credentials_file)
 
-        self.__service = google.cloud.storage.Client.from_service_account_json(
+    def __init__(self, **kw: typing.Any) -> None:
+        self.__service = GoogleBlobClient.connect_to_gcs(
             config.CONFIG_DIR / kw.get('credentials_file', 'credentials.json'))
         self.__bucket = self.__service.bucket(kw.get('bucket_name', 'nayduck'))
 
