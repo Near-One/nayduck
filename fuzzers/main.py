@@ -500,31 +500,34 @@ class FuzzProcess:
                 'nearinc/fuzzer/private',
             'topic':
                 f'{branch}: artifact {artifact}',
-            'content': (
-                f'# Fuzzer found new crash for branch *{branch}* {already_reported_msg}\n'
-                f'Full logs are available at {logs_url}.\n'
-                f'\n'
-                f'You can download the artifact by using the following command (all commands '
-                f'are to be run from the root of `nearcore`):\n'
-                f'```\n'
-                f'gsutil cp {gcs_artifact} {artifact_dest}\n'
-                f'```\n'
-                f'\n'
-                f'Then, you can reproduce by running the following command:\n'
-                f'```\n'
-                f'cd {quoted_crate}\n'
-                f'RUSTC_BOOTSTRAP=1 cargo fuzz run {quoted_runner} {quoted_artifact}\n'
-                f'```\n'
-                f'\n'
-                f'Or minimize by running the following command:\n'
-                f'```\n'
-                f'cd {quoted_crate}\n'
-                f'RUSTC_BOOTSTRAP=1 cargo fuzz tmin {quoted_runner} {quoted_artifact}\n'
-                f'```\n'
-                f'\n'
-                f'Please edit the topic name to add more meaningful information once investigated. '
-                f'Keeping the artifact hash in it can help if the same artifact gets detected '
-                f'as crashing another branch.\n'),
+            'content':
+                f'''\
+# Fuzzer found new crash for branch *{branch}* {already_reported_msg}
+
+Full logs are available at {logs_url}.
+
+You can download the artifact by using the following command (all commands \
+are to be run from the root of `nearcore`):
+```
+gsutil cp {gcs_artifact} {artifact_dest}
+```
+
+Then, you can reproduce by running the following command:
+```
+cd {quoted_crate}
+RUSTC_BOOTSTRAP=1 cargo fuzz run {quoted_runner} {quoted_artifact}
+```
+
+Or minimize by running the following command:
+```
+cd {quoted_crate}
+RUSTC_BOOTSTRAP=1 cargo fuzz tmin {quoted_runner} {quoted_artifact}
+```
+
+Please edit the topic name to add more meaningful information once investigated. \
+Keeping the artifact hash in it can help if the same artifact gets detected as \
+crashing another branch.
+'''
         })
         last_log_lines = ''
         for line in log_lines[::-1]:
@@ -624,9 +627,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         }
 
         # Figure out which targets we want to run
-        branches: typing.List[BranchType] = random_weighted(
-            cfg['branch'], NUM_FUZZERS)
-        targets: typing.List[TargetType] = [
+        branches = random_weighted(cfg['branch'], NUM_FUZZERS)
+        targets = [
             random_weighted(cfg_for[b['name']]['target'], 1)[0]
             for b in branches
         ]
