@@ -395,14 +395,16 @@ class FuzzProcess:
         self.log_file.flush()
 
         # Build the fuzzer runner
-        build_start = time.monotonic()
-        subprocess.check_call(
-            ['cargo', 'fuzz', 'build', self.target['runner']],
-            cwd=self.repo_dir / self.target['crate'],
-            stdout=self.log_file,
-            stderr=subprocess.STDOUT,
-        )
-        self.fuzz_build_time_metric.inc(time.monotonic() - build_start)
+        # TODO: actually build and have build time metrics for the fuzzer runner, but this must not
+        # block the pause/resume behavior
+        #build_start = time.monotonic()
+        #subprocess.check_call(
+        #    ['cargo', 'fuzz', 'build', self.target['runner']],
+        #    cwd=self.repo_dir / self.target['crate'],
+        #    stdout=self.log_file,
+        #    stderr=subprocess.STDOUT,
+        #)
+        #self.fuzz_build_time_metric.inc(time.monotonic() - build_start)
 
     def start(self, corpus: Corpus) -> None:
         """Start the fuzzer runner on corpus `Corpus`"""
