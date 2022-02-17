@@ -12,4 +12,5 @@ sqlalchemy
 toml
 types-flask
 types-toml
+typing-extensions
 zulip
