@@ -8,6 +8,7 @@ import random
 import shlex
 import signal
 import subprocess
+import sys
 import threading
 import time
 import typing
@@ -112,7 +113,8 @@ class Repository:
 
         if not self.repo_dir.exists() or not (self.repo_dir /
                                               '.git-clone').exists():
-            print(f'Doing initial clone of repository {self.repo_dir}')
+            print(f'Doing initial clone of repository {self.repo_dir}',
+                    file=sys.stderr)
             utils.mkdirs(self.repo_dir)
             subprocess.check_call(['git', 'clone', self.url, '.git-clone'],
                                   cwd=self.repo_dir)
@@ -123,7 +125,7 @@ class Repository:
         the worktree.
         """
 
-        print(f'Updating to latest commit of branch {branch}')
+        print(f'Updating to latest commit of branch {branch}', file=sys.stderr)
         worktree_path = self.repo_dir / branch
         if worktree_path.exists():
             subprocess.check_call(
@@ -132,7 +134,7 @@ class Repository:
             subprocess.check_call(['git', 'checkout', 'FETCH_HEAD'],
                                   cwd=worktree_path)
         else:
-            print(f'Doing initial checkout of branch {branch}')
+            print(f'Doing initial checkout of branch {branch}', file=sys.stderr)
             subprocess.check_call(
                 ['git', 'fetch', self.url, f'refs/heads/{branch}'],
                 cwd=self.repo_dir / '.git-clone')
@@ -205,7 +207,8 @@ class Corpus:
     def _reset_to_gcs(self, path: pathlib.Path,
                       log_file: typing.IO[str]) -> None:
         """Reset `path` to its GCS contents, logging to `log_file`"""
-        print(f'Resetting path {self.dir}/{path} to GCS {self.version}/{path}/')
+        print(f'Resetting path {self.dir}/{path} to GCS {self.version}/{path}/',
+                file=sys.stderr)
         log_file.write(
             f'Resetting path {self.dir}/{path} to GCS {self.version}/{path}/\n')
         log_file.flush()
@@ -223,7 +226,8 @@ class Corpus:
     def _auto_upload(self, path: pathlib.Path, crate: str, runner: str,
                      log_file: typing.IO[str], is_artifacts: bool) -> None:
         print(f'Setting up inotify watch to auto-upload changes to '
-              f'{self.dir / path} to GCS {self.bucket.name}/{path}/')
+              f'{self.dir / path} to GCS {self.bucket.name}/{path}/',
+              file=sys.stderr)
         log_file.write(f'Setting up inotify watch to auto-upload changes to '
                        f'{self.dir / path} to GCS {self.bucket.name}/{path}/\n')
         log_file.flush()
@@ -384,7 +388,7 @@ class FuzzProcess:
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
         print(f'Building fuzzer for branch {self.branch} and target '
-              f'{self.target}, log is at {self.log_relpath}')
+              f'{self.target}, log is at {self.log_relpath}', file=sys.stderr)
 
         # Log metadata information
         current_commit = str(
@@ -416,7 +420,8 @@ class FuzzProcess:
     def start(self, corpus: Corpus) -> None:
         """Start the fuzzer runner on corpus `Corpus`"""
         print(f'Starting fuzzer for branch {self.branch} and '
-              f'target {self.target}, log is at {self.log_relpath}')
+              f'target {self.target}, log is at {self.log_relpath}',
+              file=sys.stderr)
 
         # Prepare the fuzz time metric
         self.last_time = time.monotonic()
@@ -447,7 +452,7 @@ class FuzzProcess:
             self.last_time = new_time
             return False
         # else: Fuzz crash found
-        print(f'Fuzzer running {self.target} has stopped')
+        print(f'Fuzzer running {self.target} has stopped', file=sys.stderr)
         self.fuzz_crashes_metric.inc()
         return True
 
@@ -553,7 +558,7 @@ crashing another branch.
         Signal the fuzzer process (with all its process group as a fuzzer can spawn sub-fuzzers)
         """
 
-        print(f'Sending signal {sig} to fuzzer {self.proc.pid}')
+        print(f'Sending signal {sig} to fuzzer {self.proc.pid}', file=sys.stderr)
         os.killpg(os.getpgid(self.proc.pid), sig)
 
 
@@ -588,13 +593,15 @@ def kill_fuzzers(bucket: gcs.Bucket,
         try:
             fuzzer.signal(signal.SIGTERM)
         except ProcessLookupError:
-            print(f'Failed looking up process {fuzzer.proc.pid}')
+            print(f'Failed looking up process {fuzzer.proc.pid}',
+                    file=sys.stderr)
     time.sleep(5)
     for fuzzer in fuzzers:
         try:
             fuzzer.signal(signal.SIGKILL)
         except ProcessLookupError:
-            print(f'Failed looking up process {fuzzer.proc.pid}')
+            print(f'Failed looking up process {fuzzer.proc.pid}',
+                    file=sys.stderr)
     for fuzzer in fuzzers:
         bucket.blob(f'logs/{fuzzer.log_relpath}').upload_from_filename(
             str(LOGS_DIR / fuzzer.log_relpath))
@@ -771,7 +778,7 @@ def listen_for_commands(pause_event: threading.Event,
             self.end_headers()
 
     with HTTPServer(('127.0.0.1', CMD_PORT), HTTPHandler) as httpd:
-        print(f'Serving command server on port {CMD_PORT}')
+        print(f'Serving command server on port {CMD_PORT}', file=sys.stderr)
         httpd.serve_forever()
 
 
@@ -805,7 +812,8 @@ def main() -> None:
                          args=(pause_event, resume_event)).start()
 
         # Run until an exception forces us to stop
-        print('Startup complete, will start running forever now')
+        print('Startup complete, will start running forever now',
+                file=sys.stderr)
         run_fuzzers(gcs_client, pause_event, resume_event,
                     EXCEPTION_HAPPENED_IN_THREAD)
 
@@ -814,7 +822,7 @@ def main() -> None:
         if exc_info is not None:
             raise exc_info.exc_value
     except KeyboardInterrupt:
-        print('Got ^C, stopping')
+        print('Got ^C, stopping', file=sys.stderr)
 
 
 if __name__ == '__main__':
