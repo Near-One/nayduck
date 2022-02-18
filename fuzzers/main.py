@@ -52,7 +52,7 @@ def connect_to_gcs() -> gcs.Client:
 NUM_FUZZERS = typing.cast(int, os.cpu_count())
 #NUM_FUZZERS = 1
 
-CMD_PORT = 7055
+CMD_PORT = utils.FUZZER_CMD_PORT
 METRICS_PORT = 5507
 
 REPO_DIR = WORKDIR / 'fuzzed-nearcore'
