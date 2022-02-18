@@ -690,6 +690,9 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         last_sync_file_upload = started
         next_restart = started + AUTO_REFRESH_INTERVAL.total_seconds()
         while time.monotonic() < next_restart:
+            # Avoid busy-looping by sleeping 100ms between each loop run
+            time.sleep(0.1)
+
             # Exit event happened?
             if exit_evt.is_set():
                 kill_fuzzers(bucket, fuzzers)
