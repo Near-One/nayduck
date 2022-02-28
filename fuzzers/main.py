@@ -831,4 +831,5 @@ def main() -> None:
 if __name__ == '__main__':
     utils.setup_environ()
     os.environ['RUSTC_BOOTSTRAP'] = '1'  # Nightly is needed by cargo-fuzz
+    zulip.Client(config_file=ZULIPRC) # Validate the zuliprc is setup well
     main()
