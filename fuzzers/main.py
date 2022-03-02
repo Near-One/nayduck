@@ -437,6 +437,7 @@ class FuzzProcess:
                 str(corpus.corpus_for(self.target)),
                 str(corpus.artifacts_for(self.target)),
                 f'-artifact_prefix={corpus.artifacts_for(self.target)}/',
+                '-timeout=8000', # nayduck can sigstop the fuzzing process for ~2 hours at most
             ] + self.target['flags'],
             cwd=self.repo_dir / self.target['crate'],
             start_new_session=True,
