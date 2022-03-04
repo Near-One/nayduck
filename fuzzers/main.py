@@ -567,9 +567,12 @@ crashing another branch.
 T = typing.TypeVar('T')  # pylint: disable=invalid-name
 
 
-def random_weighted(array: typing.List[T], num: int) -> typing.List[T]:
+def random_weighted(array: typing.List[T], num: int, name: str) -> typing.List[T]:
+    print(f'Picking {num} random {name} among {array}', file=sys.stderr)
     untyped_array = typing.cast(typing.Any, array)
-    return random.choices(array, [x['weight'] for x in untyped_array], k=num)
+    res = random.choices(array, [x['weight'] for x in untyped_array], k=num)
+    print(f' -> picked {res}', file=sys.stderr)
+    return res
 
 
 def pause_exit_spot(pause_evt: threading.Event, resume_evt: threading.Event,
@@ -637,9 +640,9 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         }
 
         # Figure out which targets we want to run
-        branches = random_weighted(cfg['branch'], NUM_FUZZERS)
+        branches = random_weighted(cfg['branch'], NUM_FUZZERS, "branches")
         targets = [
-            random_weighted(cfg_for[b['name']]['target'], 1)[0]
+            random_weighted(cfg_for[b['name']]['target'], 1, "target")[0]
             for b in branches
         ]
 
@@ -724,8 +727,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzers.remove(fuzzer)
 
                     # Start a new fuzzer
-                    branch = random_weighted(branches, 1)[0]
-                    target = random_weighted(targets, 1)[0]
+                    branch = random_weighted(branches, 1, "branch")[0]
+                    target = random_weighted(targets, 1, "target")[0]
                     worktree = repo.worktree(branch['name'])
                     log_path = pathlib.Path('fuzz') / date / target[
                         'crate'] / target['runner'] / str(uuid.uuid4())
