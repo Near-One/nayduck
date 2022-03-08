@@ -551,7 +551,7 @@ crashing another branch.
             last_log_lines = line + last_log_lines
         client.send_message({
             'type': 'stream',
-            'to': 'nearinc/fuzzer/private',
+            'to': 'pagoda/fuzzer/private',
             'topic': f'{branch}: artifact {artifact}',
             'content': f'```spoiler Last few log lines\n{last_log_lines}\n```',
         })
