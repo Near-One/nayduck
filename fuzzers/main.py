@@ -507,7 +507,7 @@ class FuzzProcess:
             'type':
                 'stream',
             'to':
-                'nearinc/fuzzer/private',
+                'pagoda/fuzzer/private',
             'topic':
                 f'{branch}: artifact {artifact}',
             'content':
