@@ -729,8 +729,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzers.remove(fuzzer)
 
                     # Start a new fuzzer
-                    branch = random_weighted(branches, 1, "branch")[0]
-                    target = random_weighted(targets, 1, "target")[0]
+                    branch = random_weighted(cfg['branch'], 1, "branch")[0]
+                    target = random_weighted(cfg_for[b['name']]['target'], 1, "target")[0]
                     worktree = repo.worktree(branch['name'])
                     log_path = pathlib.Path('fuzz') / date / target[
                         'crate'] / target['runner'] / str(uuid.uuid4())
