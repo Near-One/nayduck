@@ -427,6 +427,8 @@ class FuzzProcess:
         self.last_time = time.monotonic()
 
         # Spin up the fuzzer process itself
+        # libfuzzer will kill the process if it takes more than -timeout number of seconds.
+        # nayduck can sigstop the fuzzing process for ~2 hours at most, so 8000s should be ok.
         self.proc = subprocess.Popen(  # pylint: disable=consider-using-with
             [
                 'cargo',
@@ -437,7 +439,7 @@ class FuzzProcess:
                 str(corpus.corpus_for(self.target)),
                 str(corpus.artifacts_for(self.target)),
                 f'-artifact_prefix={corpus.artifacts_for(self.target)}/',
-                '-timeout=8000', # nayduck can sigstop the fuzzing process for ~2 hours at most
+                '-timeout=8000',
             ] + self.target['flags'],
             cwd=self.repo_dir / self.target['crate'],
             start_new_session=True,
