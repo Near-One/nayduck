@@ -388,8 +388,7 @@ class FuzzProcess:
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
         print(f'Building fuzzer for branch {self.branch} and target '
-              f'{self.target}, log is at {self.log_relpath}, '
-              f'now is {datetime.datetime.now()}', file=sys.stderr)
+              f'{self.target}, log is at {self.log_relpath}', file=sys.stderr)
 
         # Log metadata information
         current_commit = str(
@@ -404,6 +403,7 @@ class FuzzProcess:
             f'On commit {current_commit} (tip of branch {self.branch["name"]})\n'
         )
         self.log_file.write(f'Target is {self.target}')
+        self.log_file.write(f'Current time: {datetime.datetime.now()}')
         self.log_file.flush()
 
         # Build the fuzzer runner
