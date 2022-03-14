@@ -388,7 +388,8 @@ class FuzzProcess:
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
         print(f'Building fuzzer for branch {self.branch} and target '
-              f'{self.target}, log is at {self.log_relpath}', file=sys.stderr)
+              f'{self.target}, log is at {self.log_relpath}, '
+              f'now is {datetime.datetime.now()}', file=sys.stderr)
 
         # Log metadata information
         current_commit = str(
@@ -539,21 +540,21 @@ Keeping the artifact hash in it can help if the same artifact gets detected as \
 crashing another branch.
 '''
         })
-        last_log_lines = ''
+        focus_log_lines = '\n'.join(log_lines[:5]) + '\n[...]\n'
         for line in log_lines[::-1]:
             if line.startswith('```'):
                 # Censor the end of a spoiler block, not great but this is for human consumption
                 # anyway
                 line = ' ' + line
-            if len(last_log_lines) + len(line) > 9000:
+            if len(focus_log_lines) + len(line) > 9000:
                 # Zulip limit is 10k, let's keep some safety buffer here
                 break
-            last_log_lines = line + last_log_lines
+            focus_log_lines = line + focus_log_lines
         client.send_message({
             'type': 'stream',
             'to': 'pagoda/fuzzer/private',
             'topic': f'{branch}: artifact {artifact}',
-            'content': f'```spoiler Last few log lines\n{last_log_lines}\n```',
+            'content': f'```spoiler First and last few log lines\n{focus_log_lines}\n```',
         })
 
     def signal(self, sig: int) -> None:
