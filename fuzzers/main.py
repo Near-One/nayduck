@@ -402,8 +402,8 @@ class FuzzProcess:
         self.log_file.write(
             f'On commit {current_commit} (tip of branch {self.branch["name"]})\n'
         )
-        self.log_file.write(f'Target is {self.target}')
-        self.log_file.write(f'Current time: {datetime.datetime.now()}')
+        self.log_file.write(f'Target is {self.target}\n')
+        self.log_file.write(f'Current time: {datetime.datetime.now()}\n')
         self.log_file.flush()
 
         # Build the fuzzer runner
