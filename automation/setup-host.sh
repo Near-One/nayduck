@@ -106,6 +106,11 @@ fi
 cp -nvt /etc/systemd/system/ -- \
    "/home/nayduck/nayduck/systemd/nayduck-$service.service"
 systemctl enable "nayduck-$service"
+if [ "$type" = worker ]; then
+	cp -nvt /etc/systemd/system -- \
+	   "/home/nayduck/nayduck/system/nayduck-fuzzer.service"
+	systemctl enable "nayduck-fuzzer"
+fi
 
 rm -- "$basedir/setup-host.sh"
 
