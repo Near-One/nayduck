@@ -49,7 +49,7 @@ if $only_frontend; then
 	exit 0
 fi
 
-for service in nayduck-ui nayduck-builder nayduck-worker; do
+for service in nayduck-ui nayduck-builder nayduck-worker nayduck-fuzzer; do
 	if has_service "$service"; then
 		sudo systemctl restart "$service"
 	fi
