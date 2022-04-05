@@ -7,6 +7,7 @@ import pathlib
 import random
 import shlex
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -404,6 +405,7 @@ class FuzzProcess:
         )
         self.log_file.write(f'Target is {self.target}\n')
         self.log_file.write(f'Current time: {datetime.datetime.now()}\n')
+        self.log_file.write(f'On host: {socket.gethostname()}\n')
         self.log_file.flush()
 
         # Build the fuzzer runner
