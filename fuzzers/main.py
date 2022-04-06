@@ -458,7 +458,7 @@ class FuzzProcess:
             self.last_time = new_time
             return False
         # else: Fuzz crash found
-        print(f'Fuzzer running {self.target} has stopped', file=sys.stderr)
+        print(f'Fuzzer running {self.target} has stopped, log is at {self.log_fullpath}', file=sys.stderr)
         self.fuzz_crashes_metric.inc()
         return True
 
