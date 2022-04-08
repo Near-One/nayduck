@@ -143,6 +143,10 @@ class Repository:
                 ['git', 'worktree', 'add', worktree_path, 'FETCH_HEAD'],
                 cwd=self.repo_dir / '.git-clone',
             )
+            subprocess.check_call(
+                ['rustup', 'show'], # update rustup if need be
+                cwd=worktree_path,
+            )
 
         return worktree_path
 
