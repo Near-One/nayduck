@@ -545,16 +545,18 @@ Keeping the artifact hash in it can help if the same artifact gets detected as \
 crashing another branch.
 '''
         })
-        focus_log_lines = '\n'.join(log_lines[:5]) + '\n[...]\n'
+        prepend_log_lines = '\n'.join(log_lines[:5]) + '\n[...]\n'
+        focus_log_lines = ''
         for line in log_lines[::-1]:
             if line.startswith('```'):
                 # Censor the end of a spoiler block, not great but this is for human consumption
                 # anyway
                 line = ' ' + line
-            if len(focus_log_lines) + len(line) > 9000:
+            if len(prepend_log_lines) + len(focus_log_lines) + len(line) > 9000:
                 # Zulip limit is 10k, let's keep some safety buffer here
                 break
             focus_log_lines = line + focus_log_lines
+        focus_log_lines = prepend_log_lines + focus_log_lines
         client.send_message({
             'type': 'stream',
             'to': 'pagoda/fuzzer/private',
