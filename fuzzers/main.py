@@ -503,9 +503,6 @@ class FuzzProcess:
         gcs_artifact = shlex.quote(
             f'gs://{bucket.name}/{self.corpus_vers}/{self.target["crate"]}/'
             f'{self.target["runner"]}/artifacts/{artifact}')
-        artifact_dest = shlex.quote(
-            f'{self.target["crate"]}/artifacts/{self.target["runner"]}/{artifact}'
-        )
         quoted_crate = shlex.quote(self.target['crate'])
         quoted_runner = shlex.quote(self.target['runner'])
         quoted_artifact = shlex.quote(
@@ -523,21 +520,23 @@ class FuzzProcess:
 
 Full logs are available at {logs_url}.
 
-You can download the artifact by using the following command (all commands \
-are to be run from the root of `nearcore`):
+To reproduce, first go to the fuzzer directory:
 ```
-gsutil cp {gcs_artifact} {artifact_dest}
+cd {quoted_crate}
+```
+
+You can download the artifact by using the following command:
+```
+gsutil cp {gcs_artifact} {quoted_artifact}
 ```
 
 Then, you can reproduce by running the following command:
 ```
-cd {quoted_crate}
 RUSTC_BOOTSTRAP=1 cargo fuzz run {quoted_runner} {quoted_artifact}
 ```
 
 Or minimize by running the following command:
 ```
-cd {quoted_crate}
 RUSTC_BOOTSTRAP=1 cargo fuzz tmin {quoted_runner} {quoted_artifact}
 ```
 
