@@ -460,10 +460,22 @@ def handle_test(server: worker_db.WorkerDB, test: worker_db.Test) -> None:
             __handle_test(server, outdir, runner, test)
 
 
+def should_retry(test_row: worker_db.Test, status: str) -> bool:
+    """Returns whether a test should be retried."""
+    if status not in ('FAILED', 'TIMEOUT'):
+        return False
+    # Try running a test at most three times but also limit the number so that
+    # it doesn’t take more than an hour in total.  For example, a test with five
+    # minute timeout will be tried at most three times.  On the other hand,
+    # a test with one 30 minute timeout will be tried at most twice.
+    max_tries = min(3, 3600 // test_row.timeout)
+    return test_row.tries < max_tries
+
+
 def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
                   runner: utils.Runner, test_row: worker_db.Test) -> None:
     if not utils.checkout(test_row.sha, runner):
-        server.update_test_status('CHECKOUT FAILED', test_row.test_id)
+        server.update_test_status(test_row.test_id, 'CHECKOUT FAILED')
         return
 
     utils.rmdirs(pathlib.Path.home() / '.rainbow',
@@ -499,7 +511,10 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
         server.test_started(test_row.test_id)
         status = run_test(outdir, test, envb, runner)
 
-    server.update_test_status(status, test_row.test_id)
+    if should_retry(test_row, status):
+        server.retry_test(test_row.test_id)
+    else:
+        server.update_test_status(test_row.test_id, status)
     save_logs(server,
               test_row.test_id,
               outdir,

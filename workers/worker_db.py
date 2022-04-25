@@ -11,6 +11,7 @@ class Test:
     skip_build: bool
     builder_ip: int
     sha: str
+    tries: int
 
 
 class WorkerDB(common_db.DB):
@@ -40,12 +41,14 @@ class WorkerDB(common_db.DB):
                      SET started = NOW(),
                          finished = NULL,
                          status = 'RUNNING',
-                         worker_ip = :ip
+                         worker_ip = :ip,
+                         tries = tries + 1
                    WHERE test_id IN ({sql})
-               RETURNING test_id, build_id, run_id, name, timeout, skip_build'''
+               RETURNING test_id, build_id, run_id, name, timeout, skip_build,
+                         tries'''
         sql = f'''WITH test AS ({sql})
                   SELECT test_id, build_id, name, timeout, skip_build,
-                         builder_ip, ENCODE(sha, 'hex') AS sha
+                         builder_ip, ENCODE(sha, 'hex') AS sha, tries
                     FROM test
                     JOIN runs USING (run_id)
                     JOIN builds USING (build_id)'''
@@ -58,11 +61,21 @@ class WorkerDB(common_db.DB):
                   WHERE test_id = :id'''
         self._exec(sql, id=test_id)
 
-    def update_test_status(self, status: str, test_id: int) -> None:
+    def update_test_status(self, test_id: int, status: str) -> None:
         sql = '''UPDATE tests
                     SET finished = NOW(), status = :status
                   WHERE test_id = :id'''
         self._exec(sql, status=status, id=test_id)
+
+    def retry_test(self, test_id: int) -> None:
+        sql = '''UPDATE tests
+                    SET started = NULL, status = 'PENDING'
+                  WHERE test_id = :id'''
+        self._exec(sql, id=test_id)
+
+    def remove_short_logs(self, test_id: int) -> None:
+        """Removes all short logs for given test."""
+        self._exec('DELETE FROM logs WHERE test_id = :id', id=test_id)
 
     def save_short_logs(self, test_id: int,
                         logs: typing.Collection[typing.Any]) -> None:

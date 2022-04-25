@@ -55,6 +55,7 @@ CREATE TABLE "tests" (
   "build_id"    integer         NOT NULL REFERENCES "builds" ("build_id")
                                                     ON DELETE CASCADE,
   "status"      "test_status"   NOT NULL DEFAULT 'PENDING',
+  "tries"       integer         NOT NULL DEFAULT 0,
   "category"    "test_category" NOT NULL,
   "name"        varchar         NOT NULL,
   "timeout"     integer         NOT NULL,

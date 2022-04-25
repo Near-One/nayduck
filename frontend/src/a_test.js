@@ -82,6 +82,39 @@ function formatFullTestName(test) {
 }
 
 
+function nth(n) {
+    const unit = n % 10;
+    if (unit === 1 && n % 100 !== 11) {
+        return n + 'st';
+    } else if (unit === 2 && n % 100 !== 12) {
+        return n + 'nd';
+    } else if (unit === 3 && n % 100 !== 13) {
+        return n + 'rd';
+    } else {
+        return n + 'th';
+    }
+}
+
+
+function formatTriesCount(test) {
+    const body = (() => {
+        if (!test || !test.tries) {
+            return null;
+        }
+        const count = 0 | test.tries;
+        switch (test.status) {
+        case 'PENDING':
+            return count + ' failed ' + (count === 1 ? 'try' : 'tries');
+        case 'RUNNING':
+            return count > 1 ? nth(count) + ' try' : null;
+        default:
+            return count > 1 ? count + ' tries' : null;
+        }
+    })();
+    return body && <small>  ({body})</small>;
+}
+
+
 function ATest (props) {
     const [aTest, setATest] = useState(null);
     const [baseBranchHistory, setBaseBranchHistory] = useState(null);
@@ -101,9 +134,9 @@ function ATest (props) {
     }, [props.match.params.test_id]);
 
     const gitBisectCommand = aTest && aTest.first_bad && aTest.last_good ?
-        <code style={{marginLeft: '2em'}}><small>
+        <div><code><small>
             git bisect start {aTest.first_bad.substr(0, 8)} {aTest.last_good.substr(0, 8)}
-        </small></code> : null;
+        </small></code></div> : null;
 
     const {testBaseName, testCommand} = parseTestName(aTest);
     common.useTitle(aTest && (testBaseName + ' (run #' + aTest.run_id + ')'));
@@ -128,6 +161,7 @@ function ATest (props) {
           <tr>
             <td>Status</td>
             <td><span className={statusCls}>{aTest.status}</span>
+                {formatTriesCount(aTest)}
                 {gitBisectCommand}</td>
           </tr>
           {aTest.logs ? <>

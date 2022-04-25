@@ -316,7 +316,7 @@ class BackendDB(common_db.DB):
 
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, timeout,
-                        skip_build, started, finished, runs.branch,
+                        skip_build, started, finished, runs.branch, tries,
                         ENCODE(sha, 'hex') AS sha, title, requester, is_nightly
                    FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
