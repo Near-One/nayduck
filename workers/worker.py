@@ -81,55 +81,42 @@ def find_backtrace_line(rd: typing.BinaryIO) -> bool:
 
 
 def analyse_test_outcome(test: testspec.TestSpec, ret: int,
-                         stdout: typing.BinaryIO,
-                         stderr: typing.BinaryIO) -> str:
+                         stdout: typing.BinaryIO) -> str:
     """Returns test's outcome based on exit code and test's output.
 
     Args:
         test: The test whose result is being analysed.
         ret: Test process exit code.
         stdout: Test's standard output opened as binary file.
-        stderr: Test's standard error output opened as binary file.
     Returns:
         Tests outcome as one of: 'PASSED', 'FAILED' or 'IGNORED'.
     """
-
-    def get_last_line(rd: typing.BinaryIO) -> bytes:
-        """Returns last non-empty line of a file or empty string."""
-        last_line = b''
-        for line in rd:
-            line = line.strip()
-            if line:
-                last_line = line
-        return last_line
-
-    def analyse_rust_test() -> str:
-        """Analyses outcome of an expensive or lib tests."""
-        for line in stdout:
-            line = line.strip()
-            if not line:
-                continue
-            if line.decode('utf-8', 'replace') == 'running 0 tests':
-                # If user specified incorrect test name the test executable will
-                # run no tests since the filter we provide won't match anything.
-                # Report that as a failure rather than ignored test.
-                return 'FAILED'
-            break
-        last_line = get_last_line(stdout)
-        if b'1 ignored' in last_line:
-            return 'IGNORED'
-        if b'1 failed' in last_line:
-            return 'FAILED'
+    if ret != 0:
+        return 'FAILED'
+    if test.category != 'expensive':
         return 'PASSED'
 
-    if ret != 0:
-        if b'1 passed; 0 failed;' in get_last_line(stdout):
-            return 'PASSED'
+    last_line = b''
+    for line in stdout:
+        line = line.strip()
+        if line.decode('utf-8', 'replace') == 'running 0 tests':
+            # If user specified incorrect test name the test executable will
+            # run no tests since the filter we provide won't match anything.
+            # Report that as a failure rather than ignored test.
+            return 'FAILED'
+        if line:
+            last_line = line
+            break
+
+    for line in stdout:
+        line = line.strip()
+        if line:
+            last_line = line
+
+    if b'1 ignored' in last_line:
+        return 'IGNORED'
+    if b'1 failed' in last_line:
         return 'FAILED'
-
-    if test.category == 'expensive':
-        return analyse_rust_test()
-
     return 'PASSED'
 
 
@@ -162,7 +149,7 @@ def execute_test_command(test: testspec.TestSpec, envb: _EnvB, timeout: int,
     try:
         runner.stdout.seek(stdout_start)
         runner.stderr.seek(stderr_start)
-        return analyse_test_outcome(test, ret, runner.stdout, runner.stderr)
+        return analyse_test_outcome(test, ret, runner.stdout)
     finally:
         runner.stdout.seek(0, 2)
         runner.stderr.seek(0, 2)
