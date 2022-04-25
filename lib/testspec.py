@@ -206,11 +206,6 @@ class TestDBRow:
     skip_build: bool
 
 
-class FuzzSpec(typing.NamedTuple):
-    subdir: str
-    target: str
-
-
 @dataclasses.dataclass(frozen=True)
 class TestSpec:
     """Specification for a test to be run.
@@ -311,23 +306,6 @@ class TestSpec:
             object.__setattr__(self, 'timeout', timeout)
         object.__setattr__(self, 'skip_build', bool(row.skip_build))
         return self
-
-    def get_fuzz_spec(self) -> typing.Optional[FuzzSpec]:
-        """Returns a fuzz test specification if this looks like a fuzz test.
-
-        If the test is a pytest which executes fuzz.py test returns the
-        subdirectory with the fuzz test.  For example, for test
-
-            pytest --skip-build --timeout=2h fuzz.py test-utils/runtime-tester/fuzz runtime_fuzzer
-
-        returns fuzz specification with `test-utils/runtime-tester/fuzz`
-        subdirectory and `runtime_fuzzer` target.  If the test is not a fuzz
-        test returns None.
-        """
-        if (self.category == 'pytest' and len(self.args) >= 3 and
-                self.args[0] == 'fuzz.py'):
-            return FuzzSpec(self.args[1], self.args[2])
-        return None
 
     @property
     def short_name(self) -> str:

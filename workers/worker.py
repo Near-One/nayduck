@@ -235,32 +235,6 @@ def create_tar_archive(*, outfile: pathlib.Path, entries: typing.Iterable[str],
             return False
 
 
-def cleanup_fuzz_state(fuzz_spec: testspec.FuzzSpec) -> None:
-    """Removes artifacts and corpus directories for given fuzz test."""
-    fuzz_dir = utils.REPO_DIR / fuzz_spec.subdir
-    for i in ('artifacts', 'corpus'):
-        for j in set((fuzz_spec.target.replace('_', '-'), fuzz_spec.target)):
-            path = fuzz_dir / i / j
-            if path.is_dir():
-                utils.rmdirs(path)
-            elif path.exists():
-                path.unlink()
-
-
-def generate_fuzz_state(outfile: pathlib.Path,
-                        fuzz_spec: typing.Optional[testspec.FuzzSpec]) -> bool:
-    """Generates a tar archive with fuzz crash artefacts if any are availabe."""
-    if not fuzz_spec:
-        return False
-
-    fuzz_dir = utils.REPO_DIR / fuzz_spec.subdir
-    target_dirs = sorted(
-        set((fuzz_spec.target.replace('_', '-'), fuzz_spec.target)))
-    entries = (f'{i}/{j}' for i in ('artifacts', 'corpus') for j in target_dirs
-               if (fuzz_dir / i / j).is_dir())
-    return create_tar_archive(outfile=outfile, entries=entries, cwd=fuzz_dir)
-
-
 def generate_nodes_state(outfile: pathlib.Path) -> bool:
     """Generates a tar archive with test node’s home directories."""
     directory = outfile.parent
@@ -270,18 +244,11 @@ def generate_nodes_state(outfile: pathlib.Path) -> bool:
     return create_tar_archive(outfile=outfile, entries=entries, cwd=directory)
 
 
-def list_logs(
-    directory: pathlib.Path,
-    *,
-    save_state: bool = False,
-    fuzz_spec: typing.Optional[testspec.FuzzSpec] = None
-) -> typing.Iterable[LogFile]:
+def list_logs(directory: pathlib.Path,
+              *,
+              save_state: bool = False) -> typing.Iterable[LogFile]:
     """Yields all log files to be saved."""
     if save_state:
-        outfile = directory / 'fuzz-state.tar.xz'
-        if generate_fuzz_state(outfile, fuzz_spec):
-            yield LogFile(outfile.name, outfile, binary=True)
-
         outfile = directory / 'nodes-state.tar.xz'
         if generate_nodes_state(outfile):
             yield LogFile(outfile.name, outfile, binary=True)
@@ -381,10 +348,8 @@ def read_short_log(  # pylint: disable=too-many-branches
 
 
 def save_logs(server: worker_db.WorkerDB, test_id: int, directory: pathlib.Path,
-              *, save_state: bool,
-              fuzz_spec: typing.Optional[testspec.FuzzSpec]) -> None:
-    logs = list(list_logs(directory, save_state=save_state,
-                          fuzz_spec=fuzz_spec))
+              *, save_state: bool) -> None:
+    logs = list(list_logs(directory, save_state=save_state))
     if not logs:
         return
 
@@ -530,12 +495,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
         runner.log_traceback()
         status = 'SCP FAILED'
 
-    fuzz_spec = None
     if status is None:
-        fuzz_spec = test.get_fuzz_spec()
-        if fuzz_spec:
-            cleanup_fuzz_state(fuzz_spec)
-
         if test.category in ('pytest', 'mocknet'):
             install_new_packages(runner)
         server.test_started(test_row.test_id)
@@ -545,8 +505,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
     save_logs(server,
               test_row.test_id,
               outdir,
-              save_state=status not in ('SCP FAILED', 'PASSED', 'IGNORED'),
-              fuzz_spec=fuzz_spec)
+              save_state=status not in ('SCP FAILED', 'PASSED', 'IGNORED'))
 
 
 def main() -> None:
