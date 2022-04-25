@@ -98,8 +98,10 @@ class Runner:
         """
         # pylint: disable=consider-using-with
         if outdir:
-            self.stdout = open(outdir / 'stdout', 'w+b')
-            self.stderr = open(outdir / 'stderr', 'w+b')
+            self.stdout = typing.cast(typing.BinaryIO,
+                                      open(outdir / 'stdout', 'w+b'))
+            self.stderr = typing.cast(typing.BinaryIO,
+                                      open(outdir / 'stderr', 'w+b'))
         else:
             self.stdout = typing.cast(typing.BinaryIO, tempfile.TemporaryFile())
             self.stderr = typing.cast(typing.BinaryIO, tempfile.TemporaryFile())

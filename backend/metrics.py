@@ -6,15 +6,16 @@ import prometheus_flask_exporter
 
 from . import backend_db
 
-_Samples = typing.Sequence[typing.Tuple[str, typing.Mapping[str, str], int,
-                                        None, None]]
+_Sample = prometheus_client.samples.Sample
+_Samples = typing.Iterable[prometheus_client.samples.Sample]
 
 
-class StatusMetric(prometheus_client.metrics.MetricWrapperBase):  # type: ignore
+class StatusMetric(prometheus_client.metrics.MetricWrapperBase):
     _type = prometheus_client.Enum._type  # pylint: disable=protected-access
 
     def __init__(self, name: str, documentation: str, *,
-                 registry: prometheus_client.registry.CollectorRegistry):
+                 registry: typing.Optional[
+                     prometheus_client.registry.CollectorRegistry]):
         super().__init__(name=name,
                          documentation=documentation,
                          registry=registry)
@@ -27,7 +28,7 @@ class StatusMetric(prometheus_client.metrics.MetricWrapperBase):  # type: ignore
             return {key: str(value) for key, value in zip(keys, row)}
 
         self.__samples = tuple(
-            ('', as_dict(row), 1, None, None) for row in rows)
+            _Sample('', as_dict(row), 1, None, None) for row in rows)
 
     def _metric_init(self) -> None:
         pass
@@ -43,9 +44,10 @@ def _set_status(pmetric: prometheus_client.Gauge,
         pmetric.labels(*[str(label) for label in labels]).set(1)
 
 
-class Collector:
+class Collector(prometheus_client.registry.Collector):
 
-    def __init__(self, registry: prometheus_client.registry.CollectorRegistry):
+    def __init__(self, registry: typing.Optional[
+        prometheus_client.registry.CollectorRegistry]):
         self.m_nightly_id = prometheus_client.Gauge(
             'nayduck_nightly_run_id',
             'Run id of the last nightly run',
