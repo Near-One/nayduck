@@ -52,8 +52,11 @@ class WorkerDB(common_db.DB):
                     FROM test
                     JOIN runs USING (run_id)
                     JOIN builds USING (build_id)'''
-        test = self._exec(sql, ip=self._ipv4).first()
-        return typing.cast(typing.Optional[Test], test)
+        row = self._exec(sql, ip=self._ipv4).first()
+        test = typing.cast(typing.Optional[Test], row)
+        if test and test.tries > 1:
+            self._exec('DELETE FROM logs WHERE test_id = :id', id=test.test_id)
+        return test
 
     def test_started(self, test_id: int) -> None:
         sql = '''UPDATE tests
@@ -72,10 +75,6 @@ class WorkerDB(common_db.DB):
                     SET started = NULL, status = 'PENDING'
                   WHERE test_id = :id'''
         self._exec(sql, id=test_id)
-
-    def remove_short_logs(self, test_id: int) -> None:
-        """Removes all short logs for given test."""
-        self._exec('DELETE FROM logs WHERE test_id = :id', id=test_id)
 
     def save_short_logs(self, test_id: int,
                         logs: typing.Collection[typing.Any]) -> None:
