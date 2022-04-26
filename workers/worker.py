@@ -142,7 +142,8 @@ def execute_test_command(test: testspec.TestSpec, envb: _EnvB, timeout: int,
     envb[b'NAYDUCK_TIMEOUT'] = str(timeout).encode('ascii')
     try:
         cwd, cmd = get_test_command(test)
-        ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
+        with utils.PausedFuzzers():
+            ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
     except subprocess.TimeoutExpired:
         return 'TIMEOUT'
     try:
