@@ -93,6 +93,9 @@ class WorkerDB(common_db.DB):
 
     def handle_restart(self) -> None:
         sql = '''UPDATE tests
-                    SET started = NULL, status = 'PENDING', worker_ip = 0
+                    SET started = NULL,
+                        status = 'PENDING',
+                        worker_ip = 0,
+                        tries = GREATEST(tries - 1, 0)
                   WHERE status = 'RUNNING' AND worker_ip = :ip'''
         self._exec(sql, ip=self._ipv4)
