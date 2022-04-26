@@ -465,11 +465,12 @@ def should_retry(test_row: worker_db.Test, status: str) -> bool:
     """Returns whether a test should be retried."""
     if status not in ('FAILED', 'TIMEOUT'):
         return False
-    # Try running a test at most three times but also limit the number so that
-    # it doesn’t take more than an hour in total.  For example, a test with five
-    # minute timeout will be tried at most three times.  On the other hand,
-    # a test with one 30 minute timeout will be tried at most twice.
-    max_tries = min(3, 3600 // test_row.timeout)
+    # There are a few rules we implement when deciding how many times a test
+    # will be retried.
+    # 1. Every test is retried at least once (i.e. max_tries >= 2).
+    # 2. No test is retried more than four times (i.e. max_tries <= 5).
+    # 3. Don’t run test for more than an hour unless rule 1. requires that.
+    max_tries = max(2, min(5, 3600 // test_row.timeout))
     return test_row.tries < max_tries
 
 
