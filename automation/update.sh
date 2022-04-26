@@ -35,7 +35,8 @@ sudo -u nayduck /bin/sh -c "
 	git remote update --prune
 	git reset --hard origin/master
 	if ! $only_frontend; then
-		python3 -m pip install -U -r requirements.txt
+		python3 -m pip install --no-warn-script-location -U pip
+		python3 -m pip install --no-warn-script-location -U -r requirements.txt
 	fi
 	if $has_ui; then
 		cd frontend
