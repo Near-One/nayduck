@@ -21,7 +21,7 @@ class Failure(Exception):
     def __init__(self, response: typing.Any) -> None:
         super().__init__(f'Failure. {response}')
 
-    def to_response(self) -> typing.Dict[str, typing.Union[int, str]]:
+    def to_response(self) -> dict[str, typing.Union[int, str]]:
         """Returns a JSON object intended to return to the caller on failure."""
         return {'code': 1, 'response': self.args[0]}
 
@@ -144,7 +144,7 @@ class Request(typing.NamedTuple):
     branch: str
     sha: str
     requester: str
-    tests: typing.List[testspec.TestSpec]
+    tests: list[testspec.TestSpec]
 
     @classmethod
     def from_json(cls, request_json: typing.Any, requester: str) -> 'Request':
@@ -191,8 +191,7 @@ class Request(typing.NamedTuple):
 
     @classmethod
     def parse_tests(
-            cls, tests: typing.Iterable[typing.Any]
-    ) -> typing.List[testspec.TestSpec]:
+            cls, tests: typing.Iterable[typing.Any]) -> list[testspec.TestSpec]:
         """Parses test lines.
 
         See testspec.TestSpec.from_name_with_count for description of how the
@@ -209,7 +208,7 @@ class Request(typing.NamedTuple):
             Failure: if any of the test is not valid, there are no tests given
                 or there are too many tests given.
         """
-        result: typing.List[testspec.TestSpec] = []
+        result: list[testspec.TestSpec] = []
         for line in tests:
             if not isinstance(line, str):
                 raise Failure(f'Invalid test: {line}; expected string')
@@ -239,8 +238,7 @@ def schedule_nightly_run() -> datetime.timedelta:
             return datetime.timedelta(hours=1)
 
 
-def _read_tests(repo_dir: pathlib.Path,
-                sha: str) -> typing.List[testspec.TestSpec]:
+def _read_tests(repo_dir: pathlib.Path, sha: str) -> list[testspec.TestSpec]:
     """Reads tests from the repository nightly/nightly.txt file.
 
     Reads the `nightly/nightly.txt` file in the repository to get the list of

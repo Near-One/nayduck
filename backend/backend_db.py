@@ -9,8 +9,8 @@ from lib import common_db
 from lib import testspec
 
 _Row = typing.Any
-_Dict = typing.Dict[str, typing.Any]
-_BuildKey = typing.Tuple[bool, str]
+_Dict = dict[str, typing.Any]
+_BuildKey = tuple[bool, str]
 
 
 def _pop_falsy(dictionary: _Dict, *keys: str) -> None:
@@ -138,8 +138,8 @@ class BackendDB(common_db.DB):
                       key=lambda run: -typing.cast(int, run['run_id']))
 
     def __get_statuses_for_runs(
-        self, min_run_id: int, max_run_id: int
-    ) -> typing.Dict[typing.Tuple[int, int], typing.Counter[str]]:
+            self, min_run_id: int,
+            max_run_id: int) -> dict[tuple[int, int], typing.Counter[str]]:
         """Return test statuses for runs with ids in given range.
 
         Args:
@@ -148,9 +148,9 @@ class BackendDB(common_db.DB):
         Returns:
             A {(run_id, build_id): {status: count}} dictionary.
         """
-        statuses: typing.Dict[typing.Tuple[int, int],
-                              typing.Counter[str]] = collections.defaultdict(
-                                  collections.Counter)
+        statuses: dict[tuple[int, int],
+                       typing.Counter[str]] = collections.defaultdict(
+                           collections.Counter)
         sql = '''SELECT run_id, build_id, status, COUNT(status)
                    FROM tests
                   WHERE run_id BETWEEN :lo AND :hi
@@ -398,8 +398,8 @@ class BackendDB(common_db.DB):
 
         # Into Builds
         def builds_row(
-            item: typing.Tuple[_BuildKey, testspec.TestSpecSequence]
-        ) -> typing.Tuple[int, str, bool, str, bool]:
+            item: tuple[_BuildKey, testspec.TestSpecSequence]
+        ) -> tuple[int, str, bool, str, bool]:
             (is_release, features), tests = item
             skip_build = all(test.skip_build for test in tests)
             status = 'BUILD DONE' if skip_build else 'PENDING'
@@ -449,7 +449,7 @@ class BackendDB(common_db.DB):
         finish: typing.Optional[datetime.datetime]
         test_statuses: typing.Sequence[typing.Sequence[typing.Any]]
         test_keys: typing.Sequence[str]
-        build_statuses: typing.List[typing.Sequence[typing.Any]]
+        build_statuses: list[typing.Sequence[typing.Any]]
         build_keys: typing.Sequence[str]
         last_test_success: typing.Mapping[str, float]
 
@@ -604,7 +604,7 @@ class BackendDB(common_db.DB):
 
     def get_test_log(
         self, test_id: int, log_type: str, gzip_ok: bool
-    ) -> typing.Tuple[bytes, typing.Optional[datetime.datetime], bool]:
+    ) -> tuple[bytes, typing.Optional[datetime.datetime], bool]:
         """Returns given test log.
 
         Args:
@@ -629,7 +629,7 @@ class BackendDB(common_db.DB):
 
     def get_build_log(
         self, build_id: int, log_type: str, gzip_ok: bool
-    ) -> typing.Tuple[bytes, typing.Optional[datetime.datetime], bool]:
+    ) -> tuple[bytes, typing.Optional[datetime.datetime], bool]:
         """Returns given build log.
 
         Args:
@@ -654,7 +654,7 @@ class BackendDB(common_db.DB):
 
     def _get_log_impl(
         self, sql: str, gzip_ok: bool, **kw: typing.Any
-    ) -> typing.Tuple[bytes, typing.Optional[datetime.datetime], bool]:
+    ) -> tuple[bytes, typing.Optional[datetime.datetime], bool]:
         """Returns a log from the database.
 
         Args:

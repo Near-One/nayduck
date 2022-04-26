@@ -152,7 +152,7 @@ def new_run(login: str) -> flask.Response:
             run_id = scheduler.Request.from_json(
                 flask.request.get_json(force=True),
                 requester=login).schedule(server)
-            response: typing.Dict[str, typing.Any] = {
+            response: dict[str, typing.Any] = {
                 'code': 0,
                 'response': f'Success.  {flask.request.url_root}#/run/{run_id}'
             }
@@ -186,9 +186,9 @@ def get_nightly_events() -> flask.Response:  # pylint: disable=too-many-locals
 
     last_timestamp, last_run_id = datetime.datetime.utcnow(), 0
     key_func = lambda row: (row.timestamp, row.run_id)
-    tests_by_id: typing.Dict[str, typing.List[typing.Tuple[
-        datetime.datetime, int, str]]] = collections.defaultdict(list)
-    enabled_tests: typing.Set[str] = set()
+    tests_by_id: dict[str, list[tuple[datetime.datetime, int,
+                                      str]]] = collections.defaultdict(list)
+    enabled_tests: set[str] = set()
 
     id_to_name = {}
 
@@ -196,7 +196,7 @@ def get_nightly_events() -> flask.Response:  # pylint: disable=too-many-locals
         last_timestamp = timestamp
         last_run_id = run_id
 
-        curr_tests: typing.Set[str] = set()
+        curr_tests: set[str] = set()
         for test in tests:
             identifier = testspec.TestSpec(test.name).normalised_identifier
             if identifier != test.name:
@@ -326,12 +326,12 @@ class StaticFile:
         self._data = self._load(self._path)
 
     @classmethod
-    def _load(cls, path: pathlib.Path) -> typing.Tuple[bytes, bytes]:
+    def _load(cls, path: pathlib.Path) -> tuple[bytes, bytes]:
         contents = path.read_bytes()
         compressed = gzip.compress(contents, 9)
         return contents, compressed
 
-    def get(self, compressed: bool) -> typing.Tuple[bytes, int, str]:
+    def get(self, compressed: bool) -> tuple[bytes, int, str]:
         mtime = self._path.stat().st_mtime
         if mtime != self._mtime:
             self._data = self._load(self._path)

@@ -66,7 +66,7 @@ def _encrypt(kind: bytes,
              plaintext: bytes,
              assoc_data: typing.Optional[str] = None,
              *,
-             nonce: typing.Optional[bytes] = None) -> typing.Tuple[str, bytes]:
+             nonce: typing.Optional[bytes] = None) -> tuple[str, bytes]:
     """Encrypts given plain text.
 
     Encryption uses an AEAD scheme which means that the returned data is
@@ -104,9 +104,8 @@ def _encrypt(kind: bytes,
     return urlsafe, nonce
 
 
-def _decrypt(
-        kind: bytes, ciphertext_str: str
-) -> typing.Tuple[typing.Optional[str], bytes, bytes]:
+def _decrypt(kind: bytes,
+             ciphertext_str: str) -> tuple[typing.Optional[str], bytes, bytes]:
     """Verifies and decrypts given data.
 
     It's safe to pass attacker-controlled data to this function.  Decryption
@@ -303,7 +302,7 @@ class AuthFailed(Exception):
 
 
 def get_code(state: typing.Optional[str],
-             code: typing.Optional[str]) -> typing.Tuple[AuthCode, bool]:
+             code: typing.Optional[str]) -> tuple[AuthCode, bool]:
     """Converts GitHub's provided code into authentication token.
 
     In GitHub OAuth flow, user first goes to GitHub page to confirm

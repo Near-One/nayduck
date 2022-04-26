@@ -24,7 +24,7 @@ class StatusMetric(prometheus_client.metrics.MetricWrapperBase):
     def set(self, rows: typing.Iterable[typing.Iterable[typing.Any]],
             keys: typing.Iterable[str]) -> None:
 
-        def as_dict(row: typing.Iterable[typing.Any]) -> typing.Dict[str, str]:
+        def as_dict(row: typing.Iterable[typing.Any]) -> dict[str, str]:
             return {key: str(value) for key, value in zip(keys, row)}
 
         self.__samples = tuple(
@@ -38,7 +38,7 @@ class StatusMetric(prometheus_client.metrics.MetricWrapperBase):
 
 
 def _set_status(pmetric: prometheus_client.Gauge,
-                statuses: typing.List[typing.Sequence[typing.Any]]) -> None:
+                statuses: list[typing.Sequence[typing.Any]]) -> None:
     pmetric.clear()
     for labels in statuses:
         pmetric.labels(*[str(label) for label in labels]).set(1)

@@ -13,7 +13,7 @@ def _identity(obj: _T) -> _T:
     return obj
 
 
-class Config(typing.Dict[str, typing.Any]):
+class Config(dict[str, typing.Any]):
     """A wrapper for configuration read from a file.
 
     The object provides req and take methods which behave like __getitem__ and
@@ -24,8 +24,7 @@ class Config(typing.Dict[str, typing.Any]):
         path: Path to the file the configuration was loaded from.
     """
 
-    def __init__(self, data: typing.Dict[str, typing.Any],
-                 path: pathlib.Path) -> None:
+    def __init__(self, data: dict[str, typing.Any], path: pathlib.Path) -> None:
         super().__init__(data)
         self.path = path
 
@@ -96,4 +95,4 @@ def load(name: str) -> Config:
         raise SystemExit(f'{path}: {ex}') from ex
     if not isinstance(value, dict):
         raise SystemExit(f'{path}: value is not a dictionary')
-    return Config(typing.cast(typing.Dict[str, typing.Any], value), path)
+    return Config(typing.cast(dict[str, typing.Any], value), path)

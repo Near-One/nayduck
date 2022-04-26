@@ -8,7 +8,7 @@ import sqlalchemy
 from lib import config
 
 _Row = typing.Any
-_Dict = typing.Dict[str, typing.Any]
+_Dict = dict[str, typing.Any]
 
 _T = typing.TypeVar('_T')
 _D = typing.TypeVar('_D', bound='DB')
@@ -181,7 +181,7 @@ class DB:
         return self._exec(sql, **values)
 
     @classmethod
-    def _to_dict(cls, row: _Row) -> typing.Dict[str, typing.Any]:
+    def _to_dict(cls, row: _Row) -> dict[str, typing.Any]:
         """Converts an SQLAlchemy row into a dictionary."""
         return dict(zip(row.keys(), row))
 

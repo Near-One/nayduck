@@ -23,8 +23,7 @@ _Cmd = typing.Sequence[typing.Union[str, pathlib.Path]]
 _EnvB = typing.MutableMapping[bytes, bytes]
 
 
-def get_test_command(
-        test: testspec.TestSpec) -> typing.Tuple[pathlib.Path, _Cmd]:
+def get_test_command(test: testspec.TestSpec) -> tuple[pathlib.Path, _Cmd]:
     """Returns working directory and command to execute for given test.
 
     Assumes that the repository from which the test should be run is located in
@@ -267,8 +266,7 @@ _MAX_SHORT_LOG_SIZE = 10 * 1024
 
 
 def read_short_log(  # pylint: disable=too-many-branches
-        size: int, rd: typing.BinaryIO,
-        is_binary: bool) -> typing.Tuple[bytes, bool]:
+        size: int, rd: typing.BinaryIO, is_binary: bool) -> tuple[bytes, bool]:
     """Reads a short log from given file.
 
     A short log it at most _MAX_SHORT_LOG_SIZE bytes long.  If the file is
@@ -377,7 +375,7 @@ def save_logs(server: worker_db.WorkerDB, test_id: int, directory: pathlib.Path,
 
 
 _LAST_COPIED_BUILD_ID: typing.Optional[int] = None
-_COPIED_EXPENSIVE_DEPS: typing.List[str] = []
+_COPIED_EXPENSIVE_DEPS: list[str] = []
 
 
 def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
@@ -471,7 +469,7 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
     utils.rmdirs(pathlib.Path.home() / '.rainbow',
                  utils.REPO_DIR / 'test-utils/runtime-tester/fuzz/artifacts')
 
-    config_override: typing.Dict[str, typing.Any] = {}
+    config_override: dict[str, typing.Any] = {}
     envb: _EnvB = typing.cast(_EnvB, os.environb)
 
     test = testspec.TestSpec.from_row(typing.cast(testspec.TestDBRow, test_row))

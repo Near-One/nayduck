@@ -57,7 +57,7 @@ def _format_timeout(timeout: int) -> str:
     return str(timeout)
 
 
-def _extract_category(words: typing.List[str]) -> _CategorySpec:
+def _extract_category(words: list[str]) -> _CategorySpec:
     """Extracts category specification from a test.
 
     Expects words in the format:
@@ -112,7 +112,7 @@ def _extract_category(words: typing.List[str]) -> _CategorySpec:
                          skip_build=skip_build or category == 'mocknet')
 
 
-def _extract_features(words: typing.List[str]) -> str:
+def _extract_features(words: list[str]) -> str:
     """Extracts features from a test.
 
     Expects words in the format:
@@ -269,7 +269,7 @@ class TestSpec:
         object.__setattr__(self, 'features', features)
 
     @classmethod
-    def from_name_with_count(cls, name: str) -> typing.Tuple[int, 'TestSpec']:
+    def from_name_with_count(cls, name: str) -> tuple[int, 'TestSpec']:
         """Parses a test name with an optional count prefix.
 
         This is essentially equivalent to `from_name` method with additional
@@ -394,7 +394,7 @@ class TestSpec:
         return 'debug'
 
 
-def _normalise_pytest_args(args: typing.List[str]) -> typing.Sequence[str]:
+def _normalise_pytest_args(args: list[str]) -> typing.Sequence[str]:
     """Normalises test arguments of pytest and mocknet tests specs."""
     if args[0] in ('runtime/fuzz.py', 'runtime/fuzz_runtime.py'):
         # 5011d288c87245d87ecd423eed09f6d991c08236
@@ -412,7 +412,7 @@ _TEST_RS_PATH_PREFIX_RE = re.compile('^(?:tests?::)+')
 _TEST_RS_PATH_COMPONENT_RE = re.compile('::(?:tests?::)+')
 
 
-def _normalise_expensive_args(args: typing.List[str]) -> typing.Sequence[str]:
+def _normalise_expensive_args(args: list[str]) -> typing.Sequence[str]:
     """Normalises test arguments of expensive tests specs."""
     # pylint: disable=too-many-boolean-expressions
 

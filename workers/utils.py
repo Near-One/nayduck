@@ -57,7 +57,7 @@ def _kill_process_tree(pid: int) -> None:
         pid: Process ID of the parent whose process tree to kill.
     """
 
-    def send_to_all(procs: typing.List[psutil.Process], sig: int) -> None:
+    def send_to_all(procs: list[psutil.Process], sig: int) -> None:
         for proc in procs:
             try:
                 proc.send_signal(sig)
@@ -243,7 +243,7 @@ def checkout(sha: str, runner: Runner) -> bool:
             runner(('git', 'checkout', '-f', sha), cwd=REPO_DIR) == 0)
 
 
-def get_ip() -> typing.Tuple[int, str]:
+def get_ip() -> tuple[int, str]:
     """Returns private IPv4 address of the current host as an integer.
 
     Returns:
@@ -289,8 +289,8 @@ def setup_environ() -> None:
         export GOROOT GOPATH NVM_DIR
         env -0
     '''
-    env: typing.Dict[bytes, bytes] = dict(
-        typing.cast(typing.Tuple[bytes, bytes], item.split(b'=', 1))
+    env: dict[bytes, bytes] = dict(
+        typing.cast(tuple[bytes, bytes], item.split(b'=', 1))
         for item in subprocess.check_output(
             script, shell=True, cwd=home).rstrip(b'\0').split(b'\0'))
 
