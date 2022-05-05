@@ -99,18 +99,16 @@ else
 	fi
 fi
 
-service=$type
-if [ "$type" = frontend ]; then
-	service=ui
-fi
-cp -nvt /etc/systemd/system/ -- \
-   "/home/nayduck/nayduck/systemd/nayduck-$service.service"
-systemctl enable "nayduck-$service"
-if [ "$type" = worker ]; then
-	cp -nvt /etc/systemd/system -- \
-	   "/home/nayduck/nayduck/system/nayduck-fuzzer.service"
-	systemctl enable "nayduck-fuzzer"
-fi
+case $type in
+frontend) services=ui              ;;
+worker)   services='worker fuzzer' ;;
+*)        services=$type
+esac
+for service in $services; do
+    cp -nvt /etc/systemd/system/ -- \
+		"/home/nayduck/nayduck/systemd/nayduck-$service.service"
+    systemctl enable "nayduck-$service"
+done
 
 rm -- "$basedir/setup-host.sh"
 
