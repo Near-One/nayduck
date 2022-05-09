@@ -161,11 +161,13 @@ class Repository:
             branch: the branch from which to fetch the latest configuration
         """
 
-        # TODO: rather than checking out master before parsing the config, we could use
-        # git fetch <repo>; git show FETCH_HEAD:nightly/fuzz.toml to get the file contents
-        return typing.cast(
-            ConfigType,
-            toml.load(self.worktree(branch) / 'nightly' / 'fuzz.toml'))
+        on_master_path = self.worktree('master') / 'nightly' / f'fuzz-{branch}.toml'
+        if on_master_path.exists():
+            return typing.cast(ConfigType, toml.load(on_master_path))
+        else:
+            return typing.cast(
+                ConfigType,
+                toml.load(self.worktree(branch) / 'nightly' / 'fuzz.toml'))
 
 
 class Corpus:
@@ -655,7 +657,7 @@ crashing another branch.
 T = typing.TypeVar('T')  # pylint: disable=invalid-name
 
 
-def random_weighted(array: typing.List[T], num: int, name: str) -> typing.List[T]:
+def random_weighted(array: typing.List[T], name: str) -> T:
     """Pick `num` random items from `array`, logging that as `name`
     
     Args:
@@ -663,9 +665,9 @@ def random_weighted(array: typing.List[T], num: int, name: str) -> typing.List[T
         num: number of items to pick
         name: the name to log that choice as
     """
-    print(f'Picking {num} random {name} among {array}', file=sys.stderr)
+    print(f'Picking one random {name} among {array}', file=sys.stderr)
     untyped_array = typing.cast(typing.Any, array)
-    res = random.choices(array, [x['weight'] for x in untyped_array], k=num)
+    res = random.choices(array, [x['weight'] for x in untyped_array])
     print(f' -> picked {res}', file=sys.stderr)
     return res
 
@@ -714,6 +716,53 @@ def kill_fuzzers(bucket: gcs.Bucket,
             str(LOGS_DIR / fuzzer.log_relpath))
 
 
+def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: typing.List[pathlib.Path], fuzzers: typing.List[FuzzProcess]) -> FuzzProcess:
+    """Configure one fuzzer process, without building or starting it
+
+    Args:
+        repo: the Repository handling the checkout
+        corpus: the Corpus synchronizing the current fuzzing corpus and artifacts
+        sync_log_files: a list of log file paths with details about the syncing process. One entry will be added to it with this one fuzzer's sync logs
+        fuzzers: the list of fuzzers, the newly-configured fuzzer will be added to it
+    """
+
+    # Read the configuration from the repository
+    master_cfg = repo.latest_config('master')
+    branch = random_weighted(master_cfg['branches'], 'branch')
+    branch = branch['name']
+
+    branch_cfg = repo.latest_config(branch)
+    target = random_weighted(branch_cfg['targets'], 'target')
+    crate = target['crate']
+    runner = target['runner']
+
+    # Synchronize the relevant corpus
+    corpus.stop_synchronizing()
+    corpus.update()
+    log_path = pathlib.Path('sync') / date / crate / runner / str(uuid.uuid4())
+    utils.mkdirs((LOGS_DIR / log_path).parent)
+    # pylint: disable=consider-using-with
+    corpus.synchronize(crate, runner,
+                        open(LOGS_DIR / log_path, 'a', encoding='utf-8'))
+    # pylint: enable=consider-using-with
+    sync_log_files.append(log_path)
+
+    # Initialize the fuzzer
+    worktree = repo.worktree(branch)
+    log_path = pathlib.Path('fuzz') / date / crate / runner / str(uuid.uuid4())
+    log_file = LOGS_DIR / log_path
+    utils.mkdirs(log_file.parent)
+    fuzzer = FuzzProcess(corpus_vers=corpus.version,
+                    branch=branch,
+                    target=target,
+                    repo_dir=worktree,
+                    log_relpath=log_path,
+                    log_fullpath=log_file)
+    fuzzers.append(fuzzer)
+
+    return fuzzer
+
+
 def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                 resume_evt: threading.Event, exit_evt: threading.Event) -> None:
     """
@@ -741,62 +790,20 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
 
         sync_log_files = []
         date = datetime.datetime.utcnow().strftime('%Y-%m-%d')
-
-        # Read the configuration from the repository
-        cfg = repo.latest_config('master')
-        cfg_for = {
-            b['name']: repo.latest_config(b['name']) for b in cfg['branch']
-        }
-
-        # Figure out which targets we want to run
-        branches = random_weighted(cfg['branch'], NUM_FUZZERS, "branches")
-        targets = [
-            random_weighted(cfg_for[b['name']]['target'], 1, "target")[0]
-            for b in branches
-        ]
-
-        # Synchronize the relevant corpuses
-        corpus.stop_synchronizing()
-        corpus.update()
-        for targ in set((t['crate'], t['runner']) for t in targets):
-            log_path = pathlib.Path('sync') / date / targ[0] / targ[1] / str(
-                uuid.uuid4())
-            utils.mkdirs((LOGS_DIR / log_path).parent)
-            # pylint: disable=consider-using-with
-            corpus.synchronize(targ[0], targ[1],
-                               open(LOGS_DIR / log_path, 'a', encoding='utf-8'))
-            # pylint: enable=consider-using-with
-            sync_log_files.append(log_path)
-            if pause_exit_spot(pause_evt, resume_evt, exit_evt):
-                return
+        fuzzers = []
 
         # Initialize the fuzzers
-        fuzzers = []
-        for (branch, target) in zip(branches, targets):
-            worktree = repo.worktree(branch['name'])
-            log_path = pathlib.Path(
-                'fuzz') / date / target['crate'] / target['runner'] / str(
-                    uuid.uuid4())
-            log_file = LOGS_DIR / log_path
-            utils.mkdirs(log_file.parent)
-            fuzzers.append(
-                FuzzProcess(corpus_vers=corpus.version,
-                            branch=branch,
-                            target=target,
-                            repo_dir=worktree,
-                            log_relpath=log_path,
-                            log_fullpath=log_file))
-
-        # Build the fuzzers
-        for fuzzer in fuzzers:
+        atexit.register(kill_fuzzers, bucket, fuzzers)
+        for i in range(NUM_FUZZERS):
+            fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files, fuzzers)
+            if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                return
             fuzzer.build()
             if pause_exit_spot(pause_evt, resume_evt, exit_evt):
                 return
-
-        # Start the fuzzers
-        atexit.register(kill_fuzzers, bucket, fuzzers)
-        for fuzzer in fuzzers:
             fuzzer.start(corpus)
+            if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                return
 
         # Wait until something happens
         started = time.monotonic()
@@ -834,23 +841,15 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzers.remove(fuzzer)
 
                     # Start a new fuzzer
-                    branch = random_weighted(cfg['branch'], 1, "branch")[0]
-                    target = random_weighted(cfg_for[branch['name']]['target'], 1, "target")[0]
-                    worktree = repo.worktree(branch['name'])
-                    log_path = pathlib.Path('fuzz') / date / target[
-                        'crate'] / target['runner'] / str(uuid.uuid4())
-                    utils.mkdirs((LOGS_DIR / log_path).parent)
-                    log_file = LOGS_DIR / log_path
-                    new_fuzzer = FuzzProcess(corpus_vers=corpus.version,
-                                             branch=branch,
-                                             target=target,
-                                             repo_dir=worktree,
-                                             log_relpath=log_path,
-                                             log_fullpath=log_file)
-                    # TODO: building the fuzzer should not block receiving the pause/resume messages
-                    new_fuzzer.build()
-                    new_fuzzer.start(corpus)
-                    fuzzers.append(new_fuzzer)
+                    fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files, fuzzers)
+                    if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                        return
+                    fuzzer.build()
+                    if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                        return
+                    fuzzer.start(corpus)
+                    if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                        return
 
             # Regularly upload the sync log files
             upload_interval_secs = SYNC_LOG_UPLOAD_INTERVAL.total_seconds()
