@@ -89,16 +89,16 @@ TargetType = TypedDict('TargetType', {
     'crate': str,
     'runner': str,
     'weight': int,
-    'flags': typing.List[str]
+    'flags': list[str]
 })
 ConfigType = TypedDict('ConfigType', {
-    'branch': typing.List[BranchType],
-    'target': typing.List[TargetType]
+    'branch': list[BranchType],
+    'target': list[TargetType]
 })
 
 # Branch name -> list of reported artifacts
 REPORTED_ARTIFACTS: typing.DefaultDict[str,
-                                       typing.List[str]] = defaultdict(list)
+                                       list[str]] = defaultdict(list)
 
 
 class Repository:
@@ -181,7 +181,7 @@ class Corpus:
         """
         self.dir = directory
         self.bucket = bucket
-        self.inotify_threads: typing.List[InotifyThread] = []
+        self.inotify_threads: list[InotifyThread] = []
         self.version = '<unknown>'
 
     def update(self) -> None:
@@ -461,13 +461,13 @@ class FuzzProcess:
             ('git', 'rev-parse', 'HEAD'),
             cwd=self.repo_dir,
             encoding='utf-8').stdout.strip()
-        self.log_file.write(f'Corpus version: {self.corpus_vers}\n')
-        self.log_file.write(
-            f'On commit {current_commit} (tip of branch {self.branch["name"]})\n'
-        )
-        self.log_file.write(f'Target is {self.target}\n')
-        self.log_file.write(f'Current time: {datetime.datetime.utcnow()}\n')
-        self.log_file.write(f'On host: {socket.gethostname()}\n')
+            self.log_file.write(f'''\
+Corpus version: {self.corpus_vers}
+On commit {current_commit} (tip of branch {self.branch["name"]})
+Target is {self.target}
+Current time: {datetime.datetime.utcnow()}
+On host: {socket.gethostname()}
+''')
         self.log_file.flush()
 
         # Build the fuzzer runner
@@ -549,7 +549,7 @@ class FuzzProcess:
         # Identify the artifact path
         artifact_pattern = f'Test unit written to {corpus.artifacts_for(self.target)}/'
         artifact = '<failed detecting relevant artifact in log file>'
-        for line in log_lines[::-1]:
+        for line in reversed(log_lines):
             if artifact_pattern in line:
                 artifact = line.split(artifact_pattern)[1].strip()
                 break
@@ -619,7 +619,7 @@ crashing another branch.
         })
         prepend_log_lines = '\n'.join(log_lines[:5]) + '\n[...]\n'
         focus_log_lines = ''
-        for line in log_lines[::-1]:
+        for line in reversed(log_lines[5:]):
             if line.startswith('```'):
                 # Censor the end of a spoiler block, not great but this is for human consumption
                 # anyway
@@ -657,12 +657,11 @@ crashing another branch.
 T = typing.TypeVar('T')  # pylint: disable=invalid-name
 
 
-def random_weighted(array: typing.List[T], name: str) -> T:
-    """Pick `num` random items from `array`, logging that as `name`
+def random_weighted(array: list[T], name: str) -> T:
+    """Pick one random items from `array`, logging that as `name`
     
     Args:
         array: the list to pick from
-        num: number of items to pick
         name: the name to log that choice as
     """
     print(f'Picking one random {name} among {array}', file=sys.stderr)
@@ -716,7 +715,7 @@ def kill_fuzzers(bucket: gcs.Bucket,
             str(LOGS_DIR / fuzzer.log_relpath))
 
 
-def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: typing.List[pathlib.Path], fuzzers: typing.List[FuzzProcess]) -> FuzzProcess:
+def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: list[pathlib.Path], fuzzers: list[FuzzProcess]) -> FuzzProcess:
     """Configure one fuzzer process, without building or starting it
 
     Args:
@@ -741,10 +740,8 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: typin
     corpus.update()
     log_path = pathlib.Path('sync') / date / crate / runner / str(uuid.uuid4())
     utils.mkdirs((LOGS_DIR / log_path).parent)
-    # pylint: disable=consider-using-with
-    corpus.synchronize(crate, runner,
-                        open(LOGS_DIR / log_path, 'a', encoding='utf-8'))
-    # pylint: enable=consider-using-with
+    corpus_sync_log_file = open(LOGS_DIR / log_path, 'a', encoding='utf-8') # pylint: disable=consider-using-with
+    corpus.synchronize(crate, runner, corpus_sync_log_file)
     sync_log_files.append(log_path)
 
     # Initialize the fuzzer
@@ -810,11 +807,11 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         last_sync_file_upload = started
         next_restart = started + AUTO_REFRESH_INTERVAL.total_seconds()
         while time.monotonic() < next_restart:
-            # Avoid busy-looping by sleeping 100ms between each loop run
-            time.sleep(0.1)
+            # Avoid busy-looping by sleeping 1s between each loop run
+            # time.sleep(1) # This actually happens in the exit_evt.is_set() just below
 
             # Exit event happened?
-            if exit_evt.is_set():
+            if exit_evt.is_set(timeout=1):
                 kill_fuzzers(bucket, fuzzers)
                 atexit.unregister(kill_fuzzers)
                 return
