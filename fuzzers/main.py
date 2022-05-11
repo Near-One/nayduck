@@ -97,8 +97,7 @@ ConfigType = TypedDict('ConfigType', {
 })
 
 # Branch name -> list of reported artifacts
-REPORTED_ARTIFACTS: typing.DefaultDict[str,
-                                       list[str]] = defaultdict(list)
+REPORTED_ARTIFACTS: typing.DefaultDict[str, list[str]] = defaultdict(list)
 
 
 class Repository:
@@ -120,7 +119,7 @@ class Repository:
         if not self.repo_dir.exists() or not (self.repo_dir /
                                               '.git-clone').exists():
             print(f'Doing initial clone of repository {self.repo_dir}',
-                    file=sys.stderr)
+                  file=sys.stderr)
             utils.mkdirs(self.repo_dir)
             subprocess.check_call(['git', 'clone', self.url, '.git-clone'],
                                   cwd=self.repo_dir)
@@ -148,7 +147,7 @@ class Repository:
         subprocess.check_call(['git', 'checkout', 'FETCH_HEAD'],
                               cwd=worktree_path)
         subprocess.check_call(
-            ['rustup', 'show'], # update rustup if need be
+            ['rustup', 'show'],  # update rustup if need be
             cwd=worktree_path,
         )
 
@@ -161,7 +160,8 @@ class Repository:
             branch: the branch from which to fetch the latest configuration
         """
 
-        on_master_path = self.worktree('master') / 'nightly' / f'fuzz-{branch}.toml'
+        on_master_path = self.worktree(
+            'master') / 'nightly' / f'fuzz-{branch}.toml'
         if on_master_path.exists():
             return typing.cast(ConfigType, toml.load(on_master_path))
         else:
@@ -248,7 +248,7 @@ class Corpus:
             log_file: file to which to write the logs related to the synchronization process
         """
         print(f'Resetting path {self.dir}/{path} to GCS {self.version}/{path}/',
-                file=sys.stderr)
+              file=sys.stderr)
         log_file.write(
             f'Resetting path {self.dir}/{path} to GCS {self.version}/{path}/\n')
         log_file.flush()
@@ -274,9 +274,10 @@ class Corpus:
             log_file: the file where to send logs
             is_artifacts: True iff the path being synced is an artifacts path, meaning eg. syncing deletions would be a bug
         """
-        print(f'Setting up inotify watch to auto-upload changes to '
-              f'{self.dir / path} to GCS {self.bucket.name}/{path}/',
-              file=sys.stderr)
+        print(
+            f'Setting up inotify watch to auto-upload changes to '
+            f'{self.dir / path} to GCS {self.bucket.name}/{path}/',
+            file=sys.stderr)
         log_file.write(f'Setting up inotify watch to auto-upload changes to '
                        f'{self.dir / path} to GCS {self.bucket.name}/{path}/\n')
         log_file.flush()
@@ -453,13 +454,14 @@ class FuzzProcess:
         available cores most of the time it shouldn't be a big deal. The only drawback is that
         requests to pause/exit the fuzzer would block until the current build is completed.
         """
-        print(f'Building fuzzer for branch {self.branch} and target '
-              f'{self.target}, log is at {self.log_relpath}', file=sys.stderr)
+        print(
+            f'Building fuzzer for branch {self.branch} and target '
+            f'{self.target}, log is at {self.log_relpath}',
+            file=sys.stderr)
 
         # Log metadata information
         current_commit = subprocess.check_output(
-            ('git', 'rev-parse', 'HEAD'),
-            cwd=self.repo_dir,
+            ('git', 'rev-parse', 'HEAD'), cwd=self.repo_dir,
             encoding='utf-8').stdout.strip()
         self.log_file.write(f'''\
 Corpus version: {self.corpus_vers}
@@ -488,9 +490,10 @@ On host: {socket.gethostname()}
         Args:
             corpus: the corpus directory to use for this process
         """
-        print(f'Starting fuzzer for branch {self.branch} and '
-              f'target {self.target}, log is at {self.log_relpath}',
-              file=sys.stderr)
+        print(
+            f'Starting fuzzer for branch {self.branch} and '
+            f'target {self.target}, log is at {self.log_relpath}',
+            file=sys.stderr)
 
         # Prepare the fuzz time metric
         self.last_time = time.monotonic()
@@ -528,7 +531,9 @@ On host: {socket.gethostname()}
             self.last_time = new_time
             return False
         # else: Fuzz crash found
-        print(f'Fuzzer running {self.target} has stopped, log is at {self.log_fullpath}', file=sys.stderr)
+        print(
+            f'Fuzzer running {self.target} has stopped, log is at {self.log_fullpath}',
+            file=sys.stderr)
         self.fuzz_crashes_metric.inc()
         return True
 
@@ -630,10 +635,14 @@ crashing another branch.
             focus_log_lines = line + focus_log_lines
         focus_log_lines = prepend_log_lines + focus_log_lines
         client.send_message({
-            'type': 'stream',
-            'to': 'pagoda/fuzzer/private',
-            'topic': f'{branch}: artifact {artifact}',
-            'content': f'```spoiler First and last few log lines\n{focus_log_lines}\n```',
+            'type':
+                'stream',
+            'to':
+                'pagoda/fuzzer/private',
+            'topic':
+                f'{branch}: artifact {artifact}',
+            'content':
+                f'```spoiler First and last few log lines\n{focus_log_lines}\n```',
         })
 
     def signal(self, sig: int) -> None:
@@ -644,7 +653,8 @@ crashing another branch.
             sig: the signal to send to the fuzzer process
         """
 
-        print(f'Sending signal {sig} to fuzzer {self.proc.pid}', file=sys.stderr)
+        print(f'Sending signal {sig} to fuzzer {self.proc.pid}',
+              file=sys.stderr)
         os.killpg(os.getpgid(self.proc.pid), sig)
         if sig == signal.SIGSTOP and self.time_paused is None:
             self.time_paused = time.monotonic()
@@ -703,7 +713,7 @@ def kill_fuzzers(bucket: gcs.Bucket,
             fuzzer.signal(signal.SIGTERM)
         except ProcessLookupError:
             print(f'Failed looking up process {fuzzer.proc.pid}',
-                    file=sys.stderr)
+                  file=sys.stderr)
     time.sleep(5)
     for fuzzer in fuzzers:
         try:
@@ -715,7 +725,9 @@ def kill_fuzzers(bucket: gcs.Bucket,
             str(LOGS_DIR / fuzzer.log_relpath))
 
 
-def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: list[pathlib.Path], fuzzers: list[FuzzProcess]) -> FuzzProcess:
+def configure_one_fuzzer(repo: Repository, corpus: Corpus,
+                         sync_log_files: list[pathlib.Path],
+                         fuzzers: list[FuzzProcess]) -> FuzzProcess:
     """Configure one fuzzer process, without building or starting it
 
     Args:
@@ -737,14 +749,14 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: list[
 
     # Update cargo-fuzz if need be
     subprocess.check_call(['cargo', 'install', 'cargo-fuzz'],
-                            cwd=repo.worktree(branch))
+                          cwd=repo.worktree(branch))
 
     # Synchronize the relevant corpus
     corpus.stop_synchronizing()
     corpus.update()
     log_path = pathlib.Path('sync') / date / crate / runner / str(uuid.uuid4())
     utils.mkdirs((LOGS_DIR / log_path).parent)
-    corpus_sync_log_file = open(LOGS_DIR / log_path, 'a', encoding='utf-8') # pylint: disable=consider-using-with
+    corpus_sync_log_file = open(LOGS_DIR / log_path, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
     corpus.synchronize(crate, runner, corpus_sync_log_file)
     sync_log_files.append(log_path)
 
@@ -754,11 +766,11 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: list[
     log_file = LOGS_DIR / log_path
     utils.mkdirs(log_file.parent)
     fuzzer = FuzzProcess(corpus_vers=corpus.version,
-                    branch=branch,
-                    target=target,
-                    repo_dir=worktree,
-                    log_relpath=log_path,
-                    log_fullpath=log_file)
+                         branch=branch,
+                         target=target,
+                         repo_dir=worktree,
+                         log_relpath=log_path,
+                         log_fullpath=log_file)
     fuzzers.append(fuzzer)
 
     return fuzzer
@@ -842,7 +854,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzers.remove(fuzzer)
 
                     # Start a new fuzzer
-                    fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files, fuzzers)
+                    fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files,
+                                                  fuzzers)
                     if pause_exit_spot(pause_evt, resume_evt, exit_evt):
                         return
                     fuzzer.build()
@@ -930,7 +943,7 @@ def main() -> None:
 
         # Run until an exception forces us to stop
         print('Startup complete, will start running forever now',
-                file=sys.stderr)
+              file=sys.stderr)
         run_fuzzers(gcs_client, pause_event, resume_event,
                     EXCEPTION_HAPPENED_IN_THREAD)
 
@@ -945,5 +958,5 @@ def main() -> None:
 if __name__ == '__main__':
     utils.setup_environ()
     os.environ['RUSTC_BOOTSTRAP'] = '1'  # Nightly is needed by cargo-fuzz
-    zulip.Client(config_file=ZULIPRC) # Validate the zuliprc is setup well
+    zulip.Client(config_file=ZULIPRC)  # Validate the zuliprc is setup well
     main()
