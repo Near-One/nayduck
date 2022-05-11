@@ -432,7 +432,7 @@ class FuzzProcess:
         self.log_file = open(log_fullpath, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
 
         self.last_time = 0.
-        self.time_paused = None
+        self.time_paused = typing.cast(typing.Optional[float], None)
         self.proc: typing.Any = None  # There's some weirdness around brackets and Popen
 
         self.fuzz_build_time_metric = FUZZ_BUILD_TIME.labels(
@@ -460,9 +460,9 @@ class FuzzProcess:
             file=sys.stderr)
 
         # Log metadata information
-        current_commit = subprocess.check_output(
-            ('git', 'rev-parse', 'HEAD'), cwd=self.repo_dir,
-            encoding='utf-8').stdout.strip()
+        current_commit = subprocess.check_output(('git', 'rev-parse', 'HEAD'),
+                                                 cwd=self.repo_dir,
+                                                 encoding='utf-8').strip()
         self.log_file.write(f'''\
 Corpus version: {self.corpus_vers}
 On commit {current_commit} (tip of branch {self.branch["name"]})
@@ -508,8 +508,8 @@ On host: {socket.gethostname()}
                 'run',
                 self.target['runner'],
                 '--',
-                corpus.corpus_for(self.target),
-                corpus.artifacts_for(self.target),
+                str(corpus.corpus_for(self.target)),
+                str(corpus.artifacts_for(self.target)),
                 f'-artifact_prefix={corpus.artifacts_for(self.target)}/',
                 '-timeout=8000',
             ] + self.target['flags'],
@@ -740,20 +740,21 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus,
     # Read the configuration from the repository
     master_cfg = repo.latest_config('master')
     branch = random_weighted(master_cfg['branch'], 'branch')
-    branch = branch['name']
+    branch_name = branch['name']
 
-    branch_cfg = repo.latest_config(branch)
+    branch_cfg = repo.latest_config(branch_name)
     target = random_weighted(branch_cfg['target'], 'target')
     crate = target['crate']
     runner = target['runner']
 
     # Update cargo-fuzz if need be
     subprocess.check_call(['cargo', 'install', 'cargo-fuzz'],
-                          cwd=repo.worktree(branch))
+                          cwd=repo.worktree(branch_name))
 
     # Synchronize the relevant corpus
     corpus.stop_synchronizing()
     corpus.update()
+    date = datetime.datetime.utcnow().strftime('%Y-%m-%d')
     log_path = pathlib.Path('sync') / date / crate / runner / str(uuid.uuid4())
     utils.mkdirs((LOGS_DIR / log_path).parent)
     corpus_sync_log_file = open(LOGS_DIR / log_path, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
@@ -761,7 +762,7 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus,
     sync_log_files.append(log_path)
 
     # Initialize the fuzzer
-    worktree = repo.worktree(branch)
+    worktree = repo.worktree(branch_name)
     log_path = pathlib.Path('fuzz') / date / crate / runner / str(uuid.uuid4())
     log_file = LOGS_DIR / log_path
     utils.mkdirs(log_file.parent)
@@ -801,9 +802,8 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         if pause_exit_spot(pause_evt, resume_evt, exit_evt):
             return
 
-        sync_log_files = []
-        date = datetime.datetime.utcnow().strftime('%Y-%m-%d')
-        fuzzers = []
+        sync_log_files: typing.List[pathlib.Path] = []
+        fuzzers: typing.List[FuzzProcess] = []
 
         # Initialize the fuzzers
         atexit.register(kill_fuzzers, bucket, fuzzers)
@@ -827,7 +827,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
             # time.sleep(1) # This actually happens in the exit_evt.is_set() just below
 
             # Exit event happened?
-            if exit_evt.is_set(timeout=1):
+            if exit_evt.wait(timeout=1):
                 kill_fuzzers(bucket, fuzzers)
                 atexit.unregister(kill_fuzzers)
                 return
