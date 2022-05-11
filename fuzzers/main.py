@@ -727,11 +727,11 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: list[
 
     # Read the configuration from the repository
     master_cfg = repo.latest_config('master')
-    branch = random_weighted(master_cfg['branches'], 'branch')
+    branch = random_weighted(master_cfg['branch'], 'branch')
     branch = branch['name']
 
     branch_cfg = repo.latest_config(branch)
-    target = random_weighted(branch_cfg['targets'], 'target')
+    target = random_weighted(branch_cfg['target'], 'target')
     crate = target['crate']
     runner = target['runner']
 
