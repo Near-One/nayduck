@@ -461,7 +461,7 @@ class FuzzProcess:
             ('git', 'rev-parse', 'HEAD'),
             cwd=self.repo_dir,
             encoding='utf-8').stdout.strip()
-            self.log_file.write(f'''\
+        self.log_file.write(f'''\
 Corpus version: {self.corpus_vers}
 On commit {current_commit} (tip of branch {self.branch["name"]})
 Target is {self.target}
