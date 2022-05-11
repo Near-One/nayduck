@@ -666,7 +666,7 @@ def random_weighted(array: list[T], name: str) -> T:
     """
     print(f'Picking one random {name} among {array}', file=sys.stderr)
     untyped_array = typing.cast(typing.Any, array)
-    res = random.choices(array, [x['weight'] for x in untyped_array])
+    res = random.choices(array, [x['weight'] for x in untyped_array])[0]
     print(f' -> picked {res}', file=sys.stderr)
     return res
 
