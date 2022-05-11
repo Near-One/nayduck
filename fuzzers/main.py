@@ -104,7 +104,7 @@ class Repository:
 
     def __init__(self, repo_dir: pathlib.Path, url: str):
         """Create a Repository object
-        
+
         Args:
             repo_dir: path where the repository will be forked and various worktrees checked out
             url: URL to clone from
@@ -155,7 +155,7 @@ class Repository:
 
     def latest_config(self, branch: str) -> ConfigType:
         """Parses the configuration from the tip of `branch` of repo self.url
-        
+
         Args:
             branch: the branch from which to fetch the latest configuration
         """
@@ -174,7 +174,7 @@ class Corpus:
 
     def __init__(self, directory: pathlib.Path, bucket: gcs.Bucket):
         """Create a corpus object that'll be using directory `directory`
-        
+
         Args:
             directory: the directory that will hold the corpus
             bucket: the bucket with which to sync the corpus
@@ -195,7 +195,7 @@ class Corpus:
     def synchronize(self, crate: str, runner: str,
                     log_file: typing.IO[str]) -> None:
         """Download the corpus for `crate/runner` from GCS, then start a background thread uploading any new local changes
-        
+
         Args:
             crate: the crate for which to fetch the corpus
             runner: the runner for which to fetch the corpus
@@ -221,7 +221,7 @@ class Corpus:
 
     def corpus_for(self, target: TargetType) -> pathlib.Path:
         """Return the path to the corpus for target `target`
-        
+
         Args:
             target: the target for which to return the corpus path
         """
@@ -231,7 +231,7 @@ class Corpus:
 
     def artifacts_for(self, target: TargetType) -> pathlib.Path:
         """Return the path to the artifacts for target `target`
-        
+
         Args:
             target: the target for which to return the artifacts path
         """
@@ -242,7 +242,7 @@ class Corpus:
     def _reset_to_gcs(self, path: pathlib.Path,
                       log_file: typing.IO[str]) -> None:
         """Reset `path` to its GCS contents, logging to `log_file`
-        
+
         Args:
             path: path to reset to its GCS contents
             log_file: file to which to write the logs related to the synchronization process
@@ -414,7 +414,7 @@ class FuzzProcess:
         Create a FuzzProcess object. It can be built with `.build()` and then started with
         `.start()`.
 
-        Args: 
+        Args:
             corpus_vers: is the version of the corpus (first path item), used only for logging
             branch: the branch from which to run this process
             target: the target to run in this branch
@@ -486,7 +486,7 @@ On host: {socket.gethostname()}
 
     def start(self, corpus: Corpus) -> None:
         """Start the fuzzer runner on corpus `corpus`
-        
+
         Args:
             corpus: the corpus directory to use for this process
         """
@@ -521,9 +521,9 @@ On host: {socket.gethostname()}
 
     def poll(self) -> bool:
         """Checks if the current process is still running. Returns True if it stopped.
-        
+
         This function must be called regularly while the fuzzer is running in order to make sure the fuzzing time metrics are properly updated.
-        
+
         It should not be called while the fuzzer has been paused using SIGSTOP and not yet resumed using SIGCONT."""
         if self.proc.poll() is None:
             new_time = time.monotonic()
@@ -669,7 +669,7 @@ T = typing.TypeVar('T')  # pylint: disable=invalid-name
 
 def random_weighted(array: list[T], name: str) -> T:
     """Pick one random items from `array`, logging that as `name`
-    
+
     Args:
         array: the list to pick from
         name: the name to log that choice as
@@ -789,7 +789,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         resume_evt: the resuming event to check
         exit_evt: the exiting event to check
     """
-    # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    # pylint: disable=too-many-locals,too-many-branches
 
     bucket = gcs_client.bucket(GCS_BUCKET)
 
