@@ -735,6 +735,10 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus, sync_log_files: list[
     crate = target['crate']
     runner = target['runner']
 
+    # Update cargo-fuzz if need be
+    subprocess.check_call(['cargo', 'install', 'cargo-fuzz'],
+                            cwd=repo.worktree(branch))
+
     # Synchronize the relevant corpus
     corpus.stop_synchronizing()
     corpus.update()
