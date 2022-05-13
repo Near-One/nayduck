@@ -7,6 +7,7 @@ parallel 'sh -xc {}' ::: \
 	'exec pylint -j0 */*.py' \
 	'exec python -m yapf -pir .' \
 	'exec mypy -m backend.backend' \
+	'exec mypy -m fuzzers.main' \
 	'exec mypy -m workers.builder' \
 	'exec mypy -m workers.worker' \
 	'exec shellcheck */*.sh'

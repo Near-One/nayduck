@@ -20,6 +20,7 @@ REPO_URL = 'https://github.com/nearprotocol/nearcore'
 WORKDIR = pathlib.Path('/datadrive')
 BUILDS_DIR = WORKDIR / 'builds'
 REPO_DIR = WORKDIR / 'nearcore'
+FUZZER_CMD_PORT = 7055
 
 
 def mkdirs(*paths: pathlib.Path) -> None:
@@ -341,7 +342,6 @@ class PausedFuzzers:
     active.
     """
 
-    FUZZER_CMD_PORT = 7055
     SERVICE = 'nayduck-fuzzer.service'
 
     @classmethod
@@ -355,7 +355,7 @@ class PausedFuzzers:
 
         last_exception = None
         for num in range(3):
-            url = f'http://127.0.0.1:{cls.FUZZER_CMD_PORT}/{action}'
+            url = f'http://127.0.0.1:{FUZZER_CMD_PORT}/{action}'
             try:
                 requests.get(url)
                 return

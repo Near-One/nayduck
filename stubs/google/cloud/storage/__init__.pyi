@@ -13,8 +13,18 @@ class Blob:
     def upload_from_file(self, file_obj: typing.IO[bytes]) -> None:
         ...
 
+    def upload_from_filename(self, filename: str) -> None:
+        ...
+
+    def download_as_text(self) -> str:
+        ...
+
+    def delete(self) -> None:
+        ...
+
 
 class Bucket:
+    name: str
 
     def blob(self, blob_name: str) -> Blob:
         ...
