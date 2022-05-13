@@ -521,8 +521,8 @@ On host: {socket.gethostname()}
             stderr=subprocess.STDOUT,
         )
 
-    def poll(self) -> bool:
-        """Checks if the current process is still running. Returns True if it stopped.
+    def check_if_crashed(self) -> bool:
+        """Checks if the current process has crashed. Returns True if it stopped.
 
         This function must be called regularly while the fuzzer is running in order to make sure
         the fuzzing time metrics are properly updated.
@@ -852,7 +852,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzer.signal(signal.SIGCONT)
 
             # Fuzz crash found?
-            done_fuzzers = [fuzzer for fuzzer in fuzzers if fuzzer.poll()]
+            done_fuzzers = [fuzzer for fuzzer in fuzzers if fuzzer.check_if_crashed()]
             for fuzzer in done_fuzzers:
                 bucket.blob(f'logs/{fuzzer.log_relpath}').upload_from_filename(
                     str(fuzzer.log_fullpath))
