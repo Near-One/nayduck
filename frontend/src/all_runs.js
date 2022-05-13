@@ -57,7 +57,7 @@ function AllRuns () {
     const buildName = build => {
         const features = (build.features || '').replace(/--features[= ]/g, '');
         let tag = features;
-        if (tag === 'nightly_protocol' ||
+        if (tag === 'nightly' ||
             tag === 'nightly_protocol,nightly_protocol_features') {
             tag = 'Nightly';
         } else if (tag === 'sandbox') {
