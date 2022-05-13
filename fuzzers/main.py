@@ -852,7 +852,9 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzer.signal(signal.SIGCONT)
 
             # Fuzz crash found?
-            done_fuzzers = [fuzzer for fuzzer in fuzzers if fuzzer.check_if_crashed()]
+            done_fuzzers = [
+                fuzzer for fuzzer in fuzzers if fuzzer.check_if_crashed()
+            ]
             for fuzzer in done_fuzzers:
                 bucket.blob(f'logs/{fuzzer.log_relpath}').upload_from_filename(
                     str(fuzzer.log_fullpath))
@@ -921,9 +923,6 @@ def listen_for_commands(pause_event: threading.Event,
 
 def main() -> None:
     """Main function"""
-    thread_exception: typing.Optional[threading.ExceptHookArgs] = None
-    exception_happened_in_thread = threading.Event()
-
     thread_exception: typing.Optional[threading.ExceptHookArgs] = None
     exception_happened_in_thread = threading.Event()
 
