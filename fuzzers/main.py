@@ -432,7 +432,7 @@ class FuzzProcess:
         self.log_file = open(log_fullpath, 'a', encoding='utf-8')  # pylint: disable=consider-using-with
 
         self.last_time = 0.
-        self.time_paused = typing.cast(typing.Optional[float], None)
+        self.time_paused: typing.Optional[float] = None
         self.proc: typing.Any = None  # There's some weirdness around brackets and Popen
 
         self.fuzz_build_time_metric = FUZZ_BUILD_TIME.labels(
