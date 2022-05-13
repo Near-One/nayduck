@@ -164,10 +164,10 @@ class Repository:
             'master') / 'nightly' / f'fuzz-{branch}.toml'
         if on_master_path.exists():
             return typing.cast(ConfigType, toml.load(on_master_path))
-        else:
-            return typing.cast(
-                ConfigType,
-                toml.load(self.worktree(branch) / 'nightly' / 'fuzz.toml'))
+        # else, return the config from that branch
+        return typing.cast(
+            ConfigType,
+            toml.load(self.worktree(branch) / 'nightly' / 'fuzz.toml'))
 
 
 class Corpus:
@@ -194,7 +194,8 @@ class Corpus:
 
     def synchronize(self, crate: str, runner: str,
                     log_file: typing.IO[str]) -> None:
-        """Download the corpus for `crate/runner` from GCS, then start a background thread uploading any new local changes
+        """Download the corpus for `crate/runner` from GCS, then start a background thread
+        uploading any new local changes
 
         Args:
             crate: the crate for which to fetch the corpus
@@ -272,7 +273,8 @@ class Corpus:
             crate: the crate that will be related to this path
             runner: the runner that will be related to this path
             log_file: the file where to send logs
-            is_artifacts: True iff the path being synced is an artifacts path, meaning eg. syncing deletions would be a bug
+            is_artifacts: True iff the path being synced is an artifacts path, meaning eg. syncing
+                          deletions would be a bug
         """
         print(
             f'Setting up inotify watch to auto-upload changes to '
@@ -522,9 +524,12 @@ On host: {socket.gethostname()}
     def poll(self) -> bool:
         """Checks if the current process is still running. Returns True if it stopped.
 
-        This function must be called regularly while the fuzzer is running in order to make sure the fuzzing time metrics are properly updated.
+        This function must be called regularly while the fuzzer is running in order to make sure
+        the fuzzing time metrics are properly updated.
 
-        It should not be called while the fuzzer has been paused using SIGSTOP and not yet resumed using SIGCONT."""
+        It should not be called while the fuzzer has been paused using SIGSTOP and not yet resumed
+        using SIGCONT.
+        """
         if self.proc.poll() is None:
             new_time = time.monotonic()
             self.fuzz_time_metric.inc(new_time - self.last_time)
@@ -733,9 +738,11 @@ def configure_one_fuzzer(repo: Repository, corpus: Corpus,
     Args:
         repo: the Repository handling the checkout
         corpus: the Corpus synchronizing the current fuzzing corpus and artifacts
-        sync_log_files: a list of log file paths with details about the syncing process. One entry will be added to it with this one fuzzer's sync logs
+        sync_log_files: a list of log file paths with details about the syncing process. One entry
+                        will be added to it with this one fuzzer's sync logs
         fuzzers: the list of fuzzers, the newly-configured fuzzer will be added to it
     """
+    # pylint: disable=too-many-locals
 
     # Read the configuration from the repository
     master_cfg = repo.latest_config('master')
@@ -789,7 +796,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
         resume_evt: the resuming event to check
         exit_evt: the exiting event to check
     """
-    # pylint: disable=too-many-locals,too-many-branches
+    # pylint: disable=too-many-locals,too-many-branches,too-many-return-statements
 
     bucket = gcs_client.bucket(GCS_BUCKET)
 
@@ -807,7 +814,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
 
         # Initialize the fuzzers
         atexit.register(kill_fuzzers, bucket, fuzzers)
-        for i in range(NUM_FUZZERS):
+        for _i in range(NUM_FUZZERS):
             fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files, fuzzers)
             if pause_exit_spot(pause_evt, resume_evt, exit_evt):
                 return
