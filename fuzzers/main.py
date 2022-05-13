@@ -581,7 +581,7 @@ On host: {socket.gethostname()}
 
         # Send the information in two mesages, a short one guaranteed to succeed, then a long one
         # with the log lines that could go over the message size limit
-        client = zulip.Client(config_file=ZULIPRC)
+        client = zulip.Client(config_file=str(ZULIPRC))
         gcs_artifact = shlex.quote(
             f'gs://{bucket.name}/{self.corpus_vers}/{self.target["crate"]}/'
             f'{self.target["runner"]}/artifacts/{artifact}')
@@ -852,26 +852,24 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
                     fuzzer.signal(signal.SIGCONT)
 
             # Fuzz crash found?
-            for fuzzer in fuzzers:
-                # pylint: disable=modified-iterating-list
-                if fuzzer.poll():
-                    bucket.blob(
-                        f'logs/{fuzzer.log_relpath}').upload_from_filename(
-                            str(fuzzer.log_fullpath))
-                    fuzzer.report_crash(corpus, bucket)
-                    fuzzers.remove(fuzzer)
+            done_fuzzers = [fuzzer for fuzzer in fuzzers if fuzzer.poll()]
+            for fuzzer in done_fuzzers:
+                bucket.blob(f'logs/{fuzzer.log_relpath}').upload_from_filename(
+                    str(fuzzer.log_fullpath))
+                fuzzer.report_crash(corpus, bucket)
+                fuzzers.remove(fuzzer)
 
-                    # Start a new fuzzer
-                    fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files,
-                                                  fuzzers)
-                    if pause_exit_spot(pause_evt, resume_evt, exit_evt):
-                        return
-                    fuzzer.build()
-                    if pause_exit_spot(pause_evt, resume_evt, exit_evt):
-                        return
-                    fuzzer.start(corpus)
-                    if pause_exit_spot(pause_evt, resume_evt, exit_evt):
-                        return
+                # Start a new fuzzer
+                fuzzer = configure_one_fuzzer(repo, corpus, sync_log_files,
+                                              fuzzers)
+                if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                    return
+                fuzzer.build()
+                if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                    return
+                fuzzer.start(corpus)
+                if pause_exit_spot(pause_evt, resume_evt, exit_evt):
+                    return
 
             # Regularly upload the sync log files
             upload_interval_secs = SYNC_LOG_UPLOAD_INTERVAL.total_seconds()
@@ -923,6 +921,8 @@ def listen_for_commands(pause_event: threading.Event,
 
 def main() -> None:
     """Main function"""
+    thread_exception: typing.Optional[threading.ExceptHookArgs] = None
+    exception_happened_in_thread = threading.Event()
 
     thread_exception: typing.Optional[threading.ExceptHookArgs] = None
     exception_happened_in_thread = threading.Event()
@@ -955,9 +955,8 @@ def main() -> None:
                     exception_happened_in_thread)
 
         # Finally, proxy the exception so it gets detected and acted upon by a human
-        exc_info = thread_exception
-        if exc_info is not None:
-            raise exc_info.exc_value
+        if thread_exception:
+            raise typing.cast(BaseException, thread_exception.exc_value)
     except KeyboardInterrupt:
         print('Got ^C, stopping', file=sys.stderr)
 
@@ -965,5 +964,5 @@ def main() -> None:
 if __name__ == '__main__':
     utils.setup_environ()
     os.environ['RUSTC_BOOTSTRAP'] = '1'  # Nightly is needed by cargo-fuzz
-    zulip.Client(config_file=ZULIPRC)  # Validate the zuliprc is setup well
+    zulip.Client(config_file=str(ZULIPRC))  # Validate the zuliprc is setup well
     main()
