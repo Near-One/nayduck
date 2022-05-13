@@ -669,7 +669,7 @@ crashing another branch.
 
 
 # Actually this should also require a ['weight']: int bound but it seems like a mess to encode
-T = typing.TypeVar('T')  # pylint: disable=invalid-name
+T = typing.TypeVar('T')
 
 
 def random_weighted(array: list[T], name: str) -> T:
@@ -853,6 +853,7 @@ def run_fuzzers(gcs_client: gcs.Client, pause_evt: threading.Event,
 
             # Fuzz crash found?
             for fuzzer in fuzzers:
+                # pylint: disable=modified-iterating-list
                 if fuzzer.poll():
                     bucket.blob(
                         f'logs/{fuzzer.log_relpath}').upload_from_filename(
@@ -920,18 +921,17 @@ def listen_for_commands(pause_event: threading.Event,
         httpd.serve_forever()
 
 
-THREAD_EXCEPTION: typing.Optional[threading.ExceptHookArgs] = None
-EXCEPTION_HAPPENED_IN_THREAD = threading.Event()
-
-
 def main() -> None:
     """Main function"""
 
+    thread_exception: typing.Optional[threading.ExceptHookArgs] = None
+    exception_happened_in_thread = threading.Event()
+
     # Make sure to cleanup upon ctrl-c or upon any exception in a thread
-    def new_excepthook(args: typing.Any) -> None:
-        global THREAD_EXCEPTION
-        THREAD_EXCEPTION = args
-        EXCEPTION_HAPPENED_IN_THREAD.set()
+    def new_excepthook(args: threading.ExceptHookArgs) -> None:
+        nonlocal thread_exception
+        thread_exception = args
+        exception_happened_in_thread.set()
 
     threading.excepthook = new_excepthook
 
@@ -952,10 +952,10 @@ def main() -> None:
         print('Startup complete, will start running forever now',
               file=sys.stderr)
         run_fuzzers(gcs_client, pause_event, resume_event,
-                    EXCEPTION_HAPPENED_IN_THREAD)
+                    exception_happened_in_thread)
 
         # Finally, proxy the exception so it gets detected and acted upon by a human
-        exc_info = THREAD_EXCEPTION
+        exc_info = thread_exception
         if exc_info is not None:
             raise exc_info.exc_value
     except KeyboardInterrupt:
