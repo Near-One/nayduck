@@ -36,7 +36,7 @@ set -x
 
 apt-get -y update
 apt-get -y upgrade
-apt-get -y install git python3-pip libpq-dev lld libclang-dev
+apt-get -y install fdisk git python3-pip libpq-dev lld libclang-dev
 
 grep -q ^nayduck: /etc/passwd ||
 	adduser --disabled-login --gecos NayDuck nayduck
@@ -89,8 +89,8 @@ else
 fi
 
 case $type in
-frontend) services=ui              ;;
-worker)   services='worker fuzzer' ;;
+frontend) services=ui                        ;;
+worker)   services='local-ssd worker fuzzer' ;;
 *)        services=$type
 esac
 for service in $services; do

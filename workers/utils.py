@@ -278,6 +278,15 @@ def int_to_ip(addr: int) -> str:
 
 def setup_environ() -> None:
     """Configures environment variables for workers and builders."""
+    # Look for Cargo.
+    path = WORKDIR / 'home/cargo'
+    if (path / 'bin/cargo').is_file():
+        os.environb[b'CARGO_HOME'] = os.fsencode(path)
+        os.environb[b'RUSTUP_HOME'] = os.fsencode(WORKDIR / 'home/rustup')
+        cargo_bin = path / 'bin'
+    else:
+        cargo_bin = pathlib.Path.home() / '.cargo/bin'
+
     # Add Cargo to PATH and remove various unnecessary directories
     pathsep = os.fsencode(os.pathsep)
     paths = os.environb.get(b'PATH', os.fsencode(os.defpath)).split(pathsep)
@@ -285,14 +294,12 @@ def setup_environ() -> None:
         path for path in paths
         if path.startswith(b'/') and not path.endswith(b'/sbin')
     ]
-
-    cargo_bin = pathlib.Path.home() / '.cargo/bin'
     if cargo_bin.exists():
         paths.insert(0, os.fsencode(cargo_bin))
-
     os.environb[b'PATH'] = pathsep.join(paths)
 
-    # Configure Cargo builds
+    # Configure Cargo builds to make compilation faster.  We don’t need
+    # super-optimised builds thus disabling LTO and using lld.
     os.environb[b'CARGO_PROFILE_RELEASE_LTO'] = b'false'
     os.environb[b'CARGO_PROFILE_DEV_DEBUG'] = b'0'
     os.environb[b'CARGO_PROFILE_TEST_DEBUG'] = b'0'

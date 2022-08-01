@@ -1,0 +1,8 @@
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/nayduck/nayduck
+ExecStart=/bin/sh systemd/setup-local-ssd.sh
+
+[Install]
+WantedBy=multi-user.target
