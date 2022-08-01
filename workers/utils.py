@@ -278,52 +278,32 @@ def int_to_ip(addr: int) -> str:
 
 def setup_environ() -> None:
     """Configures environment variables for workers and builders."""
-    home = pathlib.Path.home()
-
-    # Set up Go and NVM variables
-    script = '''
-        set -eu
-        [ -e ~/.go ] && GOROOT=~/.go
-        [ -e ~/go  ] && GOPATH=~/go
-        if [ -e ~/.nvm ]; then
-            NVM_DIR=~/.nvm
-            . ~/.nvm/nvm.sh
-        fi >&2
-        export GOROOT GOPATH NVM_DIR
-        env -0
-    '''
-    env: dict[bytes, bytes] = dict(
-        typing.cast(tuple[bytes, bytes], item.split(b'=', 1))
-        for item in subprocess.check_output(
-            script, shell=True, cwd=home).rstrip(b'\0').split(b'\0'))
-
-    # Add Cargo and Go to PATH and remove various unnecessary directories
+    # Add Cargo to PATH and remove various unnecessary directories
     pathsep = os.fsencode(os.pathsep)
-    paths = [home / subdir / 'bin' for subdir in ('.cargo', 'go', '.go')]
-    env[b'PATH'] = pathsep.join(
-        [os.fsencode(path) for path in paths if path.exists()] + [
-            path
-            for path in env.get(b'PATH', os.fsencode(os.defpath)).split(pathsep)
-            if (path.startswith(b'/') and not path.endswith(b'/sbin') and
-                not path.startswith(b'/snap/') and b'games' not in path)
-        ])
+    paths = os.environb.get(b'PATH', os.fsencode(os.defpath)).split(pathsep)
+    paths = [
+        path for path in paths
+        if path.startswith(b'/') and not path.endswith(b'/sbin')
+    ]
+
+    cargo_bin = pathlib.Path.home() / '.cargo/bin'
+    if cargo_bin.exists():
+        paths.insert(0, os.fsencode(cargo_bin))
+
+    os.environb[b'PATH'] = pathsep.join(paths)
 
     # Configure Cargo builds
-    env[b'CARGO_PROFILE_RELEASE_LTO'] = b'false'
-    env[b'CARGO_PROFILE_DEV_DEBUG'] = b'0'
-    env[b'CARGO_PROFILE_TEST_DEBUG'] = b'0'
+    os.environb[b'CARGO_PROFILE_RELEASE_LTO'] = b'false'
+    os.environb[b'CARGO_PROFILE_DEV_DEBUG'] = b'0'
+    os.environb[b'CARGO_PROFILE_TEST_DEBUG'] = b'0'
     if shutil.which('lld'):
-        env[b'RUSTFLAGS'] = b'-C link-arg=-fuse-ld=lld'
+        os.environb[b'RUSTFLAGS'] = b'-C link-arg=-fuse-ld=lld'
 
     # Tell tests this is NayDuck
-    env[b'NAYDUCK'] = b'1'
-    env[b'NIGHTLY_RUNNER'] = b'1'
+    os.environb[b'NAYDUCK'] = b'1'
+    os.environb[b'NIGHTLY_RUNNER'] = b'1'
 
-    env.pop(b'NEAR_PYTEST_CONFIG', None)
-
-    # Apply
-    os.environb.clear()
-    os.environb.update(env)
+    os.environb.pop(b'NEAR_PYTEST_CONFIG', None)
 
 
 class PausedFuzzers:
