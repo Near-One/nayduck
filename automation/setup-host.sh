@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# usage:  ./setup-host.sh ( [--mocknet] --worker | --builder | --frontend )
+# usage:  ./setup-host.sh ( --worker | --builder | --frontend )
 
 set -eu
 
@@ -12,7 +12,6 @@ fi
 basedir=$PWD
 
 type=
-is_mocknet=false
 for arg; do
 	case $arg in
 	--worker|--builder|--frontend)
@@ -22,9 +21,6 @@ for arg; do
 		fi
 		type=${arg#--}
 		;;
-	--mocknet)
-		is_mocknet=true
-		;;
 	*)
 		echo "$0: unknown argument: $arg" >&2
 		exit 1
@@ -32,14 +28,7 @@ for arg; do
 done
 
 if [ -z "$type" ]; then
-	if $is_mocknet; then
-		type=worker
-	else
-		echo "$0: missing --worker, --builder or --frontend argument">&2
-		exit 1
-	fi
-elif [ "$type" != worker ] && $is_mocknet; then
-	echo "$0: --mocknet argument is not compatible with --$type" >&2
+	echo "$0: missing --worker, --builder or --frontend argument">&2
 	exit 1
 fi
 
@@ -94,7 +83,7 @@ if [ "$type" = frontend ]; then
 else
 	curl https://sh.rustup.rs -sSf | sudo -u nayduck sh -s -- -y
 	sudo -u nayduck .cargo/bin/rustup target add wasm32-unknown-unknown
-	if $is_mocknet; then
+	if [ "$type" = worker ]; then
 		sudo -u nayduck .cargo/bin/cargo install cargo-fuzz
 	fi
 fi
