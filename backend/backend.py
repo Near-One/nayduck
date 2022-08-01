@@ -288,7 +288,8 @@ def login_code() -> werkzeug.wrappers.Response:
         code, is_web = auth.get_code(state=flask.request.args.get('state'),
                                      code=flask.request.args.get('code'))
     except auth.AuthFailed as ex:
-        return flask.Response(str(ex), 403, mimetype='text/plain')
+        return typing.cast(werkzeug.wrappers.Response,
+                           flask.Response(str(ex), 403, mimetype='text/plain'))
     return _login_response(code.code, is_web)
 
 

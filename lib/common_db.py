@@ -35,7 +35,8 @@ class DB:
 
     def __init__(self) -> None:
         self.__conn = _ENGINE.connect()
-        self.__in_transaction = False
+        self.__transaction: typing.Optional[
+            sqlalchemy.engine.Transaction] = None
 
     def __enter__(self: _D) -> _D:
         return self
@@ -66,7 +67,9 @@ class DB:
     def _fetch_one(self, sql: str, **kw: typing.Any) -> typing.Optional[_Dict]:
         """Returns first row of a query as dictionary."""
         row = self._exec(sql, **kw).first()
-        return row and self._to_dict(row)
+        if not row:
+            return None
+        return self._to_dict(row)
 
     def _fetch_all(self, sql: str, **kw: typing.Any) -> typing.Sequence[_Dict]:
         """Returns iterator over rows of a query as dictionaries."""
@@ -91,19 +94,19 @@ class DB:
         Returns:
             Whatever callback returns.
         """
-        if self.__in_transaction:
+        if self.__transaction:
             return callback(*args, **kw)
 
-        self.__in_transaction = True
+        self.__transaction = transaction = self.__conn.begin()
         try:
             retry = 0
             while True:
                 try:
                     result = callback(*args, **kw)
-                    self.__conn.commit()
+                    transaction.commit()
                     return result
                 except BaseException as ex:
-                    self.__conn.rollback()
+                    transaction.rollback()
                     if not (retry < 2 and
                             isinstance(ex, sqlalchemy.exc.DBAPIError) and
                             ex.connection_invalidated):  # pylint: disable=no-member
@@ -113,7 +116,7 @@ class DB:
                     retry += 1
                     self.__conn = _ENGINE.connect()
         finally:
-            self.__in_transaction = False
+            self.__transaction = None
 
     def _insert(self,
                 table: str,
@@ -139,7 +142,8 @@ class DB:
         if not id_column:
             self._exec(sql, **kw)
             return 0
-        return int(self._exec(f'{sql} RETURNING "{id_column}"', **kw).scalar())
+        row_id = self._exec(f'{sql} RETURNING "{id_column}"', **kw).scalar()
+        return int(typing.cast(int, row_id))
 
     def _multi_insert(
             self,

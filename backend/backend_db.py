@@ -170,10 +170,11 @@ class BackendDB(common_db.DB):
         row = self._exec(sql, id=test_id).first()
         if not row:
             return None
-        tests = self.get_full_test_history(row.name, row.branch)
+        name, branch = row.name, row.branch  # type: ignore
+        tests = self.get_full_test_history(name, branch)
         return {
-            'name': row.name,
-            'branch': row.branch,
+            'name': name,
+            'branch': branch,
             'tests': tests,
             'history': self.history_stats(tests),
         }
