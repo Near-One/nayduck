@@ -48,7 +48,7 @@ if ! [ -d "$dir/home" ]; then
 	# take a lot of space so best keep them on our massive local SSD.
 	mkdir -p "$dir/home"
 	chown nayduck:nayduck "$dir/home"
-	sudo -u nayduck CARGO_HOME="$dir/home/cargo" RUSTUP_HOME="$dir/home/rustup" '
+	sudo -u nayduck CARGO_HOME="$dir/home/cargo" RUSTUP_HOME="$dir/home/rustup" sh -c '
 		set -eux
 		curl https://sh.rustup.rs -sSf | sh -s -- -y
 		"$CARGO_HOME/bin/rustup" target add wasm32-unknown-unknown
