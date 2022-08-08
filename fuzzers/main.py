@@ -39,14 +39,11 @@ SYNC_LOG_UPLOAD_INTERVAL = datetime.timedelta(3600)
 
 def connect_to_gcs() -> gcs.Client:
     """Setup the environment to have gsutils work, and return a connection to GCS"""
-    #subprocess.run(
-    #    [
-    #        'gcloud', 'auth', 'activate-service-account', '--key-file',
-    #        GCS_CREDENTIALS_FILE
-    #    ],
-    #    check=True,
-    #)
-    return gcs.Client.from_service_account_json(str(GCS_CREDENTIALS_FILE))
+    credentials = config.CONFIG_DIR / 'credentials.json'
+    subprocess.check_call((
+        'gcloud', 'auth', 'activate-service-account', '--key-file', credentials
+    ))
+    return gcs.Client.from_service_account_json(str(credentials))
     #return gcs.Client(project = 'near-nayduck')
 
 
@@ -61,7 +58,6 @@ LOGS_DIR = WORKDIR / 'fuzz-logs'
 CORPUS_DIR = WORKDIR / 'fuzz-corpus'
 
 ZULIPRC = config.CONFIG_DIR / 'zuliprc'
-GCS_CREDENTIALS_FILE = config.CONFIG_DIR / 'credentials.json'
 GCS_BUCKET = 'fuzzer'
 
 FUZZ_BUILD_TIME = prometheus_client.Counter('fuzz_build_seconds',
