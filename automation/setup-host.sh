@@ -1,6 +1,30 @@
 #!/bin/sh
 
-# usage:  ./setup-host.sh ( --worker | --builder | --frontend )
+# Start by creating a `setup.tar.gz` consisting of credentials from an existing
+# NayDuck machine.  Let’s call that _source machine_.  To create the file,
+# *locally* execute:
+#
+#     local$ ssh source sudo -u nayduck tar cC ~nayduck .nayduck .ssh | gzip -9 >/tmp/setup.tar.gz
+#
+# With the file ready, copy it together with this setup-host.sh script to the
+# target machine which needs to be set up.  To do this (again locally) execute:
+#
+#     local$ scp /tmp/setup.tar.gz automation/setup-host.sh target:
+#
+# Once copying succeeds, log onto the target machine and execute the script
+# there.  Again, ssh and execution of the command can be combined into the
+# following single invocation on local machine:
+#
+#     local$ ssh target sudo /bin/sh setup-host.sh "--<role>"
+#
+# where --<role> is one of: --worker, --builder or --frontend.  The script will
+# reboot the machine so you will be forcefully logged out.
+#
+# Copying and executing the script can be repeated on other machines that need
+# to be set up.  Once all hosts are correctly initialised, cleanup the setup
+# file:
+#
+#     local$ rm /tmp/setup.tar.gz
 
 set -eu
 
