@@ -21,8 +21,8 @@ if ! [ -e "${dev}p1" ]; then
 		write
 EOF
 
-	# Data on the device is essentially lost on reboot and we’re treating it as
-	# ephemeral.  There’s no point in keeping journal.
+	# Data on the device is essentially lost on reboot and we’re treating it
+	# as ephemeral.  There’s no point in keeping journal.
 	mkfs.ext4 -E discard -O ^has_journal "${dev}p1"
 	mkdir -p "$dir"
 	mount "${dev}p1" "$dir" -o discard,noatime,nobarrier
@@ -40,12 +40,12 @@ if ! [ -f "$dir/README" ]; then
 Data in this directory is ephemeral and may disappear on reboots.
 Don’t keep any data which cannot be recreated here.
 EOF
-	chmod 644 "$dir/README"
+	chmod 444 "$dir/README"
 fi
 
 if ! [ -d "$dir/home" ]; then
-	# Install Rustup and Cargo in /datadrive/home for NayDuck to use.  Those always
-	# take a lot of space so best keep them on our massive local SSD.
+	# Install Rustup and Cargo in /datadrive/home for NayDuck to use.  Those
+	# always take a lot of space so best keep them on our massive local SSD.
 	mkdir -p "$dir/home"
 	chown nayduck:nayduck "$dir/home"
 	sudo -u nayduck CARGO_HOME="$dir/home/cargo" RUSTUP_HOME="$dir/home/rustup" sh -c '
@@ -54,4 +54,13 @@ if ! [ -d "$dir/home" ]; then
 		"$CARGO_HOME/bin/rustup" target add wasm32-unknown-unknown
 		"$CARGO_HOME/bin/cargo" install cargo-fuzz
 	'
+fi
+
+if ! [ -d "$dir/docker" ]; then
+	# Configure Docker to store its stuff in /datadrive since otherwise
+	# root file-system would quickly run out of space.
+	if -d [ /var/lib/docker ]; then
+		mv -f -- /var/lib/docker "$dir/docker"
+	fi
+	printf '{"data-root":"%s/docker"}' "$dir" >/etc/docker/daemon.json
 fi

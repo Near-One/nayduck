@@ -108,6 +108,8 @@ else
 	curl https://sh.rustup.rs -sSf | sudo -u nayduck sh -s -- -y
 	sudo -u nayduck .cargo/bin/rustup target add wasm32-unknown-unknown
 	if [ "$type" = worker ]; then
+		apt-get -y install docker.io
+		usermod -aGdocker nayduck
 		sudo -u nayduck .cargo/bin/cargo install cargo-fuzz
 	fi
 fi
