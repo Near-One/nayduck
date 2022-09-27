@@ -1,4 +1,5 @@
 [Service]
+Description=Setup script for local SSD
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/nayduck/nayduck

@@ -1,6 +1,6 @@
 [Unit]
 Description=NayDuck Worker
-After=network.target nayduck-fuzzer.service local-ssd.service
+After=network.target nayduck-fuzzer.service nayduck-local-ssd.service
 
 [Service]
 Restart=always
