@@ -64,7 +64,7 @@ fi
 if ! [ -d "$dir/docker" ]; then
 	# Configure Docker to store its stuff in /datadrive since otherwise
 	# root file-system would quickly run out of space.
-	if -d [ /var/lib/docker ]; then
+	if [ -d /var/lib/docker ]; then
 		mv -f -- /var/lib/docker "$dir/docker"
 	fi
 	printf '{"data-root":"%s/docker"}' "$dir" >/etc/docker/daemon.json
