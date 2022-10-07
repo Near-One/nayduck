@@ -54,6 +54,11 @@ if ! [ -d "$dir/home" ]; then
 		"$CARGO_HOME/bin/rustup" target add wasm32-unknown-unknown
 		"$CARGO_HOME/bin/cargo" install cargo-fuzz
 	'
+	cat >>"$dir/home/cargo/env" <<EOF
+CARGO_HOME='$dir/home/cargo'
+RUSTUP_HOME='$dir/home/rustup'
+export CARGO_HOME RUSTUP_HOME
+EOF
 fi
 
 if ! [ -d "$dir/docker" ]; then

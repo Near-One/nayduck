@@ -104,14 +104,9 @@ if [ "$type" = frontend ]; then
 	# different on different machines so this needs to be done manually.
 	# This also needs to be added as a service to systemd so it’s run on
 	# each boot.
-else
-	curl https://sh.rustup.rs -sSf | sudo -u nayduck sh -s -- -y
-	sudo -u nayduck .cargo/bin/rustup target add wasm32-unknown-unknown
-	if [ "$type" = worker ]; then
-		apt-get -y install docker.io
-		usermod -aGdocker nayduck
-		sudo -u nayduck .cargo/bin/cargo install cargo-fuzz
-	fi
+elif [ "$type" = worker ]; then
+	apt-get -y install docker.io
+	usermod -aGdocker nayduck
 fi
 
 case $type in
