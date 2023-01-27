@@ -20,7 +20,7 @@ export function parseTestName(test) {
           : ' --features test_features';
     const additionalBinariesFeatures = featuresArray.includes('nightly')
         ? '--features nightly '
-        : ' ';
+        : '';
     let release = '';
     let i = 1;
     for (; /^--/.test(spec[i] || ''); ++i) {
