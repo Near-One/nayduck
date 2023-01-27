@@ -108,7 +108,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         '-prestaked',
         '-pnear-test-contracts'
     ]
-    if spec.features and "nightly" in spec.features.split(","):
+    if spec.features and ("nightly" in spec.features.split(",")):
         build_additional_binaries_args.append("--features=nightly")
     cargo(*build_additional_binaries_args, add_features=False)
 
