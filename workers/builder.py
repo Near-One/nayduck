@@ -101,11 +101,16 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
 
     cargo('build', '-pneard', '--bin', 'neard', '--features',
           f'{test_feature},rosetta_rpc')
-    cargo('build',
-          '-pgenesis-populate',
-          '-prestaked',
-          '-pnear-test-contracts',
-          add_features=False)
+
+    build_additional_binaries_args = [
+        'build',
+        '-pgenesis-populate',
+        '-prestaked',
+        '-pnear-test-contracts'
+    ]
+    if spec.features and "nightly" in spec.features.split(","):
+        build_additional_binaries_args.append("--features=nightly")
+    cargo(*build_additional_binaries_args, add_features=False)
 
     copy(src_dir=utils.REPO_DIR / 'target' / spec.build_type,
          dst_dir=spec.build_dir / 'target',
