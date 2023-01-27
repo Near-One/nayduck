@@ -18,7 +18,7 @@ export function parseTestName(test) {
     const features = featuresArray.length > 0
           ? ' ' + featuresArray.join(' ') + ',test_features'
           : ' --features test_features';
-    const additionalBinariesFeatures = featuresArray.includes("nightly")
+    const additionalBinariesFeatures = featuresArray.includes('nightly')
         ? '--features nightly '
         : ' ';
     let release = '';
