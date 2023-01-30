@@ -66,11 +66,10 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     msg = 'expensive ' if spec.is_expensive else ''
     print(f'Building {msg}target', file=sys.stderr)
 
-    def cargo(*args: typing.Union[str, Path],
-              add_features: bool = True) -> None:
+    def cargo(*args: typing.Union[str, Path], features: typing.List[str]) -> None:
         cmd = ['cargo', *args]
-        if spec.features and add_features:
-            cmd.append('--features=' + spec.features)
+        if features:
+            cmd.append('--features=' + ','.join(features))
         if spec.is_release:
             cmd.append('--release')
         if runner(cmd, cwd=utils.REPO_DIR) != 0:
@@ -92,25 +91,34 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
 
     utils.rmdirs(spec.build_dir)
 
+    features = ['rosetta_rpc']
+    if spec.features:
+        features.extend(spec.features.split(','))
     if runner(('git', 'merge-base', '--is-ancestor',
                '9786eead37abee9097015510d6d17d76f00465ef', '@'),
               cwd=utils.REPO_DIR) == 0:
-        test_feature = 'test_features'
+        features.append('test_features')
     else:
-        test_feature = 'adversarial'
+        features.append('adversarial')
 
-    cargo('build', '-pneard', '--bin', 'neard', '--features',
-          f'{test_feature},rosetta_rpc')
+    cargo(
+        'build',
+        '-pneard',
+        '--bin',
+        'neard',
+        features=features
+    )
 
-    build_additional_binaries_args = [
+    cargo(
         'build',
         '-pgenesis-populate',
         '-prestaked',
-        '-pnear-test-contracts'
-    ]
-    if spec.features and ("nightly" in spec.features.split(",")):
-        build_additional_binaries_args.append("--features=nightly")
-    cargo(*build_additional_binaries_args, add_features=False)
+        '-pnear-test-contracts',
+        # only enable 'nightly' since other features might not be supported 
+        # by the packages above which results in 'none of the selected 
+        # packages contains these features' cargo build error
+        features=[feat for feat in features if feat == 'nightly']
+    )
 
     copy(src_dir=utils.REPO_DIR / 'target' / spec.build_type,
          dst_dir=spec.build_dir / 'target',
