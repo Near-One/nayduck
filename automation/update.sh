@@ -3,11 +3,17 @@
 set -eu
 
 only_frontend=false
+branch=origin/master
+
 for arg; do
 	case $arg in
 	--frontend-only|--front-end-only)
 		only_frontend=true
-		;;
+        ;;
+    --branch=*)
+        branch=remotes/origin/$( echo $arg |awk -F'=' '{print $2}' )
+        echo "Will be using code from branch: $branch" >&2
+        ;;
 	*)
 		echo "$0: unknown argument: $arg" >&2
 		exit 1
@@ -33,7 +39,7 @@ sudo -u nayduck /bin/sh -c "
 	set -eux
 	cd ~/nayduck
 	git remote update --prune
-	git reset --hard origin/master
+	git reset --hard $branch
 	if ! $only_frontend; then
 		python3 -m pip install --no-warn-script-location -U pip
 		python3 -m pip install --no-warn-script-location -U -r requirements.txt
