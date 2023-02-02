@@ -24,8 +24,7 @@ def __create_engine() -> sqlalchemy.engine.Engine:
                                     future=True,
                                     pool_size=1,
                                     pool_recycle=4 * 3600,
-                                    max_overflow=20,
-                                    encoding='utf-8')
+                                    max_overflow=20)
 
 
 _ENGINE = __create_engine()
