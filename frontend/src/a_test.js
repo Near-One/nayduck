@@ -14,9 +14,13 @@ export function parseTestName(test) {
     const spec = test.name.trim().split(/\s+/);
     const category = spec[0];
     const pos = spec.indexOf('--features');
-    const features = pos !== -1
-          ? ' ' + spec.splice(pos).join(' ') + ',test_features'
+    const featuresArray = pos !== -1 ? spec.splice(pos) : [];
+    const features = featuresArray.length > 0
+          ? ' ' + featuresArray.join(' ') + ',test_features'
           : ' --features test_features';
+    const additionalBinariesFeatures = featuresArray.includes('nightly')
+        ? '--features nightly '
+        : '';
     let release = '';
     let i = 1;
     for (; /^--/.test(spec[i] || ''); ++i) {
@@ -43,7 +47,7 @@ export function parseTestName(test) {
         command = 'python3 pytest/tests/' + spec.join(' ');
         command = test.skip_build ? <code>{command}</code> : <code>
           <small>cargo build {release} -pneard {features},rosetta_rpc &amp;&amp;</small><br/>
-          <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts &amp;&amp;</small><br/>
+          <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts {additionalBinariesFeatures}&amp;&amp;</small><br/>
           {command}
         </code>;
         break;
