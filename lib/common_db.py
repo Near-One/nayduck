@@ -186,7 +186,7 @@ class DB:
     @classmethod
     def _to_dict(cls, row: _Row) -> dict[str, typing.Any]:
         """Converts an SQLAlchemy row into a dictionary."""
-        return dict(zip(row.keys(), row))
+        return dict(zip(row.tuple()._fields, row))
 
     @classmethod
     def _blob_from_data(cls, data: typing.Union[str, bytes]) -> bytes:
