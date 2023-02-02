@@ -16,7 +16,7 @@ export function parseTestName(test) {
     const pos = spec.indexOf('--features');
     const featuresArray = pos !== -1 ? spec.splice(pos) : [];
     const features = featuresArray.length > 0
-          ? ' ' + featuresArray.join(',') + ',test_features'
+          ? ' ' + featuresArray.join(' ') + ',test_features'
           : ' --features test_features';
     const additionalBinariesFeatures = featuresArray.includes('nightly')
         ? '--features nightly '
