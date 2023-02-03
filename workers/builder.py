@@ -140,8 +140,13 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
             if '.' not in filename:
                 (src_dir / filename).unlink()
 
-    cargo('build', '--tests', '--target-dir', 'target_expensive',
-          '--features=expensive_tests')
+    cargo(
+        'build',
+        '--tests',
+        '--target-dir',
+        'target_expensive',
+        features='expensive_tests'
+    )
 
     copy(src_dir=src_dir,
          dst_dir=spec.build_dir / 'expensive',
