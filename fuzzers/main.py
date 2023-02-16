@@ -207,8 +207,8 @@ class Corpus:
                 f'Attempted to synchronize {crate}/{runner} that\'s already being synchronized'
             )
         base = pathlib.Path(crate) / runner
-        self._reset_to_gcs(base / 'corpus', log_file)
-        self._reset_to_gcs(base / 'artifacts', log_file)
+        self._reset_to_gcs(base / 'corpus', log_file, False)
+        self._reset_to_gcs(base / 'artifacts', log_file, True)
         self._auto_upload(base / 'corpus', crate, runner, log_file, False)
         self._auto_upload(base / 'artifacts', crate, runner, log_file, True)
 
@@ -241,7 +241,8 @@ class Corpus:
         return directory
 
     def _reset_to_gcs(self, path: pathlib.Path,
-                      log_file: typing.IO[str]) -> None:
+                      log_file: typing.IO[str],
+                      is_artifacts: bool) -> None:
         """Reset `path` to its GCS contents, logging to `log_file`
 
         Args:
@@ -254,12 +255,12 @@ class Corpus:
             f'Resetting path {self.dir}/{path} to GCS {self.version}/{path}/\n')
         log_file.flush()
         utils.mkdirs(self.dir / path)
+        cmd = ['gsutil', '-m', 'rsync']
+        if not is_artifacts:
+            cmd.append('-d')
+        cmd += [f'gs://{self.bucket.name}/{self.version}/{path}/', self.dir / path]
         subprocess.check_call(
-            [
-                'gsutil', '-m', 'rsync', '-d',
-                f'gs://{self.bucket.name}/{self.version}/{path}/',
-                self.dir / path
-            ],
+            cmd,
             stdout=log_file,
             stderr=subprocess.STDOUT,
         )
