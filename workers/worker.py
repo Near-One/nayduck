@@ -258,7 +258,8 @@ def list_logs(directory: pathlib.Path,
         if entry_path.is_dir():
             path = entry_path / 'stderr'
             if path.exists():
-                yield LogFile(entry.split('_')[0], path)
+                # Exclude the _finished part (set at cleanup phase bit.ly/3UbqdMR)
+                yield LogFile(entry.split('_finished')[0], path)
         elif entry in ('stderr', 'stdout'):
             yield LogFile(entry, entry_path)
 
