@@ -1,9 +1,10 @@
 import base64
 import functools
+import logging
 import secrets
+import sys
 import time
 import traceback
-import sys
 import typing
 
 import cryptography.hazmat.primitives.ciphers.aead
@@ -14,6 +15,7 @@ import werkzeug.exceptions
 import werkzeug.wrappers
 
 from lib import config
+
 from . import backend_db
 
 CODE_KEY = 'nay-code'
@@ -26,6 +28,8 @@ __CHACHA = cryptography.hazmat.primitives.ciphers.aead.ChaCha20Poly1305(
     __CONFIG.take('key', base64.urlsafe_b64decode))
 __CLIENT_ID = __CONFIG.take('github-client-id', str)
 __CLIENT_SECRET = __CONFIG.take('github-client-secret', str)
+
+log = logging.getLogger("backend")
 
 
 def _github(token: str, path: str) -> typing.Any:
@@ -348,8 +352,8 @@ def get_code(state: typing.Optional[str],
                         params=params,
                         headers={'accept': 'application/json'})
     if res.status_code != 200:
-        print(f'GitHub replied with {res.status_code}:\n{res.text}',
-              file=sys.stderr)
+        log.info(f'GitHub replied with {res.status_code}:\n{res.text}',
+                 file=sys.stderr)
         raise AuthFailed(f'GitHub rejected the request ({res.status_code})')
 
     try:

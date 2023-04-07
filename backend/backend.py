@@ -3,6 +3,7 @@ import datetime
 import gzip
 import itertools
 import json
+import logging
 import pathlib
 import time
 import traceback
@@ -17,13 +18,11 @@ import werkzeug.middleware.proxy_fix
 import werkzeug.wrappers
 
 from lib import testspec
-from . import auth
-from . import backend_db
-from . import metrics
-from . import scheduler
+
+from . import auth, backend_db, metrics, scheduler
 
 app = flask.Flask(__name__, static_folder=None)
-
+app.logger.setLevel(logging.INFO)
 app.wsgi_app = werkzeug.middleware.proxy_fix.ProxyFix(  # type: ignore
     app.wsgi_app)
 
@@ -275,6 +274,7 @@ def get_test_log(kind: str, obj_id: int,
 def login_redirect(mode: str) -> werkzeug.wrappers.Response:
     try:
         code = auth.AuthCode.from_request(flask.request)
+        app.logger.info(f"Received auth code from request")
         if code.verify():
             return _login_response(code.code, mode == 'web')
     except werkzeug.exceptions.HTTPException:
@@ -284,6 +284,7 @@ def login_redirect(mode: str) -> werkzeug.wrappers.Response:
 
 @app.route('/login/code', methods=['GET'])
 def login_code() -> werkzeug.wrappers.Response:
+    """This is the GitHub app callback url"""
     try:
         code, is_web = auth.get_code(state=flask.request.args.get('state'),
                                      code=flask.request.args.get('code'))
