@@ -16,7 +16,7 @@ class Test:
 
 class WorkerDB(common_db.DB):
 
-    def __init__(self, ipv4: int) -> None:
+    def __init__(self, ipv4: int, worker_hostname: str) -> None:
         """Initialises the connection.
 
         Args:
@@ -26,6 +26,7 @@ class WorkerDB(common_db.DB):
         """
         super().__init__()
         self._ipv4 = ipv4
+        self.hostname = worker_hostname
 
     def get_pending_test(self) -> typing.Optional[Test]:
         """Returns a pending test to process or None if none found."""
@@ -42,6 +43,7 @@ class WorkerDB(common_db.DB):
                          finished = NULL,
                          status = 'RUNNING',
                          worker_ip = :ip,
+                         worker_hostname = :hostname,
                          tries = tries + 1
                    WHERE test_id IN ({sql})
                RETURNING test_id, build_id, run_id, name, timeout, skip_build,
@@ -52,7 +54,7 @@ class WorkerDB(common_db.DB):
                     FROM test
                     JOIN runs USING (run_id)
                     JOIN builds USING (build_id)'''
-        row = self._exec(sql, ip=self._ipv4).first()
+        row = self._exec(sql, ip=self._ipv4, hostname=self.hostname).first()
         test = typing.cast(typing.Optional[Test], row)
         if test and test.tries > 1:
             self._exec('DELETE FROM logs WHERE test_id = :id', id=test.test_id)
@@ -95,6 +97,7 @@ class WorkerDB(common_db.DB):
                     SET started = NULL,
                         status = 'PENDING',
                         worker_ip = 0,
+                        worker_hostname = NULL,
                         tries = GREATEST(tries - 1, 0)
                   WHERE status = 'RUNNING' AND worker_ip = :ip'''
         self._exec(sql, ip=self._ipv4)

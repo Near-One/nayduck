@@ -63,6 +63,7 @@ CREATE TABLE "tests" (
   "started"     timestamptz,
   "finished"    timestamptz,
   "worker_ip"   integer         NOT NULL DEFAULT 0,
+  "worker_hostname"   varchar,
   -- Denormalised duplicate of runs.branch to speed up history search queries.
   "branch"      varchar         NOT NULL,
   -- Denormalised duplicate of runs.requester == 'NayDuck'.

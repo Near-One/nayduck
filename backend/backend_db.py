@@ -285,7 +285,7 @@ class BackendDB(common_db.DB):
             _pop_falsy(build, 'stdout', 'stderr')
         return build
 
-    def get_histoty_for_branch(self, test_id: int,
+    def get_history_for_branch(self, test_id: int,
                                branch: str) -> typing.Optional[_Row]:
         sql = 'SELECT name FROM tests WHERE test_id = :id LIMIT 1'
         test = self._fetch_one(sql, id=test_id)
@@ -318,7 +318,7 @@ class BackendDB(common_db.DB):
     def get_one_test(self, test_id: int) -> typing.Optional[_Dict]:
         sql = '''SELECT test_id, run_id, build_id, status, name, timeout,
                         skip_build, started, finished, runs.branch, tries,
-                        ENCODE(sha, 'hex') AS sha, title, requester, is_nightly
+                        ENCODE(sha, 'hex') AS sha, title, requester, worker_hostname, is_nightly
                    FROM tests JOIN runs USING (run_id)
                   WHERE test_id = :id
                   LIMIT 1'''

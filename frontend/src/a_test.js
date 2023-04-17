@@ -1,4 +1,4 @@
-import React, { useState, useEffect  } from "react";
+import React, { useState, useEffect } from "react";
 
 import * as common from "./common"
 
@@ -16,8 +16,8 @@ export function parseTestName(test) {
     const pos = spec.indexOf('--features');
     const featuresArray = pos !== -1 ? spec.splice(pos) : [];
     const features = featuresArray.length > 0
-          ? ' ' + featuresArray.join(' ') + ',test_features'
-          : ' --features test_features';
+        ? ' ' + featuresArray.join(' ') + ',test_features'
+        : ' --features test_features';
     const additionalBinariesFeatures = featuresArray.includes('nightly')
         ? '--features nightly '
         : '';
@@ -33,27 +33,27 @@ export function parseTestName(test) {
     let baseName = null;
     let command = null;
     switch (category) {
-    case 'expensive':
-        if (spec.length === 3) {
-            baseName = spec[2];
-            command = 'cargo test -p' + spec[0] + release + features +
-                ',expensive_tests -- --exact --nocapture ' + spec[2];
-            command = <code>{command}</code>;
-        }
-        break;
-    case 'pytest':
-    case 'mocknet':
-        baseName = spec[0] === 'fuzz.py' ? spec.slice(1, 3).join(' ') : spec[0];
-        command = 'python3 pytest/tests/' + spec.join(' ');
-        command = test.skip_build ? <code>{command}</code> : <code>
-          <small>cargo build {release} -pneard {features},rosetta_rpc &amp;&amp;</small><br/>
-          <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts {additionalBinariesFeatures}&amp;&amp;</small><br/>
-          {command}
-        </code>;
-        break;
-    default:
-        baseName = spec.join(' ');
-        break;
+        case 'expensive':
+            if (spec.length === 3) {
+                baseName = spec[2];
+                command = 'cargo test -p' + spec[0] + release + features +
+                    ',expensive_tests -- --exact --nocapture ' + spec[2];
+                command = <code>{command}</code>;
+            }
+            break;
+        case 'pytest':
+        case 'mocknet':
+            baseName = spec[0] === 'fuzz.py' ? spec.slice(1, 3).join(' ') : spec[0];
+            command = 'python3 pytest/tests/' + spec.join(' ');
+            command = test.skip_build ? <code>{command}</code> : <code>
+                <small>cargo build {release} -pneard {features},rosetta_rpc &amp;&amp;</small><br />
+                <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts {additionalBinariesFeatures}&amp;&amp;</small><br />
+                {command}
+            </code>;
+            break;
+        default:
+            baseName = spec.join(' ');
+            break;
     }
 
     return {
@@ -64,7 +64,7 @@ export function parseTestName(test) {
 
 
 function formatFullTestName(test) {
-    let {name, timeout, skip_build} = test;
+    let { name, timeout, skip_build } = test;
     if (timeout === 180 && !skip_build) {
         return name;
     }
@@ -107,19 +107,19 @@ function formatTriesCount(test) {
         }
         const count = 0 | test.tries;
         switch (test.status) {
-        case 'PENDING':
-            return count + ' failed ' + (count === 1 ? 'try' : 'tries');
-        case 'RUNNING':
-            return count > 1 ? nth(count) + ' try' : null;
-        default:
-            return count > 1 ? count + ' tries' : null;
+            case 'PENDING':
+                return count + ' failed ' + (count === 1 ? 'try' : 'tries');
+            case 'RUNNING':
+                return count > 1 ? nth(count) + ' try' : null;
+            default:
+                return count > 1 ? count + ' tries' : null;
         }
     })();
     return body && <small>  ({body})</small>;
 }
 
 
-function ATest (props) {
+function ATest(props) {
     const [aTest, setATest] = useState(null);
     const [baseBranchHistory, setBaseBranchHistory] = useState(null);
     const baseBranch = "master";
@@ -142,7 +142,7 @@ function ATest (props) {
             git bisect start {aTest.first_bad.substr(0, 8)} {aTest.last_good.substr(0, 8)}
         </small></code></div> : null;
 
-    const {testBaseName, testCommand} = parseTestName(aTest);
+    const { testBaseName, testCommand } = parseTestName(aTest);
     common.useTitle(aTest && (testBaseName + ' (run #' + aTest.run_id + ')'));
     const statusCls = aTest && common.statusClassName('text', aTest.status);
     return aTest && <>
@@ -154,24 +154,28 @@ function ATest (props) {
             [baseBranchHistory, baseBranch],
         ])}
         <table className="big"><tbody>
-          {common.commitRow(aTest)}
-          <tr>
-            <td>Requested by</td>
-            <td>{common.formatRequester(aTest.requester)}</td>
-          </tr>
-          <tr><td>Test</td><td>{formatFullTestName(aTest)}</td></tr>
-          {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
-          {common.formatTimeStatsRows('Run Time', aTest)}
-          <tr>
-            <td>Status</td>
-            <td><span className={statusCls}>{aTest.status}</span>
-                {formatTriesCount(aTest)}
-                {gitBisectCommand}</td>
-          </tr>
-          {aTest.logs ? <>
-             <tr><th colSpan="2">Logs</th></tr>
-             {aTest.logs.map(common.logRow)}
-           </> : null}
+            {common.commitRow(aTest)}
+            <tr>
+                <td>Requested by</td>
+                <td>{common.formatRequester(aTest.requester)}</td>
+            </tr>
+            <tr><td>Test</td><td>{formatFullTestName(aTest)}</td></tr>
+            {testCommand && <tr><td>Command</td><td>{testCommand}</td></tr>}
+            <tr>
+                <td>Worker</td>
+                <td><div>{aTest.worker_hostname}</div></td>
+            </tr>
+            {common.formatTimeStatsRows('Run Time', aTest)}
+            <tr>
+                <td>Status</td>
+                <td><span className={statusCls}>{aTest.status}</span>
+                    {formatTriesCount(aTest)}
+                    {gitBisectCommand}</td>
+            </tr>
+            {aTest.logs ? <>
+                <tr><th colSpan="2">Logs</th></tr>
+                {aTest.logs.map(common.logRow)}
+            </> : null}
         </tbody></table>
     </>;
 }

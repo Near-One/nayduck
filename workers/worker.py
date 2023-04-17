@@ -526,10 +526,11 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
 
 def main() -> None:
     ipv4, ip_str = utils.get_ip()
-    print(f'Starting worker @ {socket.gethostname()} ({ip_str} / {ipv4})',
+    worker_host = socket.gethostname()
+    print(f'Starting worker @ {worker_host} ({ip_str} / {ipv4})',
           file=sys.stderr)
 
-    with worker_db.WorkerDB(ipv4) as server:
+    with worker_db.WorkerDB(ipv4, worker_host) as server:
         server.handle_restart()
         while True:
             try:
