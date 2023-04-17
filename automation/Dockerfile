@@ -1,8 +1,6 @@
 FROM ubuntu:latest
 
-
-RUN --mount=type=secret,id=auth
-RUN --mount=type=secret,id=database 
+RUN mkdir /.nayduck
 
 RUN apt-get update
 

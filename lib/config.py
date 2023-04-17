@@ -5,7 +5,7 @@ import typing
 _SENTINEL = object()
 _T = typing.TypeVar('_T')
 
-CONFIG_DIR = pathlib.Path('/run/secrets')
+CONFIG_DIR = pathlib.Path.home() / '.nayduck'
 
 
 def _identity(obj: _T) -> _T:
