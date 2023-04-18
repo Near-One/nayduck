@@ -82,7 +82,7 @@ def load(name: str) -> Config:
         SystemExit: if file could not be opened, contains malformed JSON or
             contains value which is not a dictionary.
     """
-    path = CONFIG_DIR / f'{name}.json'
+    path = CONFIG_DIR / name / f'{name}.json'
     try:
         with open(path, encoding='utf-8') as rd:
             value = json.load(rd)
