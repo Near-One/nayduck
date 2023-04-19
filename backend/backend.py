@@ -123,7 +123,7 @@ def test_history(test_id: int) -> flask.Response:
 @app.route('/api/test/<int:test_id>/history/<path:branch>', methods=['GET'])
 def branch_history(test_id: int, branch: str) -> flask.Response:
     with backend_db.BackendDB() as server:
-        history = server.get_histoty_for_branch(test_id, branch)
+        history = server.get_history_for_branch(test_id, branch)
     return jsonify(history)
 
 
