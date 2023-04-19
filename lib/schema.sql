@@ -38,7 +38,7 @@ CREATE TABLE "builds" (
   "is_release"  boolean         NOT NULL DEFAULT FALSE,
   -- This is effectively denormalised duplicate of runs.requester == 'NayDuck'.
   "low_priority" boolean        NOT NULL DEFAULT 0,
-  "builder_ip"  integer         NOT NULL DEFAULT 0,
+  "builder_ip"  bigint         NOT NULL DEFAULT 0,
   PRIMARY KEY ("build_id")
 );
 -- Used by MasterDB.get_new_build
