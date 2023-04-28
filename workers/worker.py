@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import random
+import signal
 import socket
 import subprocess
 import sys
@@ -21,6 +22,22 @@ DEFAULT_TIMEOUT = 180
 
 _Cmd = typing.Sequence[typing.Union[str, pathlib.Path]]
 _EnvB = typing.MutableMapping[bytes, bytes]
+
+
+class GracefulWorkerKiller:
+    worker_running = True
+
+    def __init__(self, server):
+        self.server = server
+        self.test_id = None
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self):
+        if self.test_row:
+            self.server.retry_test(self.test_id)
+
+        self.worker_running = False
 
 
 def get_test_command(test: testspec.TestSpec) -> tuple[pathlib.Path, _Cmd]:
@@ -532,10 +549,12 @@ def main() -> None:
 
     with worker_db.WorkerDB(ipv4, worker_host) as server:
         server.handle_restart()
-        while True:
+        worker_handler = GracefulWorkerKiller(server)
+        while worker_handler.worker_running:
             try:
                 test_row = server.get_pending_test()
                 if test_row:
+                    worker_handler.test_id = test_row.test_id
                     handle_test(server, test_row)
                 else:
                     time.sleep(10)
