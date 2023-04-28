@@ -34,7 +34,9 @@ class GracefulWorkerKiller:
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
     def exit_gracefully(self):
-        if self.test_row:
+        print(f"Exiting gracefully." +
+              "test_id is {self.test_id}" if self.test_id else "")
+        if self.test_id:
             self.server.retry_test(self.test_id)
 
         self.worker_running = False
