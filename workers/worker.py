@@ -33,7 +33,7 @@ class GracefulWorkerKiller:
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-    def exit_gracefully(self):
+    def exit_gracefully(self, *args):
         print(f"Exiting gracefully." +
               "test_id is {self.test_id}" if self.test_id else "")
         if self.test_id:
