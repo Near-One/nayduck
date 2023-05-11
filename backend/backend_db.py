@@ -443,7 +443,8 @@ class BackendDB(common_db.DB):
 
         def execute() -> int:
             sql = '''UPDATE tests
-                        SET status = 'PENDING'
+                        SET status = 'PENDING',
+                            tries = tries - 1
                       WHERE test_id IN :ids
                         AND status = 'RUNNING'
                       '''
