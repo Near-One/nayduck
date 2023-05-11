@@ -424,6 +424,35 @@ class BackendDB(common_db.DB):
 
         return run_id
 
+    def get_tests_by_status(self, status) -> typing.Optional[_Dict]:
+        sql = '''SELECT test_id, status, name, started, timeout
+                   FROM tests
+                  WHERE status = :status
+                  ORDER BY status'''
+        tests = self._fetch_all(sql, status=status)
+
+        return tests
+
+    def clear_stale_tests(self, test_ids) -> int:
+        """Clears RUNNING tests status for given test_ids
+        Args:
+            test_ids: List of test_id's.
+        Returns:
+            Number of affected tests.
+        """
+
+        def execute() -> int:
+            sql = '''UPDATE tests
+                        SET status = 'PENDING'
+                      WHERE test_id IN :ids
+                        AND status = 'RUNNING'
+                      '''
+
+            rowcount = int(self._exec(sql, ids=tuple(test_ids)).rowcount or 0)
+            return rowcount
+
+        return self._in_transaction(execute)
+
     class LastNightlyRun:
         run_id: int
         branch: str

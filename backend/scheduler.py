@@ -232,10 +232,26 @@ def schedule_nightly_run() -> datetime.timedelta:
     """Schedules a new nightly run if last one was over 24 hours ago."""
     with backend_db.BackendDB() as server:
         try:
+            _handle_stale_tests(server)
             return _schedule_nightly_impl(server)
         except Exception:
             traceback.print_exc()
             return datetime.timedelta(hours=1)
+
+
+def _handle_stale_tests(server: backend_db.BackendDB) -> None:
+    stale_tests = []
+    running_tests = server.get_tests_by_status('RUNNING')
+
+    for test in running_tests:
+        # check if test is in RUNNING state for longer than timeout allows
+        if test['started'] < datetime.datetime.utcnow().replace(
+                tzinfo=pytz.UTC) - datetime.timedelta(seconds=test['timeout']):
+            stale_tests.append(test['test_id'])
+
+    if stale_tests:
+        result = server.clear_stale_tests(stale_tests)
+        print(f"Cleared {result} stale tests")
 
 
 def _read_tests(repo_dir: pathlib.Path, sha: str) -> list[testspec.TestSpec]:
