@@ -78,6 +78,16 @@ class WorkerDB(common_db.DB):
                   WHERE test_id = :id'''
         self._exec(sql, id=test_id)
 
+    def handle_shutdown(self, test_id: int) -> None:
+        sql = '''UPDATE tests
+                    SET started = NULL,
+                        status = 'PENDING',
+                        worker_ip = 0,
+                        worker_hostname = NULL,
+                        tries = GREATEST(tries - 1, 0)
+                  WHERE test_id = :id'''
+        self._exec(sql, id=test_id)
+
     def save_short_logs(self, test_id: int,
                         logs: typing.Collection[typing.Any]) -> None:
         columns = ('test_id', 'type', 'size', 'log', 'storage', 'stack_trace')

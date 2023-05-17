@@ -37,7 +37,7 @@ class GracefulWorkerKiller:
         print(f"Exiting gracefully." +
               "test_id is {self.test_id}" if self.test_id else "")
         if self.test_id:
-            self.server.retry_test(self.test_id)
+            self.server.handle_shutdown(self.test_id)
 
         self.worker_running = False
 
