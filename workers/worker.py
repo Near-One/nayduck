@@ -34,8 +34,8 @@ class GracefulWorkerKiller:
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 
     def exit_gracefully(self, *args):
-        print(f"Exiting gracefully." +
-              "test_id is {self.test_id}" if self.test_id else "")
+        print("Exiting gracefully." +
+              f"test_id is {self.test_id}" if self.test_id else "")
         if self.test_id:
             self.server.handle_shutdown(self.test_id)
 
