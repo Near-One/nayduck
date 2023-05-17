@@ -559,6 +559,7 @@ def main() -> None:
                     worker_handler.test_id = test_row.test_id
                     handle_test(server, test_row)
                 else:
+                    worker_handler.test_id = None
                     time.sleep(10)
             except KeyboardInterrupt:
                 print('Got SIGINT; terminating', file=sys.stderr)
