@@ -13,10 +13,11 @@ import time
 import traceback
 import typing
 
+from sqlalchemy import exc
+
 from lib import testspec
-from . import blobs
-from . import utils
-from . import worker_db
+
+from . import blobs, utils, worker_db
 
 DEFAULT_TIMEOUT = 180
 
@@ -548,9 +549,9 @@ def main() -> None:
     worker_host = socket.gethostname()
     print(f'Starting worker @ {worker_host} ({ip_str} / {ipv4})',
           file=sys.stderr)
-
     with worker_db.WorkerDB(ipv4, worker_host) as server:
         server.handle_restart()
+        db_retries = 5
         worker_handler = GracefulWorkerKiller(server)
         while worker_handler.worker_running:
             try:
@@ -561,6 +562,14 @@ def main() -> None:
                 else:
                     worker_handler.test_id = None
                     time.sleep(10)
+            except exc.SQLAlchemyError as e:
+                if db_retries <= 0:
+                    raise
+                print(
+                    f'Got a DB error {e}; Will retry {db_retries} more time(s)',
+                    file=sys.stderr)
+                db_retries -= 1
+                time.sleep(5)
             except KeyboardInterrupt:
                 print('Got SIGINT; terminating', file=sys.stderr)
                 break
