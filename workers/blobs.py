@@ -11,7 +11,7 @@ from lib import config
 
 _CONTENT_TYPE = 'text/plain; charset=utf-8'
 _CACHE_CONTROL = f'max-age={365 * 24 * 3600}'
-
+BUCKET_NAME = 'near-nayduck'
 
 class BlobClient:
     """A base class for a client for uploading blobs to the cloud."""
@@ -76,7 +76,7 @@ class GoogleBlobClient(BlobClient):
 
         self.__service = google.cloud.storage.Client.from_service_account_json(
             config.CONFIG_DIR / kw.get('credentials_file', 'credentials.json'))
-        self.__bucket = self.__service.bucket(kw.get('bucket_name', 'nayduck'))
+        self.__bucket = self.__service.bucket(kw.get('bucket_name', BUCKET_NAME))
 
     def _upload(self, name: str, rd: typing.BinaryIO) -> str:
         for ext, ctype in (('.gz', 'application/gzip'), ('.xz',
