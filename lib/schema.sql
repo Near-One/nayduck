@@ -1,7 +1,11 @@
 --
 -- PostgreSQL database dump
 --
-
+-- helper commands
+-- dropdb -h $HOST -U nayduck nayduck
+-- createdb -h $HOST -U nayduck nayduck
+-- psql -h $HOST -U nayduck -l
+-- psql -h $HOST -U nayduck -f schema.sql
 -- Dumped from database version 14.9
 -- Dumped by pg_dump version 14.11 (Debian 14.11-1.pgdg110+2)
 
