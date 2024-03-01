@@ -408,7 +408,7 @@ def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
     builder_addr = utils.int_to_ip(builder_ip)
 
     def scp(src: str, dst: str) -> None:
-        src = f'{builder_addr}:{utils.BUILDS_DIR}/{build_id}/{src}'
+        src = f'ubuntu@{builder_addr}:{utils.BUILDS_DIR}/{build_id}/{src}'
         path = utils.REPO_DIR / dst
         if not path.is_dir():
             runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
