@@ -74,8 +74,7 @@ class GoogleBlobClient(BlobClient):
     def __init__(self, **kw: typing.Any) -> None:
         import google.cloud.storage  # pylint: disable=import-outside-toplevel
 
-        self.__service = google.cloud.storage.Client.from_service_account_json(
-            config.CONFIG_DIR / kw.get('credentials_file', 'credentials.json'))
+        self.__service = google.cloud.storage.Client()
         self.__bucket = self.__service.bucket(kw.get('bucket_name', BUCKET_NAME))
 
     def _upload(self, name: str, rd: typing.BinaryIO) -> str:
