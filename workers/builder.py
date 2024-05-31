@@ -145,7 +145,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         '--tests',
         '--target-dir',
         'target_expensive',
-        features=['expensive_tests']
+        features=['expensive_tests'] + [feat for feat in features if feat == 'nightly']
     )
 
     copy(src_dir=src_dir,
