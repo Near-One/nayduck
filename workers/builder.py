@@ -109,15 +109,20 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         features=features
     )
 
+    # For tools (genesis populate, restaked and test contracts) only enable
+    # 'nightly' and 'test_features' since other features might not be supported
+    # by those packages which results in 'none of the selected packages contains
+    # these features' cargo build error
+    tools_features = ['test_features']
+    if "nightly" in features:
+        tools_features.append('nightly')
+
     cargo(
         'build',
         '-pgenesis-populate',
         '-prestaked',
         '-pnear-test-contracts',
-        # only enable 'nightly' since other features might not be supported 
-        # by the packages above which results in 'none of the selected 
-        # packages contains these features' cargo build error
-        features=[feat for feat in features if feat == 'nightly']
+        features=tools_features,
     )
 
     copy(src_dir=utils.REPO_DIR / 'target' / spec.build_type,
