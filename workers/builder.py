@@ -23,14 +23,23 @@ class BuildSpec(typing.NamedTuple):
     is_expensive: bool
 
     @classmethod
-    def from_row(cls, data: builder_db.Build) -> 'BuildSpec':
-        build_id = int(data.build_id)
-        return cls(build_id=build_id,
-                   build_dir=utils.BUILDS_DIR / str(build_id),
-                   sha=str(data.sha),
-                   features=data.features,
-                   is_release=bool(data.is_release),
-                   is_expensive=bool(data.expensive))
+    def from_row(cls, data: typing.Union[builder_db.Build, dict]) -> 'BuildSpec':
+        if isinstance(data, dict):
+            build_id = int(data['build_id'])
+            return cls(build_id=build_id,
+                       build_dir=utils.BUILDS_DIR / str(build_id),
+                       sha=str(data['sha']),
+                       features=data['features'],
+                       is_release=bool(data['is_release']),
+                       is_expensive=bool(data['expensive']))
+        else:
+            build_id = int(data.build_id)
+            return cls(build_id=build_id,
+                       build_dir=utils.BUILDS_DIR / str(build_id),
+                       sha=str(data.sha),
+                       features=data.features,
+                       is_release=bool(data.is_release),
+                       is_expensive=bool(data.expensive))
 
     @property
     def build_type(self) -> str:
