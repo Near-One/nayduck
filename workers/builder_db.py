@@ -108,9 +108,11 @@ class BuilderDB(common_db.DB):
 
     def get_latest_successful_build(self) -> typing.Optional[Build]:
         """Returns the latest successful build if available."""
-        sql = '''SELECT * FROM builds
-                WHERE status = 'BUILD DONE'
-                AND finished > NOW() - INTERVAL '1 hour'
-                ORDER BY finished DESC
-                LIMIT 1'''
+        sql = '''SELECT builds.*, ENCODE(runs.sha, 'hex') AS sha
+                 FROM builds
+                 JOIN runs USING (run_id)
+                 WHERE builds.status = 'BUILD DONE'
+                 AND builds.finished > NOW() - INTERVAL '1 hour'
+                 ORDER BY builds.finished DESC
+                 LIMIT 1'''
         return self._fetch_one(sql)
