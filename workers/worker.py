@@ -408,17 +408,19 @@ def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
     builder_addr = utils.int_to_ip(builder_ip)
 
     def scp(src: str, dst: str) -> None:
-        src = f'{builder_addr}:{utils.BUILDS_DIR}/{build_id}/{src}'
+        # src = f'{builder_addr}:{utils.BUILDS_DIR}/{build_id}/{src}'
+        src = f'{build_id}/{src}'
         path = utils.REPO_DIR / dst
         if not path.is_dir():
             runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
             utils.mkdirs(path)
         delay = 1 + random.random()
         for retry in range(3):
-            if runner(('scp', '-oStrictHostKeyChecking=no',
-                       '-oControlMaster=auto', '-oControlPath=/dev/shm/.ssh.%C',
-                       '-oControlPersist=2', '-oBatchMode=yes', src, dst),
-                      print_cmd=('scp', src, dst),
+            # if runner(('scp', '-oStrictHostKeyChecking=no',
+            #            '-oControlMaster=auto', '-oControlPath=/dev/shm/.ssh.%C',
+            #            '-oControlPersist=2', '-oBatchMode=yes', src, dst),
+            if runner(('cp', '-r', src, dst),
+                      print_cmd=('cp', '-r', src, dst),
                       cwd=utils.REPO_DIR,
                       check=retry == 2) == 0:
                 break
