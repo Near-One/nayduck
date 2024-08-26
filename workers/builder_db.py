@@ -105,3 +105,12 @@ class BuilderDB(common_db.DB):
         """Unassigns given builds from any builder."""
         sql = 'UPDATE builds SET builder_ip = 0 WHERE build_id IN ({})'
         self._exec(sql.format(', '.join(str(int(bid)) for bid in ids)))
+
+    def get_latest_successful_build(self) -> typing.Optional[Build]:
+        """Returns the latest successful build if available."""
+        sql = '''SELECT * FROM builds
+                WHERE status = 'BUILD DONE'
+                AND finished > NOW() - INTERVAL '1 hour'
+                ORDER BY finished DESC
+                LIMIT 1'''
+        return self._fetch_one(sql)

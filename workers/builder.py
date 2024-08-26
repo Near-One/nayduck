@@ -235,10 +235,17 @@ def keep_pulling() -> None:
         while True:
             wait_for_free_space(server)
             try:
-                new_build = server.get_new_build()
-                if new_build:
-                    handle_build(server, BuildSpec.from_row(new_build))
-                    continue
+                # Check for a recent successful build
+                latest_build = server.get_latest_successful_build()
+                if latest_build:
+                    # If a recent build exists, use it
+                    handle_build(server, BuildSpec.from_row(latest_build))
+                else:
+                    # If no recent build, get a new one
+                    new_build = server.get_new_build()
+                    if new_build:
+                        handle_build(server, BuildSpec.from_row(new_build))
+                continue
             except Exception:
                 traceback.print_exc()
                 server.handle_restart()
