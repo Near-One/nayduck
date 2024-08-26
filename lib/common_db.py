@@ -15,16 +15,9 @@ _D = typing.TypeVar('_D', bound='DB')
 
 
 def __create_engine() -> sqlalchemy.engine.Engine:
-    cfg = config.load('database')
-    cfg.setdefault('database', 'nayduck')
-    cfg.setdefault('username', 'nayduck')
-    cfg.setdefault('query', {}).update({'client_encoding': 'utf8'})
-    url = sqlalchemy.engine.URL.create('postgresql', **cfg)
-    return sqlalchemy.create_engine(url,
-                                    future=True,
-                                    pool_size=1,
-                                    pool_recycle=4 * 3600,
-                                    max_overflow=20)
+    cfg = config.load_config('database')
+    url = sqlalchemy.engine.URL.create(**cfg)
+    return sqlalchemy.create_engine(url, pool_pre_ping=True)
 
 
 _ENGINE = __create_engine()
