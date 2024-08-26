@@ -414,7 +414,7 @@ def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
         src = f'{utils.BUILDS_DIR}/{build_id}/{src}'
         path = utils.REPO_DIR / dst
 
-        src_path = os.path.join(utils.BUILDS_DIR, build_id, src)
+        src_path = os.path.join(utils.BUILDS_DIR, str(build_id), src)
         dst_path = os.path.join(utils.REPO_DIR, dst)
         
         # Ensure the destination directory exists
