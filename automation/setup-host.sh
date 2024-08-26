@@ -93,13 +93,13 @@ if [ "$type" = frontend ]; then
 		sudo -u nayduck npm install
 		sudo -u nayduck npm run build
 	)
-	# At the moment back end is configured to listen on port 5005 (because
+	# At the moment back end is configured to listen on port 4040 (because
 	# it’s run as unprivileged user and I haven’t figured out yet how to
 	# pass an open listening socket from systemd to Flask) which means that
 	# to listen to have the front end available on port 80 a redirection is
 	# necessary:
 	#     dev=ens4
-	#     iptables -A PREROUTING -t nat -i ${dev?} -p tcp --dport 80 -j REDIRECT --to-port 5005
+	#     iptables -A PREROUTING -t nat -i ${dev?} -p tcp --dport 80 -j REDIRECT --to-port 4040
 	# This isn’t automated because the device name may potentially be
 	# different on different machines so this needs to be done manually.
 	# This also needs to be added as a service to systemd so it’s run on
