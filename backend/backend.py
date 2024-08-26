@@ -374,5 +374,5 @@ def serve_static(path: str) -> werkzeug.wrappers.Response:
 
 if __name__ == '__main__':
     metrics.initialise(app)
-    schedule_nightly_run_check(datetime.timedelta(seconds=10))
-    app.run(debug=False, host='0.0.0.0', port=4040)
+    # schedule_nightly_run_check(datetime.timedelta(seconds=10))
+    app.run(debug=False, host='0.0.0.0', port=3000)
