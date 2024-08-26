@@ -249,7 +249,7 @@ def keep_pulling() -> None:
             try:
                 # Check for a recent successful build
                 latest_build = server.get_latest_successful_build()
-                print(latest_build)
+                # print(latest_build)
                 if False: # latest_build:
                     # If a recent build exists, use it
                     handle_build(server, BuildSpec.from_row(latest_build))
