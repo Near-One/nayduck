@@ -17,7 +17,7 @@ import psutil
 import requests
 
 REPO_URL = 'https://github.com/nearprotocol/nearcore'
-WORKDIR = pathlib.Path('/datadrive')
+WORKDIR = pathlib.Path('/tmp/datadrive')
 BUILDS_DIR = WORKDIR / 'builds'
 REPO_DIR = WORKDIR / 'nearcore'
 FUZZER_CMD_PORT = 7055
