@@ -144,7 +144,6 @@ def retry_the_run(_login: str, run_id: int) -> flask.Response:
 
 
 @app.route('/api/run/new', methods=['POST'])
-@auth.authorised
 def new_run(login: str) -> flask.Response:
     with backend_db.BackendDB() as server:
         try:
