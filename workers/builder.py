@@ -255,7 +255,8 @@ def keep_pulling() -> None:
                     if new_build:
                         handle_build(server, BuildSpec.from_row(new_build))
                 continue
-            except Exception:
+            except Exception as e:
+                print(f"Error occurred: {str(e)}", file=sys.stderr)
                 traceback.print_exc()
                 server.handle_restart()
             time.sleep(10)
