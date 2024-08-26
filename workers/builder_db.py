@@ -115,4 +115,6 @@ class BuilderDB(common_db.DB):
                  AND builds.finished > NOW() - INTERVAL '1 hour'
                  ORDER BY builds.finished DESC
                  LIMIT 1'''
-        return self._fetch_one(sql)
+        x = self._fetch_one(sql)
+        print(x)
+        return x
