@@ -29,9 +29,12 @@ class BuildSpec(typing.NamedTuple):
             return cls(build_id=build_id,
                        build_dir=utils.BUILDS_DIR / str(build_id),
                        sha=str(data['sha']),
-                       features=data['features'],
-                       is_release=bool(data['is_release']),
-                       is_expensive=bool(data['expensive']))
+                    #    features=data['features'],
+                    #    is_release=bool(data['is_release']),
+                    #    is_expensive=bool(data['expensive'])
+                        features=data.get('features', ''),
+                       is_release=bool(data.get('is_release', False)),
+                       is_expensive=False)
         else:
             build_id = int(data.build_id)
             return cls(build_id=build_id,

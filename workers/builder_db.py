@@ -108,8 +108,7 @@ class BuilderDB(common_db.DB):
 
     def get_latest_successful_build(self) -> typing.Optional[Build]:
         """Returns the latest successful build if available."""
-        sql = '''SELECT builds.*, ENCODE(runs.sha, 'hex') AS sha,
-             COALESCE(builds.expensive, FALSE) AS expensive
+        sql = '''SELECT builds.*, ENCODE(runs.sha, 'hex') AS sha
              FROM builds
              JOIN runs USING (run_id)
              WHERE builds.status = 'BUILD DONE'
