@@ -144,7 +144,8 @@ def retry_the_run(_login: str, run_id: int) -> flask.Response:
 
 
 @app.route('/api/run/new', methods=['POST'])
-def new_run(login: str) -> flask.Response:
+def new_run() -> flask.Response:
+    login = "nayduck"
     with backend_db.BackendDB() as server:
         try:
             run_id = scheduler.Request.from_json(
