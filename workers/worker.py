@@ -12,6 +12,8 @@ import tempfile
 import time
 import traceback
 import typing
+import shutil
+import glob
 
 from sqlalchemy import exc
 
@@ -411,21 +413,35 @@ def scp_build(build_id: int, builder_ip: int, test: testspec.TestSpec,
         # src = f'{builder_addr}:{utils.BUILDS_DIR}/{build_id}/{src}'
         src = f'{utils.BUILDS_DIR}/{build_id}/{src}'
         path = utils.REPO_DIR / dst
-        if not path.is_dir():
-            runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
-            utils.mkdirs(path)
-        delay = 1 + random.random()
-        for retry in range(3):
-            # if runner(('scp', '-oStrictHostKeyChecking=no',
-            #            '-oControlMaster=auto', '-oControlPath=/dev/shm/.ssh.%C',
-            #            '-oControlPersist=2', '-oBatchMode=yes', src, dst),
-            if runner(('cp', '-r', src, dst),
-                      print_cmd=('cp', '-r', src, dst),
-                      cwd=utils.REPO_DIR,
-                      check=retry == 2) == 0:
-                break
-            time.sleep(delay)
-            delay *= 2
+
+        src_path = os.path.join(utils.BUILDS_DIR, build_id, src)
+        dst_path = os.path.join(utils.REPO_DIR, dst)
+        
+        # Ensure the destination directory exists
+        os.makedirs(dst_path, exist_ok=True)
+        
+        # Use glob to expand the wildcard
+        for file in glob.glob(src_path):
+            shutil.copy2(file, dst_path)
+            print(f"Copied {file} to {dst_path}")
+
+        return None
+
+        # if not path.is_dir():
+        #     runner.log_command(('mkdir', '-p', '--', dst), cwd=utils.REPO_DIR)
+        #     utils.mkdirs(path)
+        # delay = 1 + random.random()
+        # for retry in range(3):
+        #     if runner(('scp', '-oStrictHostKeyChecking=no',
+        #                '-oControlMaster=auto', '-oControlPath=/dev/shm/.ssh.%C',
+        #                '-oControlPersist=2', '-oBatchMode=yes', src, dst),
+        #     if runner(('cp', src, dst),
+        #               print_cmd=('cp', src, dst),
+        #               cwd=utils.REPO_DIR,
+        #               check=retry == 2) == 0:
+        #         break
+        #     time.sleep(delay)
+        #     delay *= 2
 
     global _LAST_COPIED_BUILD_ID
     if _LAST_COPIED_BUILD_ID != build_id:
