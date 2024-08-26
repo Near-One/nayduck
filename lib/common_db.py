@@ -15,7 +15,7 @@ _D = typing.TypeVar('_D', bound='DB')
 
 
 def __create_engine() -> sqlalchemy.engine.Engine:
-    cfg = config.load_config('database')
+    cfg = config.load('database')
     url = sqlalchemy.engine.URL.create(**cfg)
     return sqlalchemy.create_engine(url, pool_pre_ping=True)
 
