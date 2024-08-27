@@ -133,6 +133,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
 
     cargo(
         'build',
+        '-vv',
         '-pgenesis-populate',
         '-prestaked',
         '-pnear-test-contracts',
