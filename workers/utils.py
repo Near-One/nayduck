@@ -184,7 +184,7 @@ class Runner:
             dur = format_duration(seconds=duration)
             msg = f'# command finished with exit code {ret} after {dur}\n'
             self.stderr.write(msg.encode('utf-8'))
-            if self.propagate_output:
+            if propagate_output:
                 sys.stderr.write(msg)
         if check and ret:
             raise subprocess.CalledProcessError(ret, cmd)

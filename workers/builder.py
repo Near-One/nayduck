@@ -124,7 +124,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
 
     # For tools (genesis populate, restaked and test contracts) only enable
     # 'nightly' and 'test_features' since other features might not be supported
-    # by those packages which results in 'none of the selected packages contains
+    # by those packages which results in
+    #  'none of the selected packages contains
     # these features' cargo build error
     tools_features = ['test_features']
     if "nightly" in features:
