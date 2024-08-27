@@ -128,8 +128,9 @@ def branch_history(test_id: int, branch: str) -> flask.Response:
 
 
 @app.route('/api/run/<int:run_id>/cancel', methods=['POST'])
-@auth.authorised
-def cancel_the_run(_login: str, run_id: int) -> flask.Response:
+# @auth.authorised
+def cancel_the_run(run_id: int) -> flask.Response:
+    login = "nayduck"
     with backend_db.BackendDB() as server:
         count = server.cancel_the_run(run_id)
     return jsonify(count)
