@@ -78,7 +78,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     msg = 'expensive ' if spec.is_expensive else ''
     print(f'Building {msg}target', file=sys.stderr)
 
-    def cargo(*args: typing.Union[str, Path], features: typing.List[str]) -> None:
+    def cargo(*args: typing.Union[str, Path], features: typing.List[str], propagate_output: bool = False) -> None:
         cmd = ['cargo', *args]
         if features:
             cmd.append('--features=' + ','.join(features))

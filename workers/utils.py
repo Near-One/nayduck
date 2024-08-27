@@ -117,6 +117,7 @@ class Runner:
                  check: bool = False,
                  timeout: int = 3 * 3600,
                  print_cmd: typing.Optional[_Command] = None,
+                 propagate_output: bool = False,
                  **kw: typing.Any) -> int:
         """Calls given command after printing it to standard error.
 
@@ -157,17 +158,27 @@ class Runner:
                               **kw) as proc:
             duration = time.monotonic()
             try:
-                ret = proc.wait(timeout)
+                stdout, stderr = proc.communicate(timeout=timeout)
+                ret = proc.returncode
             except subprocess.TimeoutExpired:
                 self.stderr.write(b'# Command timed out\n')
                 _kill_process_tree(proc.pid)
                 raise
             duration = time.monotonic() - duration
 
+        self.stdout.write(stdout)
+        self.stderr.write(stderr)
+        
+        if propagate_output:
+            sys.stdout.buffer.write(stdout)
+            sys.stderr.buffer.write(stderr)
+
         if ret or duration >= 30:
             dur = format_duration(seconds=duration)
-            self.stderr.write((f'# command finished with exit code {ret} '
-                               f'after {dur}\n').encode('utf-8'))
+            msg = f'# command finished with exit code {ret} after {dur}\n'
+            self.stderr.write(msg.encode('utf-8'))
+            if self.propagate_output:
+                sys.stderr.write(msg)
         if check and ret:
             raise subprocess.CalledProcessError(ret, cmd)
         return ret
