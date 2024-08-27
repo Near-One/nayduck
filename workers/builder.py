@@ -84,7 +84,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
             cmd.append('--features=' + ','.join(features))
         if spec.is_release:
             cmd.append('--release')
-        if runner(cmd, cwd=utils.REPO_DIR) != 0:
+        if runner(cmd, cwd=utils.REPO_DIR, propagate_output=propagate_output) != 0:
             raise BuildFailure()
 
     def copy(src_dir: Path, files: typing.Iterable[str], dst_dir: Path) -> None:
@@ -118,7 +118,8 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         '-pneard',
         '--bin',
         'neard',
-        features=features
+        features=features,
+        propagate_output=True,
     )
 
     # For tools (genesis populate, restaked and test contracts) only enable
@@ -135,6 +136,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         '-prestaked',
         '-pnear-test-contracts',
         features=tools_features,
+        propagate_output=True,
     )
 
     copy(src_dir=utils.REPO_DIR / 'target' / spec.build_type,
