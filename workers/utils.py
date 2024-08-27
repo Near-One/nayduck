@@ -169,12 +169,16 @@ class Runner:
             finally:
                 duration = time.monotonic() - duration
 
-        self.stdout.write(stdout)
-        self.stderr.write(stderr)
+        if stdout:
+            self.stdout.write(stdout)
+        if stderr:
+            self.stderr.write(stderr)
         
         if propagate_output:
-            sys.stdout.buffer.write(stdout)
-            sys.stderr.buffer.write(stderr)
+            if stdout:
+                sys.stdout.buffer.write(stdout)
+            if stderr:
+                sys.stderr.buffer.write(stderr)
 
         if ret or duration >= 30:
             dur = format_duration(seconds=duration)
