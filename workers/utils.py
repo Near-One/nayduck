@@ -161,10 +161,13 @@ class Runner:
                 stdout, stderr = proc.communicate(timeout=timeout)
                 ret = proc.returncode
             except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout, stderr = proc.communicate()
                 self.stderr.write(b'# Command timed out\n')
                 _kill_process_tree(proc.pid)
                 raise
-            duration = time.monotonic() - duration
+            finally:
+                duration = time.monotonic() - duration
 
         self.stdout.write(stdout)
         self.stderr.write(stderr)
