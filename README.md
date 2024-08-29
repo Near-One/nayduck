@@ -129,6 +129,7 @@ npm install
 npm run build
 ```
 
-`nayduck/debug.py` in background
-`nearcore/run.py` to launch test
-Replace `scp_build` with local recursive copy
+* Replace `scp_build` with local recursive copy
+* Run `nayduck/debug.py` in background
+* Run `nearcore/run.py` to launch test
+* See result in http://localhost:5005/.
