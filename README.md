@@ -3,7 +3,8 @@ Test Infra for Near Protocol binary https://github.com/near/nearcore
 
 # Raw notes on local setup
 
-Could be helpful for debugging.
+Could be helpful for debugging. Still some manual hacks are needed.
+TODO: improve setup using scripts from `automation/` and `systemd/` folders.
 
 nayduck/debug.py
 ```
