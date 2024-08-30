@@ -109,6 +109,18 @@ class GoogleBlobClient(BlobClient):
             blob.upload_from_file(tmp)
             return blob.public_url
 
+class LocalBlobClient(BlobClient):
+    def __init__(self, **kw: typing.Any) -> None:
+        self.base_path = kw.get('path', '/tmp/nayduck-blobs')
+        os.makedirs(self.base_path, exist_ok=True)
+
+    def _upload(self, name: str, rd: typing.BinaryIO) -> str:
+        dest_path = os.path.join(self.base_path, name)
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(dest_path, 'wb') as dest_file:
+            shutil.copyfileobj(rd, dest_file)
+        return f"file://{dest_path}"
+
 
 def __get_blob_client() -> BlobClient:
     """Initialises and returns a new blob store client.
