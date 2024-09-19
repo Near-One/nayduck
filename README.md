@@ -1,7 +1,11 @@
+
 # NayDuck
 Test Infra for Near Protocol binary https://github.com/near/nearcore
 
-# Notes on local setup.
+# Raw notes on local setup
+
+Could be helpful for debugging. Still some manual hacks are needed.
+TODO: improve setup using scripts from `automation/` and `systemd/` folders.
 
 nayduck/debug.py
 ```
@@ -41,14 +45,13 @@ nearcore/run.py
 import requests
 import json
 
-url = "http://localhost:3000/api/run/new"  # Adjust this URL if your backend is running on a different host/port
+url = "http://localhost:5005/api/run/new"  # Adjust this URL if your backend is running on a different host/port
 
 payload = {
-    # "branch": "master",  # Adjust this if you're using a different branch
-    "branch": "nayduck-debug",
-    "sha": "bf93c6a9303e445b1524f534735fd120c615aefe",
-    "title": "Run slow_chunk.py test",
-    "tests": ["pytest sanity/slow_chunk.py"],
+    "branch": "master", # Adjust this if you're using a different branch
+    "sha": "bf93c6a9303e445b1524f534735fd120c615aefe", # Select a commit hash
+    "title": "Run slow_chunk.py test", # Select a title
+    "tests": ["pytest sanity/slow_chunk.py"], # Test command
     "requester": "Manual"
 }
 
@@ -116,8 +119,8 @@ git clone https://github.com/Near-One/nayduck
 cd nayduck
 pip3 install -r requirements.txt 
 pip install psycopg2-binary
-mkdir /tmp/datadrive
-chown nayduck:nayduck /tmp/datadrive
+mkdir /datadrive
+chown nayduck:nayduck /datadrive
 
 sudo systemctl start postgresql
 PGPASSWORD=nayduck createdb -h localhost -p 5432 -U nayduck nayduck
@@ -128,5 +131,7 @@ npm install
 npm run build
 ```
 
-`nayduck/debug.py` in background
-`nearcore/run.py` to launch test
+* Replace `scp_build` with local recursive copy
+* Run `nayduck/debug.py` in background
+* Run `nearcore/run.py` to launch test
+* See result in http://localhost:5005/.
