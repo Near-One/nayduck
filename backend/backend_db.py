@@ -182,7 +182,7 @@ class BackendDB(common_db.DB):
     def get_full_test_history(self, test_name: str,
                               branch: str) -> typing.Sequence[_Dict]:
         sql = '''SELECT test_id, status, requester, title, status, started,
-                        finished, encode(sha, 'hex') AS sha
+                        tries, finished, encode(sha, 'hex') AS sha
                    FROM tests JOIN runs USING (run_id)
                   WHERE name = :name
                     AND tests.branch = :branch
@@ -224,7 +224,7 @@ class BackendDB(common_db.DB):
             run = self._to_dict(run_id)
             run_id = int(run_id.run_id)
 
-        sql = '''SELECT test_id, status, name, started, finished
+        sql = '''SELECT test_id, status, name, started, finished, tries
                    FROM tests
                   WHERE run_id = :run_id
                   ORDER BY status, started'''

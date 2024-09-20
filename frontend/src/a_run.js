@@ -278,7 +278,10 @@ function ARun (props) {
               <td>{a_test.is_release ? 'Release' : 'Dev'}</td>
               <td>{formatFeatures(a_test.features)}</td>
               <td><NavLink to={"/test/" + a_test.test_id}>{a_test.short_name}</NavLink></td>
-              <td className={statusCls}>{a_test.status}<br/>
+              <td className={statusCls}>{a_test.status}
+                {a_test.status === 'PASSED' && a_test.tries > 1 && (
+                  <small>  {a_test.tries}</small>
+                )}<br/>
               {common.renderHistory(a_test)}
               </td>
               <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
