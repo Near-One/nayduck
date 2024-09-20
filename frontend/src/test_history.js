@@ -48,7 +48,10 @@ function TestHistory (props) {
           <td>{common.branchLink(a_test)}</td>
           <td>{common.formatRequester(a_test.requester)}</td>
           <td>{common.commitNavLink('/test/' + a_test.test_id, a_test.title)}</td>
-          <td className={common.statusClassName('text', a_test.status)}>{a_test.status}</td>
+          <td className={common.statusClassName('text', a_test.status)}>{a_test.status}
+            {a_test.status === 'PASSED' && a_test.tries > 1 && (
+                  <small>  {a_test.tries}</small>
+            )}</td>
           <td>{common.allLogLinks(a_test.logs, a_test.test_id)}</td>
           <td>{timeStats.delta}</td>
           <td>{timeStats.finished}</td>
