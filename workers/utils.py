@@ -298,7 +298,8 @@ def setup_environ() -> None:
         paths.insert(0, os.fsencode(cargo_bin))
     os.environb[b'PATH'] = pathsep.join(paths)
 
-    # TODO: remove once compiler bug is fixed.
+    # TODO: remove once compiler bug is fixed:
+    # https://github.com/rust-lang/rust/issues/131564
     os.environb[b'CARGO_INCREMENTAL'] = b'0'
 
     # Configure Cargo builds to make compilation faster.  We don’t need
