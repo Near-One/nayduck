@@ -19,8 +19,8 @@ export function parseTestName(test) {
         ? ' ' + featuresArray.join(' ') + ',test_features'
         : ' --features test_features';
     const additionalBinariesFeatures = featuresArray.includes('nightly')
-        ? '--features nightly '
-        : '';
+        ? '--features test_features,nightly '
+        : '--features test_features ';
     let release = '';
     let i = 1;
     for (; /^--/.test(spec[i] || ''); ++i) {
