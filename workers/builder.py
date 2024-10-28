@@ -102,7 +102,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         features.append('adversarial')
 
     # Be sure to update the build commands in the web UI if you make any changes here!
-    # The logic is in the parseTestName file.
+    # The logic is in the parseTestName function.
 
     cargo(
         'build',
