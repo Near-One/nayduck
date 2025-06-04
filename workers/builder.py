@@ -104,13 +104,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     # Be sure to update the build commands in the web UI if you make any changes here!
     # The logic is in the parseTestName function.
 
-    cargo(
-        'build',
-        '-pneard',
-        '--bin',
-        'neard',
-        features=features
-    )
+    cargo('build', '-pneard', '--bin', 'neard', features=features)
 
     # For tools (genesis populate, restaked and test contracts) only enable
     # 'nightly' and 'test_features' since other features might not be supported
@@ -149,13 +143,11 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
             if '.' not in filename:
                 (src_dir / filename).unlink()
 
-    cargo(
-        'build',
-        '--tests',
-        '--target-dir',
-        'target_expensive',
-        features=['expensive_tests'] + tools_features
-    )
+    cargo('build',
+          '--tests',
+          '--target-dir',
+          'target_expensive',
+          features=tools_features)
 
     copy(src_dir=src_dir,
          dst_dir=spec.build_dir / 'expensive',
