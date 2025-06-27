@@ -9,11 +9,11 @@ const testStatusKeys = {
     'CHECKOUT FAILED': 2,
     'SCP FAILED': 3,
     'TIMEOUT': 4,
-    'PASSED': 5,
-    'IGNORED': 6,
-    'CANCELED': 7,
-    'RUNNING': 8,
-    'PENDING': 9,
+    'IGNORED': 5,
+    'CANCELED': 6,
+    'RUNNING': 7,
+    'PENDING': 8,
+    'PASSED': 9,
 };
 
 
