@@ -108,6 +108,13 @@ const processRun = run => {
         const bIdx = testStatusKeys[b[0]] || 10;
         return aIdx - bIdx;
     });
+
+    // Sort tests by status priority (passed tests at bottom)
+    run.tests.sort((a, b) => {
+        const aIdx = testStatusKeys[a.status] || 10;
+        const bIdx = testStatusKeys[b.status] || 10;
+        return aIdx - bIdx;
+    });
 };
 
 
@@ -223,7 +230,14 @@ function ARun (props) {
     }, [props.match.params.run_id]);
 
     const filterByAll = event => {
-        setFilteredRuns(filterTests(aRun.tests));
+        const filtered = filterTests(aRun.tests);
+        // Apply status sorting to filtered results
+        filtered.sort((a, b) => {
+            const aIdx = testStatusKeys[a.status] || 10;
+            const bIdx = testStatusKeys[b.status] || 10;
+            return aIdx - bIdx;
+        });
+        setFilteredRuns(filtered);
     }
 
     const orderByTestTime = event => {
