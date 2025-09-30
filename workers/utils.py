@@ -243,7 +243,7 @@ def checkout(sha: str, runner: Runner) -> bool:
         rmdirs(REPO_DIR)
 
     return (runner(('git', 'clone', REPO_URL), cwd=REPO_DIR.parent) == 0 and
-            runner(('git', 'fetch', 'origin', '-p', sha), cwd=REPO_DIR) == 0) and
+            runner(('git', 'fetch', 'origin', '-p', sha), cwd=REPO_DIR) == 0 and
             runner(('git', 'checkout', '-f', sha), cwd=REPO_DIR) == 0)
 
 
