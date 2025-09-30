@@ -115,6 +115,7 @@ class CommitInfo(typing.NamedTuple):
             Failure: if git command returns an error (most probably because the
                 commit does not exist).
         """
+        _run(*('git', 'fetch', 'origin', '-p', sha), cwd=repo_dir)
         cmd = ('git', 'log', '--format=%H\n%s', '-n1', sha, '--')
         sha, title = _run(*cmd, cwd=repo_dir).decode('utf-8',
                                                      'replace').splitlines()
