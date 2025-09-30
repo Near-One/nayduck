@@ -236,13 +236,14 @@ def checkout(sha: str, runner: Runner) -> bool:
             cwd=REPO_DIR)
         # yapf: disable
         if ((result.returncode == 0 or
-             runner(('git', 'remote', 'update', '-p'), cwd=REPO_DIR) == 0) and
+             runner(('git', 'fetch', 'origin', '-p', sha), cwd=REPO_DIR) == 0) and
             runner(('git', 'checkout', '-f', sha), cwd=REPO_DIR) == 0):
             return True
         # yapf: enable
         rmdirs(REPO_DIR)
 
     return (runner(('git', 'clone', REPO_URL), cwd=REPO_DIR.parent) == 0 and
+            runner(('git', 'fetch', 'origin', '-p', sha), cwd=REPO_DIR) == 0) and
             runner(('git', 'checkout', '-f', sha), cwd=REPO_DIR) == 0)
 
 
