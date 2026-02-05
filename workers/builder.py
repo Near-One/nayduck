@@ -114,6 +114,12 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     if "nightly" in features:
         tools_features.append('nightly')
 
+    # Like "nightly", "protocol_feature_spice" should be propagated to the tests
+    # build if it was requested.
+    tests_features = tools_features.copy()
+    if "protocol_feature_spice" in features:
+        tests_features.append("protocol_feature_spice")
+
     cargo(
         'build',
         '-vv',
@@ -147,7 +153,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
           '--tests',
           '--target-dir',
           'target_expensive',
-          features=tools_features)
+          features=tests_features)
 
     copy(src_dir=src_dir,
          dst_dir=spec.build_dir / 'expensive',

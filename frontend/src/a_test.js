@@ -37,7 +37,7 @@ export function parseTestName(test) {
             if (spec.length === 3) {
                 baseName = spec[2];
                 command = 'cargo test -p' + spec[0] + release + features +
-                    ',expensive_tests -- --exact --nocapture ' + spec[2];
+                    ' -- --exact --nocapture ' + spec[2];
                 command = <code>{command}</code>;
             }
             break;
