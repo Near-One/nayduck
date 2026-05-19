@@ -34,7 +34,11 @@ class BuildSpec(typing.NamedTuple):
 
     @property
     def build_type(self) -> str:
-        return ('debug', 'release')[self.is_release]
+        # Non-release builds use the `dev-release` cargo profile (release-style
+        # optimisations, no LTO, debug-assertions on) so expensive tests run
+        # noticeably faster than under the default `dev` profile.  Cargo writes
+        # the artefacts to `target/dev-release/` accordingly.
+        return 'release' if self.is_release else 'dev-release'
 
     def __str__(self) -> str:
         ret = f'Build #{self.build_id}: sha={self.sha}'
@@ -70,8 +74,7 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         cmd = ['cargo', *args]
         if features:
             cmd.append('--features=' + ','.join(features))
-        if spec.is_release:
-            cmd.append('--release')
+        cmd.append('--release' if spec.is_release else '--profile=dev-release')
         if runner(cmd, cwd=utils.REPO_DIR) != 0:
             raise BuildFailure()
 
