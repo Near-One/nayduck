@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+import types
 import typing
 
 import pytz
@@ -233,21 +234,52 @@ def schedule_nightly_run() -> datetime.timedelta:
     """Schedules a new nightly run if last one was over 24 hours ago."""
     with backend_db.BackendDB() as server:
         try:
-            _handle_stale_tests(server)
             return _schedule_nightly_impl(server)
         except Exception:
             traceback.print_exc()
             return datetime.timedelta(hours=1)
 
 
+# How often to look for stale tests.  Worker VMs can disappear mid-test (e.g.
+# on autoscaler scale-in) leaving their tests in RUNNING state forever, so this
+# needs to run much more often than the nightly check.
+STALE_TESTS_CHECK_INTERVAL = datetime.timedelta(minutes=5)
+
+# Extra time on top of a test’s timeout before it’s considered stale.  Covers
+# the time a live worker spends between claiming a test and starting it
+# (checkout, scp of the build, pip install) and between the timeout firing and
+# reporting the status (killing the process tree).
+_STALE_TEST_GRACE = datetime.timedelta(minutes=15)
+
+
+def clear_stale_tests() -> None:
+    """Resets tests stuck in RUNNING state for too long back to PENDING."""
+    with backend_db.BackendDB() as server:
+        try:
+            _handle_stale_tests(server)
+        except Exception:
+            traceback.print_exc()
+
+
+def _get_full_timeout(test: dict[str, typing.Any]) -> int:
+    """Returns test’s timeout including provisions for remote tests."""
+    try:
+        return testspec.TestSpec.from_row(
+            typing.cast(testspec.TestDBRow,
+                        types.SimpleNamespace(**test))).full_timeout
+    except ValueError:
+        return int(test['timeout'])
+
+
 def _handle_stale_tests(server: backend_db.BackendDB) -> None:
     stale_tests = []
     running_tests = server.get_tests_by_status('RUNNING')
+    now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
 
     for test in running_tests:
         # check if test is in RUNNING state for longer than timeout allows
-        if test['started'] < datetime.datetime.utcnow().replace(
-                tzinfo=pytz.UTC) - datetime.timedelta(seconds=test['timeout']):
+        timeout = datetime.timedelta(seconds=_get_full_timeout(test))
+        if test['started'] < now - timeout - _STALE_TEST_GRACE:
             stale_tests.append(test['test_id'])
 
     if stale_tests:

@@ -178,6 +178,16 @@ def schedule_nightly_run_check(delta: datetime.timedelta) -> None:
                   run_date=(datetime.datetime.now() + delta))
 
 
+def schedule_stale_tests_check() -> None:
+    sched.add_job(func=scheduler.clear_stale_tests,
+                  trigger='interval',
+                  id='stale_tests_check',
+                  seconds=int(
+                      scheduler.STALE_TESTS_CHECK_INTERVAL.total_seconds()),
+                  coalesce=True,
+                  max_instances=1)
+
+
 @app.route('/api/nightly-events', methods=['GET'])
 def get_nightly_events() -> flask.Response:  # pylint: disable=too-many-locals
     with backend_db.BackendDB() as server:
@@ -375,4 +385,5 @@ def serve_static(path: str) -> werkzeug.wrappers.Response:
 if __name__ == '__main__':
     metrics.initialise(app)
     schedule_nightly_run_check(datetime.timedelta(seconds=10))
+    schedule_stale_tests_check()
     app.run(debug=False, host='0.0.0.0', port=5005)
