@@ -183,7 +183,8 @@ CREATE TABLE public.tests (
     timeout integer DEFAULT 180 NOT NULL,
     skip_build boolean DEFAULT false NOT NULL,
     tries integer DEFAULT 0 NOT NULL,
-    worker_hostname character varying
+    worker_hostname character varying,
+    expected_duration integer DEFAULT 0 NOT NULL
 );
 
 
@@ -304,6 +305,13 @@ CREATE INDEX tests_build_id_status_idx ON public.tests USING btree (build_id, st
 --
 
 CREATE INDEX tests_name_finished_status_idx ON public.tests USING btree (name, finished, status) WHERE (is_nightly AND (finished IS NOT NULL) AND (status <> ALL (ARRAY['PENDING'::public.test_status, 'RUNNING'::public.test_status])));
+
+
+--
+-- Name: tests_name_finished_idx; Type: INDEX; Schema: public; Owner: nayduck
+--
+
+CREATE INDEX tests_name_finished_idx ON public.tests USING btree (name, finished) WHERE ((NOT is_nightly) AND (status = 'PASSED'::public.test_status));
 
 
 --

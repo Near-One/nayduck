@@ -29,15 +29,20 @@ class WorkerDB(common_db.DB):
         self.hostname = worker_hostname
 
     def get_pending_test(self) -> typing.Optional[Test]:
-        """Returns a pending test to process or None if none found."""
+        """Returns a pending test to process or None if none found.
+
+        Older runs go first and within a run the longest tests go first, so
+        that a long test doesn’t start at the tail of a run and extend it.
+        """
         sql = '''SELECT test_id
                    FROM tests
                    JOIN builds USING (build_id)
                   WHERE tests.status = 'PENDING'
                     AND (skip_build OR
                          (builds.status = 'BUILD DONE' AND builder_ip != 0))
-                  ORDER BY low_priority
-                  LIMIT 1'''
+                  ORDER BY low_priority, tests.run_id, expected_duration DESC
+                  LIMIT 1
+                    FOR UPDATE OF tests SKIP LOCKED'''
         sql = f'''UPDATE tests
                      SET started = NOW(),
                          finished = NULL,
