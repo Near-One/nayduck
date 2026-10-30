@@ -424,8 +424,8 @@ class BackendDB(common_db.DB):
 
         return run_id
 
-    def get_tests_by_status(self, status) -> typing.Optional[_Dict]:
-        sql = '''SELECT test_id, status, name, started, timeout
+    def get_tests_by_status(self, status: str) -> typing.Sequence[_Dict]:
+        sql = '''SELECT test_id, status, name, started, timeout, skip_build
                    FROM tests
                   WHERE status = :status
                   ORDER BY status'''
