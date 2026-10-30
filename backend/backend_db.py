@@ -414,15 +414,46 @@ class BackendDB(common_db.DB):
             returning=('build_id', 'is_release', 'features'))
 
         # Into Tests
+        durations = self.__get_expected_durations(
+            set(test.short_name for tests in builds.values() for test in tests))
         columns = ('run_id', 'build_id', 'name', 'category', 'timeout',
-                   'skip_build', 'branch', 'is_nightly')
+                   'skip_build', 'branch', 'is_nightly', 'expected_duration')
         new_rows = sorted((run_id, build_id, test.short_name, test.category,
-                           test.timeout, test.skip_build, branch, is_nightly)
+                           test.timeout, test.skip_build, branch, is_nightly,
+                           durations.get(test.short_name, test.timeout))
                           for build_id, is_release, features in rows
                           for test in builds[(is_release, features)])
         self._multi_insert('tests', columns, new_rows)
 
         return run_id
+
+    def __get_expected_durations(
+            self, names: typing.Collection[str]) -> dict[str, int]:
+        """Returns expected duration in seconds of each of the given tests.
+
+        The estimate is the median duration of the test’s passing non-nightly
+        (i.e. CI and manually requested) runs from the last two weeks.  Workers
+        pick the longest tests first so that they don’t end up starting at the
+        tail of a run and extend it.  Tests with no recent history are missing
+        from the result.
+        """
+        if not names:
+            return {}
+        sql = '''SELECT name,
+                        PERCENTILE_CONT(0.5) WITHIN GROUP (
+                            ORDER BY EXTRACT(EPOCH FROM finished - started)
+                        ) AS duration
+                   FROM tests
+                  WHERE NOT is_nightly
+                    AND status = 'PASSED'
+                    AND finished > NOW() - INTERVAL '14 days'
+                    AND name = ANY(:names)
+                  GROUP BY name'''
+        return {
+            row.name: int(row.duration)
+            for row in self._exec(sql, names=list(names))
+            if row.duration is not None
+        }
 
     def get_tests_by_status(self, status: str) -> typing.Sequence[_Dict]:
         sql = '''SELECT test_id, status, name, started, timeout, skip_build
