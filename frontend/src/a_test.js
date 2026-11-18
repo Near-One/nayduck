@@ -21,11 +21,12 @@ export function parseTestName(test) {
     const additionalBinariesFeatures = featuresArray.includes('nightly')
         ? '--features test_features,nightly '
         : '--features test_features ';
-    let release = '';
+    // Mirror workers/builder.py: non-release builds run with --profile=dev-release.
+    let buildProfile = ' --profile=dev-release';
     let i = 1;
     for (; /^--/.test(spec[i] || ''); ++i) {
         if (spec[i] === '--release') {
-            release = ' --release';
+            buildProfile = ' --release';
         }
     }
     spec.splice(0, i);
@@ -36,7 +37,7 @@ export function parseTestName(test) {
         case 'expensive':
             if (spec.length === 3) {
                 baseName = spec[2];
-                command = 'cargo test -p' + spec[0] + release + features +
+                command = 'cargo test -p' + spec[0] + buildProfile + features +
                     ' -- --exact --nocapture ' + spec[2];
                 command = <code>{command}</code>;
             }
@@ -46,8 +47,8 @@ export function parseTestName(test) {
             baseName = spec[0] === 'fuzz.py' ? spec.slice(1, 3).join(' ') : spec[0];
             command = 'python3 pytest/tests/' + spec.join(' ');
             command = test.skip_build ? <code>{command}</code> : <code>
-                <small>cargo build {release} -pneard {features},rosetta_rpc &amp;&amp;</small><br />
-                <small>cargo build {release} -pgenesis-populate -prestaked -pnear-test-contracts {additionalBinariesFeatures}&amp;&amp;</small><br />
+                <small>cargo build {buildProfile} -pneard {features},rosetta_rpc &amp;&amp;</small><br />
+                <small>cargo build {buildProfile} -pgenesis-populate -prestaked -pnear-test-contracts {additionalBinariesFeatures}&amp;&amp;</small><br />
                 {command}
             </code>;
             break;

@@ -36,7 +36,7 @@ function Build (props) {
     };
 
     const buildType = (() => {
-        const type = BuildInfo.is_release ? 'Release' : 'Dev';
+        const type = BuildInfo.is_release ? 'Release' : 'Dev-release';
         const features = BuildInfo.features;
         if (!features) {
             return type;
@@ -44,7 +44,7 @@ function Build (props) {
         return type + ' --features=' + features;
     })();
 
-    common.useTitle((BuildInfo.is_release ? 'Release' : 'Dev') + ' build #' +
+    common.useTitle((BuildInfo.is_release ? 'Release' : 'Dev-release') + ' build #' +
                     props.match.params.build_id);
     return <>
       {common.renderBreadCrumbs({runId: BuildInfo.run_id})}
