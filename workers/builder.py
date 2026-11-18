@@ -51,6 +51,55 @@ class BuildFailure(RuntimeError):
     pass
 
 
+def _is_executable(path: Path) -> bool:
+    try:
+        attrs = path.stat()
+    except OSError:
+        return False
+    return bool(stat.S_ISREG(attrs.st_mode) and attrs.st_mode & 0o100)
+
+
+def find_test_executables(profile_dir: Path) -> typing.List[Path]:
+    """Returns test executables which cargo built in given profile directory.
+
+    Cargo names test executables `<name>-<hash>` but where it puts them depends
+    on its version.  Older versions (e.g. 1.95) put all of them directly in the
+    `deps` directory.  Newer versions (e.g. 1.100) put each of them in its own
+    `build/<package>/<hash>/out` directory.  The repository may be checked out
+    at commits using either so both layouts are handled.
+
+    Args:
+        profile_dir: A profile subdirectory of a cargo target directory, e.g.
+            `target_expensive/debug`.
+    Returns:
+        Paths of all the test executables found in the directory.
+    """
+    found = []
+
+    for path in profile_dir.glob('deps/*'):
+        if '.' in path.name:
+            continue
+        if not _is_executable(path):
+            continue
+        found.append(path)
+
+    # The `out` directory is also where build scripts and their outputs as
+    # well as binaries are stored.  Unlike test executables, none of them are
+    # named after the hash of the directory.
+    for path in profile_dir.glob('build/*/*/out/*'):
+        name = path.name
+        dir_hash = path.parent.parent.name
+        if '.' in name:
+            continue
+        if not name.endswith('-' + dir_hash):
+            continue
+        if not _is_executable(path):
+            continue
+        found.append(path)
+
+    return sorted(found)
+
+
 def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
     """Builds and copies artefacts to the build output directory.
 
@@ -79,15 +128,6 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
         utils.mkdirs(dst_dir)
         for filename in files:
             os.link(src_dir / filename, dst_dir / filename)
-
-    def is_test_executable(src_dir: Path, name: str) -> bool:
-        if '.' in name:
-            return False
-        try:
-            attrs = (src_dir / name).stat()
-        except OSError:
-            return False
-        return bool(stat.S_ISREG(attrs.st_mode) and attrs.st_mode & 0o100)
 
     utils.rmdirs(spec.build_dir)
 
@@ -143,11 +183,9 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
 
     # Make sure there are no left overs from previous builds.  Don't delete
     # the entire directory so we can benefit from incremental building.
-    src_dir = utils.REPO_DIR / 'target_expensive' / spec.build_type / 'deps'
-    if src_dir.exists():
-        for filename in os.listdir(src_dir):
-            if '.' not in filename:
-                (src_dir / filename).unlink()
+    profile_dir = utils.REPO_DIR / 'target_expensive' / spec.build_type
+    for path in find_test_executables(profile_dir):
+        path.unlink()
 
     cargo('build',
           '--tests',
@@ -155,12 +193,16 @@ def build_target(spec: BuildSpec, runner: utils.Runner) -> None:
           'target_expensive',
           features=tests_features)
 
-    copy(src_dir=src_dir,
-         dst_dir=spec.build_dir / 'expensive',
-         files=[
-             name for name in os.listdir(src_dir)
-             if is_test_executable(src_dir, name)
-         ])
+    executables = find_test_executables(profile_dir)
+    if not executables:
+        msg = f'No test executables found in {profile_dir}\n'
+        sys.stderr.write(msg)
+        runner.stderr.write(msg.encode('utf-8'))
+        raise BuildFailure()
+    dst_dir = spec.build_dir / 'expensive'
+    utils.mkdirs(dst_dir)
+    for path in executables:
+        os.link(path, dst_dir / path.name)
 
 
 def wait_for_free_space(server: builder_db.BuilderDB) -> None:
