@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import os
 import pathlib
@@ -6,6 +7,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import traceback
 import types
 import typing
@@ -50,8 +52,25 @@ def _run(*cmd: typing.Union[str, pathlib.Path],
                       f'{ex.returncode}:\n{stderr}') from ex
 
 
+# Serialises access to the local clone of the nearcore repository.  The
+# backend handles requests in threads and a merge queue submits several runs
+# within seconds of each other.  Concurrent ‘git remote update’ invocations
+# in a single repository fail with ‘cannot lock ref’ errors and _update_repo
+# reacts to a failure by deleting the repository and cloning it anew.  Without
+# the lock, that pulls the repository from under git commands of all the other
+# requests (failing them) and makes following requests wait for a full clone.
+#
+# Use _updated_repo to get to the repository rather than taking the lock
+# directly.  Note that this works only as long as the backend is a single
+# process.
+_REPO_LOCK = threading.Lock()
+
+
 def _update_repo() -> pathlib.Path:
     """Fetches the latest code from nearcore repository and returns path to it.
+
+    Do not call directly; use _updated_repo instead which makes sure no other
+    thread is using the repository at the same time.
 
     The command clones the nearcore repository to ~/nearcore.git directory and
     returns path to it (i.e. Path representing ~/nearcore.git).  If the
@@ -100,6 +119,20 @@ def _update_repo() -> pathlib.Path:
     return repo_dir
 
 
+@contextlib.contextmanager
+def _updated_repo() -> typing.Iterator[pathlib.Path]:
+    """Yields path to an up-to-date local clone of the nearcore repository.
+
+    The caller has exclusive access to the repository within the `with` block
+    and must not use the path once the block is left.
+
+    Raises:
+        Failure: if cloning of the remote repository fails.
+    """
+    with _REPO_LOCK:
+        yield _update_repo()
+
+
 class CommitInfo(typing.NamedTuple):
     sha: str
     title: str
@@ -110,7 +143,7 @@ class CommitInfo(typing.NamedTuple):
 
         Args:
             repo_dir: Directory where the repository is located.  Can be
-                obtained from _update_repo function.
+                obtained from _updated_repo function.
             sha: A commit reference to retrieve information about.
         Raises:
             Failure: if git command returns an error (most probably because the
@@ -184,7 +217,9 @@ class Request(typing.NamedTuple):
         Raises:
             Failure: on any kind of error.
         """
-        commit = commit or CommitInfo.for_commit(_update_repo(), self.sha)
+        if commit is None:
+            with _updated_repo() as repo_dir:
+                commit = CommitInfo.for_commit(repo_dir, self.sha)
         return server.schedule_a_run(branch=self.branch,
                                      sha=commit.sha,
                                      title=commit.title,
@@ -344,16 +379,17 @@ def _schedule_nightly_impl(server: backend_db.BackendDB) -> datetime.timedelta:
         if not need_new_run:
             return datetime.timedelta(hours=24) - delta
 
-        repo_dir = _update_repo()
+    with _updated_repo() as repo_dir:
         commit = CommitInfo.for_commit(repo_dir, 'master')
-        need_new_run = last.sha != commit.sha
-        print(f'master sha={commit.sha}' +
-              ('' if need_new_run else '; no need for a new run'),
-              file=sys.stderr)
-        if not need_new_run:
-            return datetime.timedelta(hours=1)
+        if last:
+            need_new_run = last.sha != commit.sha
+            print(f'master sha={commit.sha}' +
+                  ('' if need_new_run else '; no need for a new run'),
+                  file=sys.stderr)
+            if not need_new_run:
+                return datetime.timedelta(hours=1)
+        tests = _read_tests(repo_dir, commit.sha)
 
-    tests = _read_tests(repo_dir, commit.sha)
     req = Request(branch='master',
                   sha=commit.sha,
                   requester='NayDuck',
