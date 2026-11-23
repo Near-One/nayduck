@@ -271,8 +271,8 @@ def handle_build(server: builder_db.BuilderDB, spec: BuildSpec) -> None:
 
 def keep_pulling() -> None:
     ipv4, ip_str = utils.get_ip()
-    print(f'Starting builder @ {socket.gethostname()} ({ip_str} / {ipv4})',
-          file=sys.stderr)
+    hostname = socket.gethostname().split('.')[0]
+    print(f'Starting builder @ {hostname} ({ip_str} / {ipv4})', file=sys.stderr)
 
     with builder_db.BuilderDB(ipv4) as server:
         server.handle_restart()

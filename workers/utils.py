@@ -11,16 +11,13 @@ import tempfile
 import time
 import traceback
 import typing
-import types
 
 import psutil
-import requests
 
 REPO_URL = 'https://github.com/nearprotocol/nearcore'
 WORKDIR = pathlib.Path('/datadrive')
 BUILDS_DIR = WORKDIR / 'builds'
 REPO_DIR = WORKDIR / 'nearcore'
-FUZZER_CMD_PORT = 7055
 
 
 def mkdirs(*paths: pathlib.Path) -> None:
@@ -316,49 +313,3 @@ def setup_environ() -> None:
     os.environb[b'NIGHTLY_RUNNER'] = b'1'
 
     os.environb.pop(b'NEAR_PYTEST_CONFIG', None)
-
-
-class PausedFuzzers:
-    """A context manager which pauses fuzzer running on the host.
-
-    NayDuck workers share their hosts with fuzzers which consume all the CPU
-    they can get.  To make performance of tests more consistent we pause the
-    fuzzers while worker is running a test and run them only when worker is
-    idling (which is most of the time).
-
-    This object is used as a context manager.  On entry the fuzzer is paused; on
-    exit it’s resumed.
-
-    If the fuzzer is not detected on the machine, this is a no-op.  Detection of
-    running fuzzer is by checking whether nayduck-fuzzer systemd service is
-    active.
-    """
-
-    SERVICE = 'nayduck-fuzzer.service'
-
-    @classmethod
-    def _perform_action(cls, action: str) -> None:
-        """Perform an action (pause or resume) without risking an exception."""
-        cmd = ('systemctl', 'is-active', '--quiet', cls.SERVICE)
-        if subprocess.call(cmd) != 0:
-            print(f'{cls.SERVICE} not active, won’t {action} it',
-                  file=sys.stderr)
-            return
-
-        last_exception = None
-        for num in range(3):
-            url = f'http://127.0.0.1:{FUZZER_CMD_PORT}/{action}'
-            try:
-                requests.get(url)
-                return
-            except requests.exceptions.RequestException as ex:
-                last_exception = ex
-                time.sleep(1.5**num)
-        print(f'Failed to {action} fuzzers: {last_exception}', file=sys.stderr)
-
-    def __enter__(self) -> None:
-        self._perform_action('pause')
-
-    def __exit__(self, exc_type: type[BaseException], exc_value: BaseException,
-                 exc_tb: types.TracebackType) -> None:
-        self._perform_action('resume')

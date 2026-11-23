@@ -52,7 +52,6 @@ if ! [ -d "$dir/home" ]; then
 		set -eux
 		curl https://sh.rustup.rs -sSf | sh -s -- -y
 		"$CARGO_HOME/bin/rustup" target add wasm32-unknown-unknown
-		"$CARGO_HOME/bin/cargo" install cargo-fuzz
 	'
 	cat >>"$dir/home/cargo/env" <<EOF
 CARGO_HOME='$dir/home/cargo'

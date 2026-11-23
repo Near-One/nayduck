@@ -111,7 +111,7 @@ fi
 
 case $type in
 frontend) services=ui                        ;;
-worker)   services='local-ssd worker fuzzer' ;;
+worker)   services='local-ssd worker' ;;
 *)        services=$type
 esac
 for service in $services; do
