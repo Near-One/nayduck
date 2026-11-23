@@ -162,8 +162,7 @@ def execute_test_command(test: testspec.TestSpec, envb: _EnvB, timeout: int,
     envb[b'NAYDUCK_TIMEOUT'] = str(timeout).encode('ascii')
     try:
         cwd, cmd = get_test_command(test)
-        with utils.PausedFuzzers():
-            ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
+        ret = runner(cmd, cwd=cwd, timeout=timeout, env=envb)
     except subprocess.TimeoutExpired:
         return 'TIMEOUT'
     try:
@@ -546,7 +545,8 @@ def __handle_test(server: worker_db.WorkerDB, outdir: pathlib.Path,
 
 def main() -> None:
     ipv4, ip_str = utils.get_ip()
-    worker_host = socket.gethostname()
+    # Short name: on newer Ubuntu GCE images gethostname() returns the FQDN.
+    worker_host = socket.gethostname().split('.')[0]
     print(f'Starting worker @ {worker_host} ({ip_str} / {ipv4})',
           file=sys.stderr)
     with worker_db.WorkerDB(ipv4, worker_host) as server:
