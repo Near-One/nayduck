@@ -19,7 +19,7 @@ def __create_engine() -> sqlalchemy.engine.Engine:
     cfg.setdefault('database', 'nayduck')
     cfg.setdefault('username', 'nayduck')
     cfg.setdefault('query', {}).update({'client_encoding': 'utf8'})
-    url = sqlalchemy.engine.URL.create('postgresql', **cfg)
+    url = sqlalchemy.engine.URL.create('postgresql+psycopg2', **cfg)
     return sqlalchemy.create_engine(url,
                                     future=True,
                                     pool_size=1,
