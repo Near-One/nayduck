@@ -66,8 +66,10 @@ def _github(token: str, path: str) -> typing.Any:
         A JSON response sent by GitHub.
     Raises:
         GitHubUnavailable: if GitHub could not be reached, did not respond in
-            time, responded with a 5xx status or with a malformed body.
-        GitHubRejected: if GitHub responded with any other non-200 status.
+            time, responded with a 5xx status or with a 200 status and
+            a malformed body.
+        GitHubRejected: if GitHub responded with any other non-200 status,
+            whatever the body.
     """
     headers = {
         'accept': 'application/vnd.github.v3+json',
@@ -84,8 +86,9 @@ def _github(token: str, path: str) -> typing.Any:
     try:
         data = res.json()
     except ValueError as ex:
-        raise GitHubUnavailable(
-            f'HTTP {res.status_code} with malformed body') from ex
+        if res.status_code != 200:
+            raise GitHubRejected(f'HTTP {res.status_code}') from ex
+        raise GitHubUnavailable('HTTP 200 with malformed body') from ex
     if res.status_code != 200:
         message = data.get('message') if isinstance(data, dict) else None
         raise GitHubRejected(f'HTTP {res.status_code}: {message}')

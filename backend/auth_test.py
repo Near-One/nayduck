@@ -38,6 +38,10 @@ _RATE_LIMITED = (403, {'message': 'API rate limit exceeded'})
 _SERVER_ERROR = (502, {'message': 'Server Error'})
 _UNEXPECTED = (200, {'message': 'not a list'})
 _TIMEOUT = requests.Timeout()
+# Stands for a body which is not JSON.
+_MALFORMED = ValueError('malformed JSON')
+_REJECTED_NO_BODY = [(401, _MALFORMED), (403, _MALFORMED)]
+_OK_NO_BODY = (200, _MALFORMED)
 
 
 def _code(is_authorised: bool, age: int) -> auth.AuthCode:
@@ -61,7 +65,10 @@ def _github(answer: typing.Any) -> typing.Any:
                                           side_effect=answer)
     status_code, body = answer
     response = unittest.mock.Mock(status_code=status_code)
-    response.json.return_value = body
+    if isinstance(body, Exception):
+        response.json.side_effect = body
+    else:
+        response.json.return_value = body
     return unittest.mock.patch.object(auth.requests,
                                       'get',
                                       return_value=response)
@@ -105,6 +112,8 @@ def _request(code: auth.AuthCode) -> tuple[int, bool, typing.Optional[str]]:
     ((200, []), False),
     (_BAD_CREDENTIALS, False),
     (_RATE_LIMITED, False),
+    (_REJECTED_NO_BODY[0], False),
+    (_REJECTED_NO_BODY[1], False),
 ])
 def test_verify_organisations(answer: typing.Any, want: bool) -> None:
     with _github(answer) as get:
@@ -112,10 +121,10 @@ def test_verify_organisations(answer: typing.Any, want: bool) -> None:
     assert get.call_args.kwargs['timeout'] == auth._GITHUB_TIMEOUT
 
 
-@pytest.mark.parametrize(
-    'answer',
-    [_SERVER_ERROR, _UNEXPECTED, _TIMEOUT,
-     requests.ConnectionError()])
+@pytest.mark.parametrize('answer', [
+    _SERVER_ERROR, _UNEXPECTED, _OK_NO_BODY, _TIMEOUT,
+    requests.ConnectionError()
+])
 def test_verify_organisations_unavailable(answer: typing.Any) -> None:
     with _github(answer), pytest.raises(auth.GitHubUnavailable):
         auth._verify_organisations('user', 'gho_token')
@@ -140,8 +149,9 @@ def test_stale_code_of_a_member(was_authorised: bool) -> None:
     get.assert_not_called()
 
 
-@pytest.mark.parametrize('answer',
-                         [_NOT_MEMBER, _BAD_CREDENTIALS, _RATE_LIMITED])
+@pytest.mark.parametrize(
+    'answer',
+    [_NOT_MEMBER, _BAD_CREDENTIALS, _RATE_LIMITED, *_REJECTED_NO_BODY])
 @pytest.mark.parametrize('was_authorised', [True, False])
 def test_stale_code_of_a_non_member(answer: typing.Any,
                                     was_authorised: bool) -> None:
@@ -150,10 +160,10 @@ def test_stale_code_of_a_non_member(answer: typing.Any,
     assert (401, False, None) == got
 
 
-@pytest.mark.parametrize(
-    'answer',
-    [_SERVER_ERROR, _UNEXPECTED, _TIMEOUT,
-     requests.ConnectionError()])
+@pytest.mark.parametrize('answer', [
+    _SERVER_ERROR, _UNEXPECTED, _OK_NO_BODY, _TIMEOUT,
+    requests.ConnectionError()
+])
 def test_github_unavailable_keeps_last_result(answer: typing.Any) -> None:
     with _github(answer):
         # No cookie: the code is not refreshed so the next request checks
