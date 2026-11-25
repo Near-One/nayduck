@@ -52,26 +52,34 @@ def _code(is_authorised: bool, age: int) -> auth.AuthCode:
                          token='gho_token')
 
 
-def _github(answer: typing.Any) -> typing.Any:
-    """Patches the GitHub API call to give the specified answer.
-
-    Args:
-        answer: Either a (status code, JSON body) tuple to respond with or an
-            exception to raise.
-    """
+def _response(answer: typing.Any) -> typing.Any:
+    """Returns what a GitHub API call gives for the specified answer."""
     if isinstance(answer, Exception):
-        return unittest.mock.patch.object(auth.requests,
-                                          'get',
-                                          side_effect=answer)
+        return answer
     status_code, body = answer
     response = unittest.mock.Mock(status_code=status_code)
     if isinstance(body, Exception):
         response.json.side_effect = body
     else:
         response.json.return_value = body
-    return unittest.mock.patch.object(auth.requests,
-                                      'get',
-                                      return_value=response)
+    return response
+
+
+def _github(*answers: typing.Any) -> typing.Any:
+    """Patches the GitHub API call to give the specified answers.
+
+    Args:
+        answers: Answers to consecutive calls.  Each is either a (status
+            code, JSON body) tuple to respond with or an exception to raise.
+            If there is just one, it is the answer to every call.
+    """
+    responses = [_response(answer) for answer in answers]
+    get = unittest.mock.Mock(side_effect=responses)
+    if len(responses) == 1 and isinstance(responses[0], Exception):
+        get = unittest.mock.Mock(side_effect=responses[0])
+    elif len(responses) == 1:
+        get = unittest.mock.Mock(return_value=responses[0])
+    return unittest.mock.patch.object(auth.requests, 'get', get)
 
 
 def _request(code: auth.AuthCode) -> tuple[int, bool, typing.Optional[str]]:
@@ -128,6 +136,46 @@ def test_verify_organisations(answer: typing.Any, want: bool) -> None:
 def test_verify_organisations_unavailable(answer: typing.Any) -> None:
     with _github(answer), pytest.raises(auth.GitHubUnavailable):
         auth._verify_organisations('user', 'gho_token')
+
+
+def _page_of(*last: str) -> tuple[int, list[dict[str, str]]]:
+    """Returns a full page of organisations ending with the given ones."""
+    count = auth._ORGANISATIONS_PER_PAGE - len(last)
+    logins = [f'other-{i}' for i in range(count)] + list(last)
+    return 200, [{'login': login} for login in logins]
+
+
+def _pages_requested(get: typing.Any) -> list[str]:
+    return [call.args[0].split('?')[1] for call in get.call_args_list]
+
+
+def test_verify_organisations_reads_further_pages() -> None:
+    with _github(_page_of(), _page_of(), _MEMBER) as get:
+        assert auth._verify_organisations('user', 'gho_token')
+    assert _pages_requested(get) == [
+        'per_page=100&page=1', 'per_page=100&page=2', 'per_page=100&page=3'
+    ]
+
+    # The last page may be empty if the count is a multiple of the page size.
+    for last_page in (_NOT_MEMBER, (200, [])):
+        with _github(_page_of(), last_page) as get:
+            assert not auth._verify_organisations('user', 'gho_token')
+        assert len(get.call_args_list) == 2
+
+
+def test_verify_organisations_stops_at_a_match() -> None:
+    with _github(_page_of('near'), _TIMEOUT) as get:
+        assert auth._verify_organisations('user', 'gho_token')
+    assert _pages_requested(get) == ['per_page=100&page=1']
+
+
+def test_verify_organisations_failure_on_a_further_page() -> None:
+    with _github(_page_of(), _BAD_CREDENTIALS):
+        assert not auth._verify_organisations('user', 'gho_token')
+    for answer in (_SERVER_ERROR, _UNEXPECTED, _TIMEOUT):
+        with _github(_page_of(), answer), \
+             pytest.raises(auth.GitHubUnavailable):
+            auth._verify_organisations('user', 'gho_token')
 
 
 def test_fresh_code_is_not_rechecked() -> None:

@@ -31,6 +31,10 @@ __CLIENT_SECRET = __CONFIG.take('github-client-secret', str)
 # Organisations whose members are allowed to schedule, cancel and retry runs.
 _ORGANISATIONS = ('near', 'nearprotocol')
 
+# Number of organisations to request from GitHub at a time.  100 is the most
+# GitHub allows.
+_ORGANISATIONS_PER_PAGE = 100
+
 # Timeout, in seconds, of a single request to GitHub.  The requests are made
 # while handling a request from the user so they must not hang.
 _GITHUB_TIMEOUT = 10
@@ -95,6 +99,34 @@ def _github(token: str, path: str) -> typing.Any:
     return data
 
 
+def _list_organisations(token: str) -> typing.Iterator[str]:
+    """Yields logins of all the organisations the user is a member of.
+
+    Reads the list page by page so the caller can stop reading as soon as it
+    finds what it looks for.
+
+    Args:
+        token: GitHub authorisation token.
+    Raises:
+        GitHubUnavailable: if GitHub gave no usable answer.  See _github.
+        GitHubRejected: if GitHub refused the request.  See _github.
+    """
+    page = 1
+    while True:
+        path = f'/user/orgs?per_page={_ORGANISATIONS_PER_PAGE}&page={page}'
+        orgs = _github(token, path)
+        if not isinstance(orgs, list):
+            raise GitHubUnavailable('unexpected response')
+        for org in orgs:
+            if not isinstance(org, dict) or not isinstance(
+                    org.get('login'), str):
+                raise GitHubUnavailable('unexpected response')
+            yield org['login']
+        if len(orgs) < _ORGANISATIONS_PER_PAGE:
+            return
+        page += 1
+
+
 def _verify_organisations(login: str, token: str) -> bool:
     """Verifies that user authorised with given token is in required org.
 
@@ -107,22 +139,20 @@ def _verify_organisations(login: str, token: str) -> bool:
     Raises:
         GitHubUnavailable: if GitHub gave no usable answer.  See _github.
     """
+    count = 0
     try:
-        orgs = _github(token, '/user/orgs?per_page=100')
+        for org in _list_organisations(token):
+            if org in _ORGANISATIONS:
+                _log(f'{login}: authorised; member of {org}')
+                return True
+            count += 1
     except GitHubRejected as ex:
         _log(f'{login}: not authorised; GitHub refused the token ({ex})')
         return False
     except GitHubUnavailable as ex:
         _log(f'{login}: membership unknown; GitHub unavailable ({ex})')
         raise
-    if not isinstance(orgs, list):
-        _log(f'{login}: membership unknown; unexpected response from GitHub')
-        raise GitHubUnavailable('unexpected response')
-    for org in orgs:
-        if isinstance(org, dict) and org.get('login') in _ORGANISATIONS:
-            _log(f'{login}: authorised; member of {org["login"]}')
-            return True
-    _log(f'{login}: not authorised; none of the {len(orgs)} organisations '
+    _log(f'{login}: not authorised; none of the {count} organisations '
          'GitHub listed is an accepted one')
     return False
 
