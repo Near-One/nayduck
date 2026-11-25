@@ -1,6 +1,5 @@
 import base64
 import functools
-import logging
 import secrets
 import sys
 import time
@@ -29,7 +28,36 @@ __CHACHA = cryptography.hazmat.primitives.ciphers.aead.ChaCha20Poly1305(
 __CLIENT_ID = __CONFIG.take('github-client-id', str)
 __CLIENT_SECRET = __CONFIG.take('github-client-secret', str)
 
-log = logging.getLogger("backend")
+# Organisations whose members are allowed to schedule, cancel and retry runs.
+_ORGANISATIONS = ('near', 'nearprotocol')
+
+# Number of organisations to request from GitHub at a time.  100 is the most
+# GitHub allows.
+_ORGANISATIONS_PER_PAGE = 100
+
+# Timeout, in seconds, of a single request to GitHub.  The requests are made
+# while handling a request from the user so they must not hang.
+_GITHUB_TIMEOUT = 10
+
+
+class GitHubUnavailable(Exception):
+    """GitHub gave no usable answer (network error, time out, server error).
+
+    The failure says nothing about the user or their token and repeating the
+    request later may succeed.
+    """
+
+
+class GitHubRejected(Exception):
+    """GitHub refused the request with a 4xx status.
+
+    This is what happens when the token has expired or has been revoked.
+    """
+
+
+def _log(message: str) -> None:
+    """Prints a message to the service's log."""
+    print(f'auth: {message}', file=sys.stderr, flush=True)
 
 
 def _github(token: str, path: str) -> typing.Any:
@@ -40,29 +68,91 @@ def _github(token: str, path: str) -> typing.Any:
         path: API path.
     Returns:
         A JSON response sent by GitHub.
+    Raises:
+        GitHubUnavailable: if GitHub could not be reached, did not respond in
+            time, responded with a 5xx status or with a 200 status and
+            a malformed body.
+        GitHubRejected: if GitHub responded with any other non-200 status.
     """
     headers = {
         'accept': 'application/vnd.github.v3+json',
         'authorization': f'token {token}',
     }
-    return requests.get(f'https://api.github.com{path}', headers=headers).json()
+    try:
+        res = requests.get(f'https://api.github.com{path}',
+                           headers=headers,
+                           timeout=_GITHUB_TIMEOUT)
+    except requests.RequestException as ex:
+        raise GitHubUnavailable(type(ex).__name__) from ex
+    if res.status_code >= 500:
+        raise GitHubUnavailable(f'HTTP {res.status_code}')
+    try:
+        data = res.json()
+    except ValueError as ex:
+        if res.status_code != 200:
+            raise GitHubRejected(f'HTTP {res.status_code}') from ex
+        raise GitHubUnavailable('HTTP 200 with malformed body') from ex
+    if res.status_code != 200:
+        message = data.get('message') if isinstance(data, dict) else None
+        raise GitHubRejected(f'HTTP {res.status_code}: {message}')
+    return data
 
 
-def _verify_organisations(token: str) -> bool:
+def _list_organisations(token: str) -> typing.Iterator[str]:
+    """Yields logins of all the organisations the user is a member of.
+
+    Reads the list page by page so the caller can stop reading as soon as it
+    finds what it looks for.
+
+    Args:
+        token: GitHub authorisation token.
+    Raises:
+        GitHubUnavailable: if GitHub gave no usable answer.  See _github.
+        GitHubRejected: if GitHub refused the request.  See _github.
+    """
+    page = 1
+    while True:
+        path = f'/user/orgs?per_page={_ORGANISATIONS_PER_PAGE}&page={page}'
+        orgs = _github(token, path)
+        if not isinstance(orgs, list):
+            raise GitHubUnavailable('unexpected response')
+        for org in orgs:
+            if not isinstance(org, dict) or not isinstance(
+                    org.get('login'), str):
+                raise GitHubUnavailable('unexpected response')
+            yield org['login']
+        if len(orgs) < _ORGANISATIONS_PER_PAGE:
+            return
+        page += 1
+
+
+def _verify_organisations(login: str, token: str) -> bool:
     """Verifies that user authorised with given token is in required org.
 
     Args:
+        login: User's GitHub login name; used for logging only.
         token: GitHub authorisation token.
     Returns:
         Whether user authorised with given GitHub token is in one of the
         required organisations.
+    Raises:
+        GitHubUnavailable: if GitHub gave no usable answer.  See _github.
     """
+    count = 0
     try:
-        for org in _github(token, '/user/orgs'):
-            if org['login'] in ('near', 'nearprotocol'):
+        for org in _list_organisations(token):
+            if org in _ORGANISATIONS:
+                _log(f'{login}: authorised; member of {org}')
                 return True
-    except Exception:
-        traceback.print_exc()
+            count += 1
+    except GitHubRejected as ex:
+        _log(f'{login}: not authorised; GitHub refused the token ({ex})')
+        return False
+    except GitHubUnavailable as ex:
+        _log(f'{login}: membership unknown; GitHub unavailable ({ex})')
+        raise
+    _log(f'{login}: not authorised; none of the {count} organisations '
+         'GitHub listed is an accepted one')
     return False
 
 
@@ -247,12 +337,13 @@ class AuthCode:
              authorisation code.
         Raises:
             ValueError: If GitHub token does not start with "gho_".
+            GitHubUnavailable: If GitHub gave no usable answer about user's
+                organisations.
         """
         if not token.startswith('gho_'):
-            raise ValueError(
-                f'Expected GitHub token "{token}" to start with "gho_".')
+            raise ValueError('Expected GitHub token to start with "gho_".')
         return cls(login=login,
-                   is_authorised=_verify_organisations(token),
+                   is_authorised=_verify_organisations(login, token),
                    last_check=int(time.time()),
                    token=token)
 
@@ -267,8 +358,13 @@ class AuthCode:
         """
         now = int(time.time())
         if self.__last_check < now - 24 * 3600:
+            try:
+                is_authorised = _verify_organisations(self.__login,
+                                                      self.__token)
+            except GitHubUnavailable:
+                return self.__is_authorised
             self.__last_check = now
-            self.__is_authorised = _verify_organisations(self.__token)
+            self.__is_authorised = is_authorised
             self.__code = self.__format_code()
         return self.__is_authorised
 
@@ -348,23 +444,30 @@ def get_code(state: typing.Optional[str],
         'client_secret': __CLIENT_SECRET,
         'code': code
     }
-    res = requests.post('https://github.com/login/oauth/access_token',
-                        params=params,
-                        headers={'accept': 'application/json'})
+    unavailable = 'GitHub is unavailable; try again later'
+    try:
+        res = requests.post('https://github.com/login/oauth/access_token',
+                            params=params,
+                            headers={'accept': 'application/json'},
+                            timeout=_GITHUB_TIMEOUT)
+    except requests.RequestException as ex:
+        _log(f'login: GitHub unavailable ({type(ex).__name__})')
+        raise AuthFailed(unavailable) from ex
     if res.status_code != 200:
-        log.info(f'GitHub replied with {res.status_code}:\n{res.text}',
-                 file=sys.stderr)
+        _log(f'login: GitHub replied with {res.status_code}:\n{res.text}')
         raise AuthFailed(f'GitHub rejected the request ({res.status_code})')
 
     try:
         token = res.json()['access_token']
         assert token.startswith('gho_')
         login = _github(token, '/user')['login']
+        return AuthCode.for_user(login=login, token=token), is_web
+    except GitHubUnavailable as ex:
+        _log(f'login: GitHub unavailable ({ex})')
+        raise AuthFailed(unavailable) from ex
     except Exception as ex:
         traceback.print_exc()
         raise AuthFailed('GitHub rejected the code') from ex
-
-    return AuthCode.for_user(login=login, token=token), is_web
 
 
 def add_cookie(response: werkzeug.wrappers.Response, code: str) -> None:
@@ -391,9 +494,12 @@ def authorised(
         code = AuthCode.from_request(flask.request)
         old_code_str = code.code
         if not code.verify():
-            _unauthorised(f'You ({code.login}) are not a member of Near or '
-                          'Near Protocol organisation or you have revoked '
-                          'GitHub authorisation for NayDuck.')
+            _log(f'{code.login}: request to {flask.request.path} is not '
+                 'authorised')
+            raise _unauthorised(
+                f'You ({code.login}) are not a member of Near or '
+                'Near Protocol organisation or you have '
+                'revoked GitHub authorisation for NayDuck.')
         response = flask.make_response(handler(code.login, *args, **kw))
         if code.code != old_code_str:
             add_cookie(response, code.code)
