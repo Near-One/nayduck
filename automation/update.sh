@@ -47,7 +47,9 @@ sudo -u nayduck /bin/sh -c "
 	if $has_ui; then
 		cd frontend
 		npm install -U
-		npm run build
+		# react-scripts 3 builds with webpack 4, which hashes with MD4.
+		# OpenSSL 3 (Node 17 and newer) allows MD4 only with this option.
+		NODE_OPTIONS=--openssl-legacy-provider npm run build
 	fi
 "
 
