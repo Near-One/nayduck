@@ -72,8 +72,7 @@ def _github(token: str, path: str) -> typing.Any:
         GitHubUnavailable: if GitHub could not be reached, did not respond in
             time, responded with a 5xx status or with a 200 status and
             a malformed body.
-        GitHubRejected: if GitHub responded with any other non-200 status,
-            whatever the body.
+        GitHubRejected: if GitHub responded with any other non-200 status.
     """
     headers = {
         'accept': 'application/vnd.github.v3+json',
