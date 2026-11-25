@@ -464,9 +464,10 @@ def authorised(
         if not code.verify():
             _log(f'{code.login}: request to {flask.request.path} is not '
                  'authorised')
-            _unauthorised(f'You ({code.login}) are not a member of Near or '
-                          'Near Protocol organisation or you have revoked '
-                          'GitHub authorisation for NayDuck.')
+            raise _unauthorised(
+                f'You ({code.login}) are not a member of Near or '
+                'Near Protocol organisation or you have '
+                'revoked GitHub authorisation for NayDuck.')
         response = flask.make_response(handler(code.login, *args, **kw))
         if code.code != old_code_str:
             add_cookie(response, code.code)
